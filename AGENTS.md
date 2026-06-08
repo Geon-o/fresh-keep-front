@@ -19,8 +19,11 @@ Whenever the user requests to push changes to GitHub (e.g., "깃허브에 push �
    - *Example*: `feat: 냉장고 칸 내부 세로 스크롤 기능 추가`
    - *Example*: `fix: 기타 카테고리 텍스트 투명화 버그 수정`
 
-3. **Staging & Push Sequence**: Run the following git commands sequentially:
+3. **User Approval Required (CRITICAL)**: You MUST present the proposed commit message to the user and obtain their explicit approval (e.g., "승인해줘", "진행해") before executing any commit or push commands. **Never execute them automatically.**
+
+4. **Staging & Push Sequence**: After receiving user approval, run the following git commands sequentially:
    - `git add .`
    - `git commit -m '<type>: <한국어 설명>'` (use single quotes in PowerShell to prevent escaping issues)
    - `git push origin main` (or push to the active branch)
+
 
