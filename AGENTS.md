@@ -19,7 +19,10 @@ Whenever the user requests to push changes to GitHub (e.g., "깃허브에 push �
    - *Example*: `feat: 냉장고 칸 내부 세로 스크롤 기능 추가`
    - *Example*: `fix: 기타 카테고리 텍스트 투명화 버그 수정`
 
-3. **User Approval Required (CRITICAL)**: You MUST present the proposed commit message to the user and obtain their explicit approval (e.g., "승인해줘", "진행해") before executing any commit or push commands. **Never execute them automatically.**
+3. **User Approval Required (CRITICAL)**:
+   - You MUST present the proposed commit message to the user and obtain their explicit approval via a direct chat question (e.g., "이 메시지로 커밋 및 푸시를 진행할까요?") before running any `git commit` or `git push` commands.
+   - **Vague words like "진행해" (Proceed) must NEVER be interpreted as git approval unless the immediate preceding text from the agent was a clear proposal to commit/push.** If in doubt, ask in plain text for explicit confirmation.
+   - **Never run git command tools automatically.** They must be proposed only after written agreement in the chat.
 
 4. **Staging & Push Sequence**: After receiving user approval, run the following git commands sequentially:
    - `git add .`
