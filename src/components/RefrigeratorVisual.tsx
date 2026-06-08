@@ -3,15 +3,18 @@ import { StyleSheet, TouchableOpacity, View, Text, Modal } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FridgeType, Ingredient } from '../types';
 import { SAMPLE_INGREDIENTS, CATEGORY_EMOJI } from './CompartmentDetail';
+import RefrigeratorSelector from './RefrigeratorSelector';
 
 interface RefrigeratorVisualProps {
-  type: FridgeType;
+  type: FridgeType | null;
   onPressCompartment: (id: string, label: string) => void;
   onReset: () => void;
+  onSelectType: (type: FridgeType) => void;
 }
 
-export default function RefrigeratorVisual({ type, onPressCompartment, onReset }: RefrigeratorVisualProps) {
+export default function RefrigeratorVisual({ type, onPressCompartment, onReset, onSelectType }: RefrigeratorVisualProps) {
   const [menuVisible, setMenuVisible] = useState(false);
+  const [selectorVisible, setSelectorVisible] = useState(false);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
 
   useEffect(() => {
@@ -182,12 +185,58 @@ export default function RefrigeratorVisual({ type, onPressCompartment, onReset }
         </TouchableOpacity>
       </View>
 
-      {/* 냉장고 레이아웃 */}
+      {/* 냉장고 레이아웃 및 추가 버튼 */}
       <View style={styles.fridgeWrapper}>
-        {type === 'four-door' && renderFourDoor()}
-        {type === 'side-by-side' && renderSideBySide()}
-        {type === 'two-door' && renderTwoDoor()}
+        {type === null ? (
+          <TouchableOpacity
+            style={styles.addFridgeBox}
+            activeOpacity={0.8}
+            onPress={() => setSelectorVisible(true)}
+          >
+            <View style={styles.addIconCircle}>
+              <Text style={styles.addIconText}>+</Text>
+            </View>
+            <Text style={styles.addFridgeTitle}>냉장고 추가</Text>
+            <Text style={styles.addFridgeDesc}>새로운 냉장고 타입을 설정하고 관리를 시작하세요</Text>
+          </TouchableOpacity>
+        ) : (
+          <>
+            {type === 'four-door' && renderFourDoor()}
+            {type === 'side-by-side' && renderSideBySide()}
+            {type === 'two-door' && renderTwoDoor()}
+          </>
+        )}
       </View>
+
+      {/* 냉장고 추가/선택 모달 (바텀 시트 스타일) */}
+      <Modal
+        visible={selectorVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectorVisible(false)}
+      >
+        <View style={styles.selectorModalOverlay}>
+          <TouchableOpacity
+            style={styles.backdrop}
+            activeOpacity={1}
+            onPress={() => setSelectorVisible(false)}
+          />
+          <View style={styles.selectorModalContent}>
+            <View style={styles.selectorModalHeader}>
+              <Text style={styles.selectorModalTitle}>냉장고 형태 설정</Text>
+              <TouchableOpacity onPress={() => setSelectorVisible(false)} style={styles.selectorCloseButton}>
+                <Text style={styles.selectorCloseButtonText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <RefrigeratorSelector
+              onSelect={(selectedType) => {
+                onSelectType(selectedType);
+                setSelectorVisible(false);
+              }}
+            />
+          </View>
+        </View>
+      </Modal>
 
       {/* 사이드 서랍 메뉴 모달 */}
       <Modal
@@ -437,5 +486,83 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#9E9E9E',
+  },
+  addFridgeBox: {
+    width: '85%',
+    height: '70%',
+    maxHeight: 450,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#3F51B5',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  addIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#E8EAF6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  addIconText: {
+    fontSize: 32,
+    color: '#3F51B5',
+    fontWeight: '300',
+  },
+  addFridgeTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#37474F',
+    marginBottom: 8,
+  },
+  addFridgeDesc: {
+    fontSize: 13,
+    color: '#90A4AE',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  selectorModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  selectorModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '90%',
+    paddingBottom: 24,
+  },
+  selectorModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ECEFF1',
+  },
+  selectorModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#37474F',
+  },
+  selectorCloseButton: {
+    padding: 6,
+  },
+  selectorCloseButtonText: {
+    fontSize: 20,
+    color: '#757575',
+    fontWeight: 'bold',
   },
 });
