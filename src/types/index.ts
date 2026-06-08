@@ -24,6 +24,7 @@ export interface Ingredient {
   quantity: number;
   unit: string;
   memo?: string;
+  fridgeId?: string; // 연결된 냉장고 식별 ID
 }
 
 export interface Recipe {

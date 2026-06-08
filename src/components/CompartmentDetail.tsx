@@ -7,6 +7,7 @@ interface CompartmentDetailProps {
   compartmentId: string;
   compartmentLabel: string;
   onBack: () => void;
+  fridgeId: string;
 }
 
 // 특정 칸별 샘플 식재료 데이터 (디자인 테스트용 모의 데이터)
@@ -76,7 +77,7 @@ const CATEGORIES: { key: IngredientCategory; label: string; emoji: string }[] = 
   { key: 'etc', label: '기타', emoji: '' },
 ];
 
-export default function CompartmentDetail({ compartmentId, compartmentLabel, onBack }: CompartmentDetailProps) {
+export default function CompartmentDetail({ compartmentId, compartmentLabel, onBack, fridgeId }: CompartmentDetailProps) {
   // 선반 동적 배열 상태 관리
   const [insideShelves, setInsideShelves] = useState<{ id: string; label: string }[]>([
     { id: 'shelf_1', label: '선반 1단' },
@@ -117,8 +118,8 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
   useEffect(() => {
     const loadData = async () => {
       try {
-        // 1. 선반 구성 불러오기
-        const configStr = await AsyncStorage.getItem(`@shelf_config_${compartmentId}`);
+        // 1. 선반 구성 불러오기 (냉장고 ID별 네임스페이스 적용)
+        const configStr = await AsyncStorage.getItem(`@shelf_config_${fridgeId}_${compartmentId}`);
         let currentInside = insideShelves;
         let currentDoor = doorShelves;
         let currentHasDoor = hasDoorStorage;
@@ -140,27 +141,27 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
         } else {
           // 기본값 세팅 저장
           const config = { insideShelves, doorShelves, hasDoorStorage };
-          await AsyncStorage.setItem(`@shelf_config_${compartmentId}`, JSON.stringify(config));
+          await AsyncStorage.setItem(`@shelf_config_${fridgeId}_${compartmentId}`, JSON.stringify(config));
         }
 
         // 2. 전체 식재료 불러오기 및 필터링
         const ingredientsStr = await AsyncStorage.getItem('@ingredients');
         if (ingredientsStr) {
           const allIngredients: Ingredient[] = JSON.parse(ingredientsStr);
-          const filtered = allIngredients.filter(item => item.location === compartmentId);
+          const filtered = allIngredients.filter(item => item.fridgeId === fridgeId && item.location === compartmentId);
           setIngredients(filtered);
         } else {
-          // 처음 구동 시 SAMPLE_INGREDIENTS를 기본값으로 합쳐서 저장
-          const allSamples = Object.values(SAMPLE_INGREDIENTS).flat();
+          // 처음 구동 시 SAMPLE_INGREDIENTS를 기본값으로 합쳐서 저장 (현재 냉장고 ID 부여)
+          const allSamples = Object.values(SAMPLE_INGREDIENTS).flat().map(item => ({ ...item, fridgeId }));
           await AsyncStorage.setItem('@ingredients', JSON.stringify(allSamples));
-          setIngredients(SAMPLE_INGREDIENTS[compartmentId] || []);
+          setIngredients(SAMPLE_INGREDIENTS[compartmentId]?.map(item => ({ ...item, fridgeId })) || []);
         }
       } catch (e) {
         console.error('Failed to load data', e);
       }
     };
     loadData();
-  }, [compartmentId]);
+  }, [compartmentId, fridgeId]);
 
   // 선반 구성 저장 헬퍼
   const saveShelfConfig = async (
@@ -170,7 +171,7 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
   ) => {
     try {
       const config = { insideShelves: inside, doorShelves: door, hasDoorStorage: hasDoor };
-      await AsyncStorage.setItem(`@shelf_config_${compartmentId}`, JSON.stringify(config));
+      await AsyncStorage.setItem(`@shelf_config_${fridgeId}_${compartmentId}`, JSON.stringify(config));
     } catch (e) {
       console.error('Failed to save shelf config', e);
     }
@@ -184,11 +185,12 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
       if (ingredientsStr) {
         allIngredients = JSON.parse(ingredientsStr);
       } else {
-        allIngredients = Object.values(SAMPLE_INGREDIENTS).flat();
+        const allSamples = Object.values(SAMPLE_INGREDIENTS).flat().map(item => ({ ...item, fridgeId }));
+        allIngredients = allSamples;
       }
       
-      // 현재 compartmentId의 식재료 제거 후 업데이트
-      allIngredients = allIngredients.filter(item => item.location !== compartmentId);
+      // 현재 compartmentId 및 fridgeId의 식재료만 필터링하여 제거 후 업데이트
+      allIngredients = allIngredients.filter(item => !(item.fridgeId === fridgeId && item.location === compartmentId));
       allIngredients = [...allIngredients, ...currentIngredients];
       
       await AsyncStorage.setItem('@ingredients', JSON.stringify(allIngredients));
@@ -307,6 +309,7 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
         quantity: formQuantity,
         unit: formUnit,
         memo: formMemo.trim() || undefined,
+        fridgeId, // 냉장고 ID 연동!
       };
       updatedIngredients = [...ingredients, newIngredient];
       setIngredients(updatedIngredients);

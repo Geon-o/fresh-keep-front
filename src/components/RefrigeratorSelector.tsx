@@ -21,7 +21,10 @@ export default function RefrigeratorSelector({ onSelect }: RefrigeratorSelectorP
       <View style={styles.cardContainer}>
         {/* 4문형 */}
         <TouchableOpacity
-          style={[styles.card, selected === 'four-door' && styles.cardSelected]}
+          style={{
+            ...styles.card,
+            ...(selected === 'four-door' ? styles.cardSelected : {}),
+          }}
           activeOpacity={0.8}
           onPress={() => setSelected('four-door')}
         >
@@ -42,7 +45,10 @@ export default function RefrigeratorSelector({ onSelect }: RefrigeratorSelectorP
 
         {/* 양문형 */}
         <TouchableOpacity
-          style={[styles.card, selected === 'side-by-side' && styles.cardSelected]}
+          style={{
+            ...styles.card,
+            ...(selected === 'side-by-side' ? styles.cardSelected : {}),
+          }}
           activeOpacity={0.8}
           onPress={() => setSelected('side-by-side')}
         >
@@ -59,7 +65,10 @@ export default function RefrigeratorSelector({ onSelect }: RefrigeratorSelectorP
 
         {/* 일반 2문형 */}
         <TouchableOpacity
-          style={[styles.card, selected === 'two-door' && styles.cardSelected]}
+          style={{
+            ...styles.card,
+            ...(selected === 'two-door' ? styles.cardSelected : {}),
+          }}
           activeOpacity={0.8}
           onPress={() => setSelected('two-door')}
         >
