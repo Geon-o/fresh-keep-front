@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, TouchableOpacity, View, Text, ScrollView, Platform, Alert, TextInput, Modal } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ingredient, IngredientCategory } from '../types';
+import { useAuth } from '../context/AuthContext';
+import { getFridgeLayout } from '../api/fridgeService';
+import { addIngredient, updateIngredient, deleteIngredient } from '../api/ingredientService';
+import { serializeMemo, deserializeMemo } from '../utils/memoSerializer';
 
 interface CompartmentDetailProps {
   compartmentId: string;
@@ -78,6 +82,9 @@ const CATEGORIES: { key: IngredientCategory; label: string; emoji: string }[] = 
 ];
 
 export default function CompartmentDetail({ compartmentId, compartmentLabel, onBack, fridgeId }: CompartmentDetailProps) {
+  const { isLoggedIn } = useAuth();
+  const [serverCompartmentId, setServerCompartmentId] = useState<number | null>(null);
+
   // 선반 동적 배열 상태 관리
   const [insideShelves, setInsideShelves] = useState<{ id: string; label: string }[]>([
     { id: 'shelf_1', label: '선반 1단' },
@@ -114,54 +121,82 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
   const [formExpiryDate, setFormExpiryDate] = useState('');
   const [formMemo, setFormMemo] = useState('');
 
-  // AsyncStorage에서 데이터 불러오기
+  // 선반 구성 및 식재료 불러오기 (서버 vs 로컬 분기)
   useEffect(() => {
     const loadData = async () => {
       try {
-        // 1. 선반 구성 불러오기 (냉장고 ID별 네임스페이스 적용)
+        // 1. 선반 구성 불러오기 (레이아웃 설정은 로컬 설정을 활용)
         const configStr = await AsyncStorage.getItem(`@shelf_config_${fridgeId}_${compartmentId}`);
-        let currentInside = insideShelves;
-        let currentDoor = doorShelves;
-        let currentHasDoor = hasDoorStorage;
-
         if (configStr) {
           const config = JSON.parse(configStr);
-          if (config.insideShelves) {
-            setInsideShelves(config.insideShelves);
-            currentInside = config.insideShelves;
-          }
-          if (config.doorShelves) {
-            setDoorShelves(config.doorShelves);
-            currentDoor = config.doorShelves;
-          }
-          if (config.hasDoorStorage !== undefined) {
-            setHasDoorStorage(config.hasDoorStorage);
-            currentHasDoor = config.hasDoorStorage;
-          }
+          if (config.insideShelves) setInsideShelves(config.insideShelves);
+          if (config.doorShelves) setDoorShelves(config.doorShelves);
+          if (config.hasDoorStorage !== undefined) setHasDoorStorage(config.hasDoorStorage);
         } else {
-          // 기본값 세팅 저장
-          const config = { insideShelves, doorShelves, hasDoorStorage };
+          const config = { insideShelves: insideShelves, doorShelves: doorShelves, hasDoorStorage: hasDoorStorage };
           await AsyncStorage.setItem(`@shelf_config_${fridgeId}_${compartmentId}`, JSON.stringify(config));
         }
 
-        // 2. 전체 식재료 불러오기 및 필터링
-        const ingredientsStr = await AsyncStorage.getItem('@ingredients');
-        if (ingredientsStr) {
-          const allIngredients: Ingredient[] = JSON.parse(ingredientsStr);
-          const filtered = allIngredients.filter(item => item.fridgeId === fridgeId && item.location === compartmentId);
-          setIngredients(filtered);
+        // 2. 식재료 로드
+        if (isLoggedIn) {
+          // 서버에서 해당 냉장고 레이아웃 정보 로드 후 매핑
+          const layout = await getFridgeLayout(Number(fridgeId));
+          
+          // compartmentId 매칭 구획 찾기
+          const serverComp = layout.compartments.find(comp => {
+            const isLeft = compartmentId.includes('left');
+            const isRight = compartmentId.includes('right');
+            if (compartmentId.startsWith('freezer')) {
+              if (comp.storageType !== 'FROZEN') return false;
+            } else {
+              if (comp.storageType !== 'REFRIGERATED') return false;
+            }
+            if (isLeft && !comp.name.includes('좌')) return false;
+            if (isRight && !comp.name.includes('우')) return false;
+            return true;
+          });
+
+          if (serverComp) {
+            setServerCompartmentId(serverComp.id);
+            const mapped = serverComp.ingredients.map(ing => {
+              const deserialized = deserializeMemo(ing.memo);
+              return {
+                id: String(ing.id),
+                name: ing.name,
+                location: compartmentId,
+                subLocation: deserialized.subLocation as any,
+                category: deserialized.category,
+                expiryDate: ing.expirationDate,
+                quantity: ing.quantity,
+                unit: ing.unit,
+                memo: deserialized.memo || undefined,
+                fridgeId: String(fridgeId),
+              };
+            });
+            setIngredients(mapped);
+          } else if (layout.compartments.length > 0) {
+            // 매칭 실패 시 첫 번째 구획 사용
+            setServerCompartmentId(layout.compartments[0].id);
+          }
         } else {
-          // 처음 구동 시 SAMPLE_INGREDIENTS를 기본값으로 합쳐서 저장 (현재 냉장고 ID 부여)
-          const allSamples = Object.values(SAMPLE_INGREDIENTS).flat().map(item => ({ ...item, fridgeId }));
-          await AsyncStorage.setItem('@ingredients', JSON.stringify(allSamples));
-          setIngredients(SAMPLE_INGREDIENTS[compartmentId]?.map(item => ({ ...item, fridgeId })) || []);
+          // 로컬 로드
+          const ingredientsStr = await AsyncStorage.getItem('@ingredients');
+          if (ingredientsStr) {
+            const allIngredients: Ingredient[] = JSON.parse(ingredientsStr);
+            const filtered = allIngredients.filter(item => item.fridgeId === fridgeId && item.location === compartmentId);
+            setIngredients(filtered);
+          } else {
+            const allSamples = Object.values(SAMPLE_INGREDIENTS).flat().map(item => ({ ...item, fridgeId }));
+            await AsyncStorage.setItem('@ingredients', JSON.stringify(allSamples));
+            setIngredients(SAMPLE_INGREDIENTS[compartmentId]?.map(item => ({ ...item, fridgeId })) || []);
+          }
         }
       } catch (e) {
         console.error('Failed to load data', e);
       }
     };
     loadData();
-  }, [compartmentId, fridgeId]);
+  }, [compartmentId, fridgeId, isLoggedIn]);
 
   // 선반 구성 저장 헬퍼
   const saveShelfConfig = async (
@@ -275,7 +310,7 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
   };
 
   // 식재료 저장 (추가/수정 공용)
-  const handleSaveIngredient = () => {
+  const handleSaveIngredient = async () => {
     if (!formName.trim()) {
       if (Platform.OS === 'web') {
         window.alert('식재료 이름을 입력해주세요.');
@@ -296,44 +331,105 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
       return;
     }
 
-    let updatedIngredients = [...ingredients];
+    const memoContent = serializeMemo(formCategory, selectedShelfId, formMemo);
 
-    if (modalMode === 'add') {
-      const newIngredient: Ingredient = {
-        id: `ing_${Date.now()}`,
-        name: formName.trim(),
-        location: compartmentId,
-        subLocation: selectedShelfId as any,
-        category: formCategory,
-        expiryDate: formExpiryDate,
-        quantity: formQuantity,
-        unit: formUnit,
-        memo: formMemo.trim() || undefined,
-        fridgeId, // 냉장고 ID 연동!
-      };
-      updatedIngredients = [...ingredients, newIngredient];
-      setIngredients(updatedIngredients);
+    if (isLoggedIn) {
+      try {
+        if (modalMode === 'add') {
+          if (!serverCompartmentId) {
+            throw new Error('서버 구획 ID를 로드하지 못했습니다.');
+          }
+          const savedIng = await addIngredient({
+            compartmentId: serverCompartmentId,
+            name: formName.trim(),
+            quantity: Number(formQuantity),
+            unit: formUnit,
+            expirationDate: formExpiryDate,
+            memo: memoContent,
+          });
+          
+          const newIngredient: Ingredient = {
+            id: String(savedIng.id),
+            name: savedIng.name,
+            location: compartmentId,
+            subLocation: selectedShelfId as any,
+            category: formCategory,
+            expiryDate: savedIng.expirationDate,
+            quantity: savedIng.quantity,
+            unit: savedIng.unit,
+            memo: formMemo.trim() || undefined,
+            fridgeId,
+          };
+          setIngredients([...ingredients, newIngredient]);
+        } else {
+          if (!selectedIngredientId) return;
+          const updatedIng = await updateIngredient(Number(selectedIngredientId), {
+            name: formName.trim(),
+            quantity: Number(formQuantity),
+            unit: formUnit,
+            expirationDate: formExpiryDate,
+            memo: memoContent,
+          });
+
+          setIngredients(ingredients.map(item =>
+            item.id === selectedIngredientId
+              ? {
+                  ...item,
+                  name: updatedIng.name,
+                  category: formCategory,
+                  expiryDate: updatedIng.expirationDate,
+                  quantity: updatedIng.quantity,
+                  unit: updatedIng.unit,
+                  memo: formMemo.trim() || undefined,
+                }
+              : item
+          ));
+        }
+      } catch (e) {
+        console.error('Failed to save ingredient to server', e);
+        Alert.alert('오류 ⚠️', '서버에 식재료를 저장하지 못했습니다.');
+        return;
+      }
     } else {
-      updatedIngredients = ingredients.map(item =>
-        item.id === selectedIngredientId
-          ? {
-              ...item,
-              name: formName.trim(),
-              category: formCategory,
-              expiryDate: formExpiryDate,
-              quantity: formQuantity,
-              unit: formUnit,
-              memo: formMemo.trim() || undefined,
-            }
-          : item
-      );
-      setIngredients(updatedIngredients);
+      let updatedIngredients = [...ingredients];
+
+      if (modalMode === 'add') {
+        const newIngredient: Ingredient = {
+          id: `ing_${Date.now()}`,
+          name: formName.trim(),
+          location: compartmentId,
+          subLocation: selectedShelfId as any,
+          category: formCategory,
+          expiryDate: formExpiryDate,
+          quantity: formQuantity,
+          unit: formUnit,
+          memo: formMemo.trim() || undefined,
+          fridgeId,
+        };
+        updatedIngredients = [...ingredients, newIngredient];
+        setIngredients(updatedIngredients);
+      } else {
+        updatedIngredients = ingredients.map(item =>
+          item.id === selectedIngredientId
+            ? {
+                ...item,
+                name: formName.trim(),
+                category: formCategory,
+                expiryDate: formExpiryDate,
+                quantity: formQuantity,
+                unit: formUnit,
+                memo: formMemo.trim() || undefined,
+              }
+            : item
+        );
+        setIngredients(updatedIngredients);
+      }
+
+      await saveIngredients(updatedIngredients);
     }
 
-    saveIngredients(updatedIngredients);
     setModalVisible(false);
     
-    // 추가/수정 완료 후 선반 상세 모달 다시 열기
     if (selectedShelfForDetail) {
       setTimeout(() => {
         setShelfDetailModalVisible(true);
@@ -343,13 +439,25 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
 
   // 식재료 개별 삭제
   const handleRemoveIngredient = (id: string) => {
-    const performRemove = () => {
-      const updated = ingredients.filter(item => item.id !== id);
-      setIngredients(updated);
-      saveIngredients(updated);
+    const performRemove = async () => {
+      if (isLoggedIn) {
+        try {
+          await deleteIngredient(Number(id));
+          const updated = ingredients.filter(item => item.id !== id);
+          setIngredients(updated);
+        } catch (e) {
+          console.error('Failed to delete ingredient from server', e);
+          Alert.alert('오류 ⚠️', '식재료 삭제에 실패했습니다.');
+          return;
+        }
+      } else {
+        const updated = ingredients.filter(item => item.id !== id);
+        setIngredients(updated);
+        saveIngredients(updated);
+      }
+
       setModalVisible(false);
       
-      // 삭제 후 선반 상세 모달 다시 열기
       if (selectedShelfForDetail) {
         setTimeout(() => {
           setShelfDetailModalVisible(true);
@@ -374,10 +482,22 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
 
   // 식재료 직접 삭제 (상세 페이지에서 ✕ 버튼 클릭 시 안내 후 삭제)
   const handleConfirmRemoveIngredientDirect = (id: string, name: string) => {
-    const performRemove = () => {
-      const updated = ingredients.filter(item => item.id !== id);
-      setIngredients(updated);
-      saveIngredients(updated);
+    const performRemove = async () => {
+      if (isLoggedIn) {
+        try {
+          await deleteIngredient(Number(id));
+          const updated = ingredients.filter(item => item.id !== id);
+          setIngredients(updated);
+        } catch (e) {
+          console.error('Failed to delete ingredient from server', e);
+          Alert.alert('오류 ⚠️', '식재료 삭제에 실패했습니다.');
+          return;
+        }
+      } else {
+        const updated = ingredients.filter(item => item.id !== id);
+        setIngredients(updated);
+        saveIngredients(updated);
+      }
     };
 
     if (Platform.OS === 'web') {
@@ -421,7 +541,7 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
   const handleDeleteShelf = (shelfId: string, label: string, section: 'inside' | 'door') => {
     const hasItems = getItemsBySubLocation(shelfId).length > 0;
 
-    const performDelete = () => {
+    const performDelete = async () => {
       let updatedInside = insideShelves;
       let updatedDoor = doorShelves;
 
@@ -435,9 +555,19 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
       saveShelfConfig(updatedInside, updatedDoor, hasDoorStorage);
 
       // 해당 선반에 있던 재료들도 함께 제거
+      const itemsToDelete = getItemsBySubLocation(shelfId);
+      if (isLoggedIn) {
+        try {
+          await Promise.all(itemsToDelete.map(item => deleteIngredient(Number(item.id))));
+        } catch (e) {
+          console.error('Failed to delete shelf items from server', e);
+        }
+      }
       const updatedIngredients = ingredients.filter(item => item.subLocation !== shelfId);
       setIngredients(updatedIngredients);
-      saveIngredients(updatedIngredients);
+      if (!isLoggedIn) {
+        saveIngredients(updatedIngredients);
+      }
     };
 
     if (hasItems) {
@@ -464,20 +594,27 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
     if (enable === hasDoorStorage) return;
 
     if (!enable) {
-      // 비활성화하려고 하는 경우: 문쪽 보관실에 식재료가 남아있는지 확인
       const doorShelvesIds = doorShelves.map(s => s.id);
       const hasItemsInDoor = ingredients.some(item => item.subLocation && doorShelvesIds.includes(item.subLocation));
 
-      const performDisable = () => {
+      const performDisable = async () => {
         setHasDoorStorage(false);
-        // 문쪽 보관실 선반 비우기
         setDoorShelves([]);
         saveShelfConfig(insideShelves, [], false);
 
-        // 문쪽에 있던 식재료들도 필터링하여 삭제
+        const itemsToDelete = ingredients.filter(item => item.subLocation && doorShelvesIds.includes(item.subLocation));
+        if (isLoggedIn) {
+          try {
+            await Promise.all(itemsToDelete.map(item => deleteIngredient(Number(item.id))));
+          } catch (e) {
+            console.error('Failed to delete door items from server', e);
+          }
+        }
         const updatedIngredients = ingredients.filter(item => !item.subLocation || !doorShelvesIds.includes(item.subLocation));
         setIngredients(updatedIngredients);
-        saveIngredients(updatedIngredients);
+        if (!isLoggedIn) {
+          saveIngredients(updatedIngredients);
+        }
       };
 
       if (hasItemsInDoor || doorShelves.length > 0) {

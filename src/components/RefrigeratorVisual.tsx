@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, TouchableOpacity, View, Text, Modal, ScrollView, useWindowDimensions, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
 import { FridgeType, Ingredient } from '../types';
 import { SAMPLE_INGREDIENTS, CATEGORY_EMOJI } from './CompartmentDetail';
 import RefrigeratorSelector from './RefrigeratorSelector';
+import { useAuth } from '../context/AuthContext';
+import { getFridgeLayout } from '../api/fridgeService';
+import { deserializeMemo, convertServerLocationToLocal } from '../utils/memoSerializer';
 
 interface RefrigeratorVisualProps {
   refrigerators: { id: string; type: FridgeType; name: string }[];
@@ -21,30 +25,64 @@ export default function RefrigeratorVisual({
   onDeleteFridge
 }: RefrigeratorVisualProps) {
   const { width: screenWidth } = useWindowDimensions();
+  const router = useRouter();
+  const { isLoggedIn, user, logout } = useAuth();
   const [menuVisible, setMenuVisible] = useState(false);
   const [selectorVisible, setSelectorVisible] = useState(false);
   const [selectorMode, setSelectorMode] = useState<'add' | 'edit'>('add');
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
 
-  // 식재료 실시간 로드
+  // 식재료 실시간 로드 (서버 vs 로컬 분기)
   useEffect(() => {
     const loadIngredients = async () => {
       try {
-        const ingredientsStr = await AsyncStorage.getItem('@ingredients');
-        if (ingredientsStr) {
-          setIngredients(JSON.parse(ingredientsStr));
+        if (isLoggedIn) {
+          // 각 냉장고의 레이아웃을 서버에서 로드
+          const promises = refrigerators.map(f => getFridgeLayout(Number(f.id)).catch(() => null));
+          const layouts = await Promise.all(promises);
+          const allIngredients: Ingredient[] = [];
+
+          layouts.forEach((layout, index) => {
+            if (!layout) return;
+            const fridge = refrigerators[index];
+            layout.compartments.forEach(comp => {
+              comp.ingredients.forEach(ing => {
+                // 백엔드 memo 필드 파싱 (카테고리 및 선반정보 역직렬화)
+                const deserialized = deserializeMemo(ing.memo);
+                allIngredients.push({
+                  id: String(ing.id),
+                  name: ing.name,
+                  location: convertServerLocationToLocal(comp.storageType, comp.name),
+                  subLocation: deserialized.subLocation as any,
+                  category: deserialized.category,
+                  expiryDate: ing.expirationDate,
+                  quantity: ing.quantity,
+                  unit: ing.unit,
+                  memo: deserialized.memo || undefined,
+                  fridgeId: fridge.id,
+                });
+              });
+            });
+          });
+          setIngredients(allIngredients);
         } else {
-          // 샘플 데이터 초기화
-          const allSamples = Object.values(SAMPLE_INGREDIENTS).flat();
-          setIngredients(allSamples);
+          // 로컬 로드
+          const ingredientsStr = await AsyncStorage.getItem('@ingredients');
+          if (ingredientsStr) {
+            setIngredients(JSON.parse(ingredientsStr));
+          } else {
+            // 샘플 데이터 초기화
+            const allSamples = Object.values(SAMPLE_INGREDIENTS).flat();
+            setIngredients(allSamples);
+          }
         }
       } catch (e) {
         console.error('Failed to load ingredients for visual', e);
       }
     };
     loadIngredients();
-  }, [menuVisible]); // 메뉴가 닫힐 때 혹은 열릴 때 최신 데이터 동기화
+  }, [menuVisible, refrigerators, isLoggedIn]);
 
   // 특정 냉장고의 칸 요약 뱃지 계산
   const getCompartmentSummary = (fridgeId: string, compartmentId: string) => {
@@ -366,7 +404,48 @@ export default function RefrigeratorVisual({
               </TouchableOpacity>
             </View>
 
-            <View style={styles.drawerBody}>
+             <View style={styles.drawerBody}>
+              {/* 사용자 인증 연동 */}
+              <View style={styles.userContainer}>
+                {isLoggedIn ? (
+                  <>
+                    <View style={styles.userProfile}>
+                      <Text style={styles.userEmoji}>👤</Text>
+                      <View>
+                        <Text style={styles.userName}>{user?.name || '사용자'}님</Text>
+                        <Text style={styles.userEmail}>{user?.email || ''}</Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.menuItem, { marginTop: 8 }]}
+                      activeOpacity={0.7}
+                      onPress={async () => {
+                        setMenuVisible(false);
+                        await logout();
+                      }}
+                    >
+                      <Text style={styles.menuItemText}>🔓 로그아웃</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.loginGuide}>로그인하고 여러 기기 동기화 기능을 이용해 보세요!</Text>
+                    <TouchableOpacity
+                      style={[styles.menuItem, styles.loginButton]}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        setMenuVisible(false);
+                        router.push('/login');
+                      }}
+                    >
+                      <Text style={styles.loginButtonText}>🔑 로그인하기</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </View>
+
+              <View style={styles.drawerDivider} />
+
               {activeFridge ? (
                 <>
                   <Text style={styles.drawerSectionLabel}>{activeFridge.name} 설정</Text>
@@ -721,5 +800,50 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#9E9E9E',
+  },
+  userContainer: {
+    padding: 4,
+    marginBottom: 4,
+  },
+  userProfile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 8,
+  },
+  userEmoji: {
+    fontSize: 22,
+    backgroundColor: '#F1F5F9',
+    padding: 6,
+    borderRadius: 18,
+    overflow: 'hidden',
+    textAlign: 'center',
+  },
+  userName: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#1E293B',
+  },
+  userEmail: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  loginGuide: {
+    fontSize: 12,
+    color: '#64748B',
+    marginBottom: 10,
+    lineHeight: 18,
+  },
+  loginButton: {
+    backgroundColor: '#6366F1',
+    borderColor: '#4F46E5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loginButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
