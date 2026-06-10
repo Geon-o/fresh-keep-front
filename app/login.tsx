@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
   header: {
     width: '100%',
     paddingHorizontal: 24,
-    paddingTop: 12,
+    paddingTop: 24,
     paddingBottom: 8,
     flexDirection: 'row',
     justifyContent: 'flex-start',
