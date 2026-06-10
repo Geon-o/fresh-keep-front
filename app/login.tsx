@@ -42,56 +42,57 @@ export default function LoginScreen() {
       <View style={styles.bgCircle2} />
 
       <View style={styles.content}>
-        {/* 앱 브랜딩 영역 */}
-        <View style={styles.brandContainer}>
-          <Text style={styles.logoText}>FRESHKEEP</Text>
-          <Text style={styles.subtitle}>스마트한 냉장고 식재료 관리 파트너</Text>
-        </View>
+        {/* 중앙 정렬용 그룹 래퍼 */}
+        <View style={styles.mainContainer}>
+          {/* 앱 브랜딩 영역 */}
+          <View style={styles.brandContainer}>
+            <Text style={styles.logoText}>FRESHKEEP</Text>
+            <Text style={styles.subtitle}>스마트한 냉장고 식재료 관리 파트너</Text>
+          </View>
 
-        {/* 소셜 로그인 카드 */}
-        <View style={styles.card}>
-          {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#6366F1" />
-              <Text style={styles.loadingText}>로그인 인증 처리 중...</Text>
-            </View>
-          ) : (
-            <View style={styles.buttonContainer}>
-              {/* 카카오 로그인 */}
-              <TouchableOpacity
-                style={styles.kakaoButton}
-                activeOpacity={0.85}
-                onPress={() => handleLogin('kakao')}
-              >
-                <Text style={styles.kakaoIcon}>💬</Text>
-                <Text style={styles.kakaoButtonText}>Kakao로 시작하기</Text>
-              </TouchableOpacity>
+          {/* 소셜 로그인 카드 */}
+          <View style={styles.card}>
+            {isLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#6366F1" />
+                <Text style={styles.loadingText}>로그인 인증 처리 중...</Text>
+              </View>
+            ) : (
+              <View style={styles.buttonContainer}>
+                {/* 카카오 로그인 */}
+                <TouchableOpacity
+                  style={styles.kakaoButton}
+                  activeOpacity={0.85}
+                  onPress={() => handleLogin('kakao')}
+                >
+                  <Text style={styles.kakaoIcon}>💬</Text>
+                  <Text style={styles.kakaoButtonText}>Kakao로 시작하기</Text>
+                </TouchableOpacity>
 
-              {/* 네이버 로그인 */}
-              <TouchableOpacity
-                style={styles.naverButton}
-                activeOpacity={0.85}
-                onPress={() => handleLogin('naver')}
-              >
-                <Text style={styles.naverIcon}>🍀</Text>
-                <Text style={styles.naverButtonText}>Naver로 시작하기</Text>
-              </TouchableOpacity>
+                {/* 네이버 로그인 */}
+                <TouchableOpacity
+                  style={styles.naverButton}
+                  activeOpacity={0.85}
+                  onPress={() => handleLogin('naver')}
+                >
+                  <Text style={styles.naverIcon}>🍀</Text>
+                  <Text style={styles.naverButtonText}>Naver로 시작하기</Text>
+                </TouchableOpacity>
 
-              {/* 구글 로그인 */}
-              <TouchableOpacity
-                style={styles.googleButton}
-                activeOpacity={0.85}
-                onPress={() => handleLogin('google')}
-              >
-                <Text style={styles.googleIcon}>🔑</Text>
-                <Text style={styles.googleButtonText}>Google로 시작하기</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
+                {/* 구글 로그인 */}
+                <TouchableOpacity
+                  style={styles.googleButton}
+                  activeOpacity={0.85}
+                  onPress={() => handleLogin('google')}
+                >
+                  <Text style={styles.googleIcon}>🔑</Text>
+                  <Text style={styles.googleButtonText}>Google로 시작하기</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
 
-        <View style={styles.footerContainer}>
-          {/* 돌아가기 버튼 (예전 건너뛰기 버튼 위치) */}
+          {/* 돌아가기 버튼 (로그인 카드 바로 아래 배치) */}
           <TouchableOpacity
             style={styles.backButton}
             activeOpacity={0.7}
@@ -105,7 +106,9 @@ export default function LoginScreen() {
           >
             <Text style={styles.backButtonText}>로그인하지 않고 돌아가기 〉</Text>
           </TouchableOpacity>
+        </View>
 
+        <View style={styles.footerContainer}>
           {/* 개발자용 테스트 로그인 버튼 */}
           <TouchableOpacity
             style={styles.devLoginButton}
@@ -144,10 +147,16 @@ const styles = StyleSheet.create({
     borderRadius: 150,
     backgroundColor: 'rgba(59, 130, 246, 0.04)', // 은은한 블루 글로우
   },
+  mainContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    width: '100%',
+  },
   backButton: {
     alignSelf: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    marginTop: 8, // 카드 바로 밑으로 왔을 때 밸런스를 위한 상단 마진
   },
   backButtonText: {
     fontSize: 13,
@@ -159,11 +168,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'space-between',
     paddingHorizontal: 24,
-    paddingVertical: 48, // 원래 여백 복원
+    paddingVertical: 24, // 세로 스페이스 밸런스 조정
   },
   brandContainer: {
     alignItems: 'center',
-    marginTop: 48, // 상단 헤더가 제거되었으므로 마진 복원
+    marginBottom: 28, // 로고와 카드 사이 적절한 거리
   },
   logoText: {
     fontSize: 36,
@@ -192,21 +201,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06, // 은은한 그림자
     shadowRadius: 16,
     elevation: 4,
-    marginVertical: 24,
-  },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#0F172A', // 다크 슬레이트
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  cardDesc: {
-    fontSize: 13,
-    color: '#64748B', // 미디움 슬레이트 그레이
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 28,
+    marginBottom: 8, // 카드와 돌아가기 버튼 사이 간격 최소화
   },
   loadingContainer: {
     alignItems: 'center',
