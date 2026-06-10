@@ -39,11 +39,28 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       
       {/* 백그라운드 디자인 서클 (디자인 완성도 향상) */}
       <View style={styles.bgCircle1} />
       <View style={styles.bgCircle2} />
+
+      {/* 상단 헤더 및 돌아가기 버튼 */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          activeOpacity={0.7}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/');
+            }
+          }}
+        >
+          <Text style={styles.backButtonText}>〈 돌아가기</Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.content}>
         {/* 앱 브랜딩 영역 */}
@@ -128,7 +145,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F172A', // 딥 메탈릭 네이비/슬레이트
+    backgroundColor: '#F8FAFC', // 깔끔한 슬레이트 화이트 (라이트 테마로 일치화)
   },
   bgCircle1: {
     position: 'absolute',
@@ -137,7 +154,7 @@ const styles = StyleSheet.create({
     width: 250,
     height: 250,
     borderRadius: 125,
-    backgroundColor: 'rgba(99, 102, 241, 0.12)', // 연한 인디고 서클
+    backgroundColor: 'rgba(99, 102, 241, 0.05)', // 은은한 인디고 글로우
   },
   bgCircle2: {
     position: 'absolute',
@@ -146,22 +163,40 @@ const styles = StyleSheet.create({
     width: 300,
     height: 300,
     borderRadius: 150,
-    backgroundColor: 'rgba(59, 130, 246, 0.1)', // 연한 블루 서클
+    backgroundColor: 'rgba(59, 130, 246, 0.04)', // 은은한 블루 글로우
+  },
+  header: {
+    width: '100%',
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 8,
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+  },
+  backButton: {
+    paddingVertical: 8,
+    paddingRight: 16,
+  },
+  backButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4F46E5', // 인디고 액션 컬러
   },
   content: {
     flex: 1,
     justifyContent: 'space-between',
     paddingHorizontal: 24,
-    paddingVertical: 48,
+    paddingVertical: 24, // 여백 조정
   },
   brandContainer: {
     alignItems: 'center',
-    marginTop: 60,
+    marginTop: 20, // 헤더 크기 대응 마진 축소
   },
   logoText: {
     fontSize: 36,
     fontWeight: '900',
-    color: '#F8FAFC',
+    color: '#0F172A', // 다크 슬레이트
     letterSpacing: 2,
     ...Platform.select({
       ios: { fontFamily: 'System' },
@@ -170,33 +205,33 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 14,
-    color: '#94A3B8',
+    color: '#475569', // 슬레이트 그레이
     marginTop: 8,
     fontWeight: '500',
   },
   card: {
-    backgroundColor: 'rgba(30, 41, 59, 0.7)', // 반투명 다크 그레이
+    backgroundColor: '#FFFFFF', // 깔끔한 화이트 카드
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: '#E2E8F0', // 연한 보더
     borderRadius: 24,
     padding: 28,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 8,
-    marginVertical: 40,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06, // 은은한 그림자
+    shadowRadius: 16,
+    elevation: 4,
+    marginVertical: 24,
   },
   cardTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#F8FAFC',
+    color: '#0F172A', // 다크 슬레이트
     textAlign: 'center',
     marginBottom: 12,
   },
   cardDesc: {
     fontSize: 13,
-    color: '#94A3B8',
+    color: '#64748B', // 미디움 슬레이트 그레이
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 28,
@@ -208,7 +243,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 13,
-    color: '#94A3B8',
+    color: '#64748B',
   },
   buttonContainer: {
     gap: 12,
@@ -244,7 +279,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
     borderWidth: 1,
@@ -288,7 +323,7 @@ const styles = StyleSheet.create({
   },
   skipButtonText: {
     fontSize: 13,
-    color: '#64748B', // 뮤트 실버 그레이
+    color: '#4F46E5', // 인디고 텍스트
     fontWeight: '600',
     textAlign: 'center',
   },
@@ -300,13 +335,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: '#F1F5F9', // 연한 회색 배경
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: '#E2E8F0',
   },
   devLoginButtonText: {
     fontSize: 12,
-    color: '#94A3B8',
+    color: '#475569',
     fontWeight: '600',
   },
 });
