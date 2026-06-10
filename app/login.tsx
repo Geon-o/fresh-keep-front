@@ -13,14 +13,22 @@ export default function LoginScreen() {
     const success = await login(provider);
     if (success) {
       // 로그인 성공 시 메인 대시보드로 이동
-      router.replace('/');
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/');
+      }
     }
   };
 
   const handleDeveloperLogin = async () => {
     const success = await loginAsDeveloper();
     if (success) {
-      router.replace('/');
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/');
+      }
     }
   };
 

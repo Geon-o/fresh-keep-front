@@ -101,6 +101,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // 딥링크 이벤트 감지 (예: 카카오톡 로그인 후 외부 브라우저를 통해 앱으로 복귀하는 케이스 대응)
+  useEffect(() => {
+    const handleDeepLink = async (event: { url: string }) => {
+      console.log('Authentication deep link event captured:', event.url);
+      try {
+        if (event.url && event.url.includes('oauth-callback')) {
+          const parsed = Linking.parse(event.url);
+          const accessToken = (parsed.queryParams?.accessToken || parsed.queryParams?.token) as string;
+          const refreshToken = parsed.queryParams?.refreshToken as string;
+
+          if (accessToken && refreshToken) {
+            console.log('Successfully extracted tokens from deep link URL. Committing authentication...');
+            setIsLoading(true);
+            await saveAuthTokens(accessToken, refreshToken);
+            await fetchUserProfile(accessToken);
+            
+            // 로그인 직후 데이터 마이그레이션 안내 띄우기
+            setTimeout(() => {
+              promptDataSync();
+            }, 600);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to process deep link authentication', e);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    // 포그라운드 상태에서의 리스너 등록
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+
+    // 백그라운드에서 완전히 꺼진 상태에서 딥링크를 통해 앱이 최초 켜진 경우 처리
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        handleDeepLink({ url });
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
   const handleForceLogout = () => {
     setIsLoggedIn(false);
     setUser(null);
@@ -112,6 +156,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchUserProfile = async (token: string) => {
     try {
       const response = await client.get<UserProfile>('/api/users/me');
+      
+      // 만약 응답 데이터가 객체가 아니거나, 이메일/이름 정보가 유효하지 않으면 (Spring Security 리다이렉트로 HTML을 받은 경우 등) 에러로 처리
+      if (!response.data || typeof response.data !== 'object' || (!response.data.email && !response.data.name)) {
+        throw new Error('Invalid user profile response (possibly redirected to HTML login page)');
+      }
+      
       setUser(response.data);
       setIsLoggedIn(true);
     } catch (e) {
@@ -152,6 +202,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // 인앱 브라우저 로그인 실행
       const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUrl);
+
+      // 브라우저 세션이 종료된 시점, 딥링크 이벤트 리스너를 통해 이미 로그인 처리가 완료되어 토큰이 존재하는지 확인
+      const { accessToken: checkedToken } = await getAuthTokens();
+      if (checkedToken) {
+        console.log('Authentication already completed successfully via deep link listener.');
+        return true;
+      }
 
       if (result.type === 'success' && result.url) {
         // 리다이렉트 결과 URL 파싱

@@ -1,25 +1,37 @@
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ACCESS_TOKEN_KEY = 'auth_access_token';
 const REFRESH_TOKEN_KEY = 'auth_refresh_token';
 
+const isWeb = Platform.OS === 'web';
+
 /**
- * 암호화 저장소(SecureStore)에 값을 비동기로 저장합니다.
+ * 암호화 저장소(SecureStore)에 값을 비동기로 저장합니다. 웹 환경인 경우 AsyncStorage를 사용합니다.
  */
 export async function saveSecureValue(key: string, value: string): Promise<void> {
   try {
-    await SecureStore.setItemAsync(key, value);
+    if (isWeb) {
+      await AsyncStorage.setItem(key, value);
+    } else {
+      await SecureStore.setItemAsync(key, value);
+    }
   } catch (error) {
     console.error(`Failed to save secure value for key [${key}]`, error);
   }
 }
 
 /**
- * 암호화 저장소(SecureStore)에서 값을 비동기로 조회합니다.
+ * 암호화 저장소(SecureStore)에서 값을 비동기로 조회합니다. 웹 환경인 경우 AsyncStorage를 사용합니다.
  */
 export async function getSecureValue(key: string): Promise<string | null> {
   try {
-    return await SecureStore.getItemAsync(key);
+    if (isWeb) {
+      return await AsyncStorage.getItem(key);
+    } else {
+      return await SecureStore.getItemAsync(key);
+    }
   } catch (error) {
     console.error(`Failed to retrieve secure value for key [${key}]`, error);
     return null;
@@ -27,11 +39,15 @@ export async function getSecureValue(key: string): Promise<string | null> {
 }
 
 /**
- * 암호화 저장소(SecureStore)에서 값을 삭제합니다.
+ * 암호화 저장소(SecureStore)에서 값을 삭제합니다. 웹 환경인 경우 AsyncStorage를 사용합니다.
  */
 export async function deleteSecureValue(key: string): Promise<void> {
   try {
-    await SecureStore.deleteItemAsync(key);
+    if (isWeb) {
+      await AsyncStorage.removeItem(key);
+    } else {
+      await SecureStore.deleteItemAsync(key);
+    }
   } catch (error) {
     console.error(`Failed to delete secure value for key [${key}]`, error);
   }
