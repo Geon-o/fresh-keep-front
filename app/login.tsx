@@ -41,23 +41,6 @@ export default function LoginScreen() {
       <View style={styles.bgCircle1} />
       <View style={styles.bgCircle2} />
 
-      {/* 상단 헤더 및 돌아가기 버튼 */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          activeOpacity={0.7}
-          onPress={() => {
-            if (router.canGoBack()) {
-              router.back();
-            } else {
-              router.replace('/');
-            }
-          }}
-        >
-          <Text style={styles.backButtonText}>〈 돌아가기</Text>
-        </TouchableOpacity>
-      </View>
-
       <View style={styles.content}>
         {/* 앱 브랜딩 영역 */}
         <View style={styles.brandContainer}>
@@ -65,13 +48,8 @@ export default function LoginScreen() {
           <Text style={styles.subtitle}>스마트한 냉장고 식재료 관리 파트너</Text>
         </View>
 
-        {/* 안내 문구 및 카드 */}
+        {/* 소셜 로그인 카드 */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>간편하게 시작해 보세요</Text>
-          <Text style={styles.cardDesc}>
-            로그인하면 여러 기기에서 실시간 동기화를 지원하며, 유통기한 알림과 AI 식재료 추천 기능을 완전히 누리실 수 있습니다.
-          </Text>
-
           {isLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#6366F1" />
@@ -113,6 +91,20 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.footerContainer}>
+          {/* 돌아가기 버튼 (예전 건너뛰기 버튼 위치) */}
+          <TouchableOpacity
+            style={styles.backButton}
+            activeOpacity={0.7}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/');
+              }
+            }}
+          >
+            <Text style={styles.backButtonText}>로그인하지 않고 돌아가기 〉</Text>
+          </TouchableOpacity>
 
           {/* 개발자용 테스트 로그인 버튼 */}
           <TouchableOpacity
@@ -152,33 +144,26 @@ const styles = StyleSheet.create({
     borderRadius: 150,
     backgroundColor: 'rgba(59, 130, 246, 0.04)', // 은은한 블루 글로우
   },
-  header: {
-    width: '100%',
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 8,
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-  },
   backButton: {
+    alignSelf: 'center',
     paddingVertical: 8,
-    paddingRight: 16,
+    paddingHorizontal: 16,
   },
   backButtonText: {
-    fontSize: 14,
+    fontSize: 13,
+    color: '#4F46E5', // 인디고 텍스트
     fontWeight: '600',
-    color: '#4F46E5', // 인디고 액션 컬러
+    textAlign: 'center',
   },
   content: {
     flex: 1,
     justifyContent: 'space-between',
     paddingHorizontal: 24,
-    paddingVertical: 24, // 여백 조정
+    paddingVertical: 48, // 원래 여백 복원
   },
   brandContainer: {
     alignItems: 'center',
-    marginTop: 20, // 헤더 크기 대응 마진 축소
+    marginTop: 48, // 상단 헤더가 제거되었으므로 마진 복원
   },
   logoText: {
     fontSize: 36,
