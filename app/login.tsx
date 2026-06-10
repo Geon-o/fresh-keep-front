@@ -32,10 +32,6 @@ export default function LoginScreen() {
     }
   };
 
-  const handleSkip = () => {
-    // 비로그인 (로컬 모드)로 계속 진행
-    router.replace('/');
-  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -117,15 +113,6 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.footerContainer}>
-          {/* 비로그인 건너뛰기 버튼 */}
-          <TouchableOpacity
-            style={styles.skipButton}
-            activeOpacity={0.7}
-            onPress={handleSkip}
-            disabled={isLoading}
-          >
-            <Text style={styles.skipButtonText}>로그인 없이 로컬 모드로 계속하기 〉</Text>
-          </TouchableOpacity>
 
           {/* 개발자용 테스트 로그인 버튼 */}
           <TouchableOpacity
@@ -316,17 +303,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
-  skipButton: {
-    alignSelf: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-  skipButtonText: {
-    fontSize: 13,
-    color: '#4F46E5', // 인디고 텍스트
-    fontWeight: '600',
-    textAlign: 'center',
-  },
+
   footerContainer: {
     alignItems: 'center',
     gap: 16,
