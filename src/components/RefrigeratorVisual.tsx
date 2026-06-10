@@ -153,8 +153,12 @@ export default function RefrigeratorVisual({
 
   // 냉장고 추가 모드 활성화
   const handleOpenAddSelector = () => {
-    setSelectorMode('add');
-    setSelectorVisible(true);
+    if (!isLoggedIn) {
+      router.push('/login');
+    } else {
+      setSelectorMode('add');
+      setSelectorVisible(true);
+    }
   };
 
   // 각 냉장고 타입별 렌더링 헬퍼
@@ -406,9 +410,9 @@ export default function RefrigeratorVisual({
 
              <View style={styles.drawerBody}>
               {/* 사용자 인증 연동 */}
-              <View style={styles.userContainer}>
-                {isLoggedIn ? (
-                  <>
+              {isLoggedIn && (
+                <>
+                  <View style={styles.userContainer}>
                     <View style={styles.userProfile}>
                       <Text style={styles.userEmoji}>👤</Text>
                       <View>
@@ -426,25 +430,10 @@ export default function RefrigeratorVisual({
                     >
                       <Text style={styles.menuItemText}>🔓 로그아웃</Text>
                     </TouchableOpacity>
-                  </>
-                ) : (
-                  <>
-                    <Text style={styles.loginGuide}>로그인하고 여러 기기 동기화 기능을 이용해 보세요!</Text>
-                    <TouchableOpacity
-                      style={[styles.menuItem, styles.loginButton]}
-                      activeOpacity={0.7}
-                      onPress={() => {
-                        setMenuVisible(false);
-                        router.push('/login');
-                      }}
-                    >
-                      <Text style={styles.loginButtonText}>🔑 로그인하기</Text>
-                    </TouchableOpacity>
-                  </>
-                )}
-              </View>
-
-              <View style={styles.drawerDivider} />
+                  </View>
+                  <View style={styles.drawerDivider} />
+                </>
+              )}
 
               {activeFridge ? (
                 <>
