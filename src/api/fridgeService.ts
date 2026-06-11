@@ -23,6 +23,9 @@ export interface ServerCompartment {
   name: string;
   storageType: 'REFRIGERATED' | 'FROZEN' | 'ROOM_TEMP' | 'SPECIAL';
   sequenceOrder: number;
+  insideShelves?: string;
+  doorShelves?: string;
+  hasDoorStorage?: boolean;
   ingredients: ServerIngredient[];
 }
 
@@ -92,3 +95,21 @@ export async function updateFridge(fridgeId: number, name: string, type: FridgeT
   });
   return response.data;
 }
+
+/**
+ * 6. 특정 구획의 선반 설정 및 문쪽 보관실 사용 설정 변경
+ */
+export async function updateCompartmentShelves(
+  fridgeId: number,
+  compartmentId: number,
+  insideShelves: any[],
+  doorShelves: any[],
+  hasDoorStorage: boolean
+): Promise<void> {
+  await client.put(`/api/fridges/${fridgeId}/compartments/${compartmentId}/shelves`, {
+    insideShelves: JSON.stringify(insideShelves),
+    doorShelves: JSON.stringify(doorShelves),
+    hasDoorStorage,
+  });
+}
+

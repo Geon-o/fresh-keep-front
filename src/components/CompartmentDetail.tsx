@@ -3,7 +3,7 @@ import { StyleSheet, TouchableOpacity, View, Text, ScrollView, Platform, Alert, 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ingredient, IngredientCategory } from '../types';
 import { useAuth } from '../context/AuthContext';
-import { getFridgeLayout } from '../api/fridgeService';
+import { getFridgeLayout, updateCompartmentShelves } from '../api/fridgeService';
 import { addIngredient, updateIngredient, deleteIngredient } from '../api/ingredientService';
 import { serializeMemo, deserializeMemo } from '../utils/memoSerializer';
 
@@ -125,16 +125,18 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
   useEffect(() => {
     const loadData = async () => {
       try {
-        // 1. 선반 구성 불러오기 (레이아웃 설정은 로컬 설정을 활용)
-        const configStr = await AsyncStorage.getItem(`@shelf_config_${fridgeId}_${compartmentId}`);
-        if (configStr) {
-          const config = JSON.parse(configStr);
-          if (config.insideShelves) setInsideShelves(config.insideShelves);
-          if (config.doorShelves) setDoorShelves(config.doorShelves);
-          if (config.hasDoorStorage !== undefined) setHasDoorStorage(config.hasDoorStorage);
-        } else {
-          const config = { insideShelves: insideShelves, doorShelves: doorShelves, hasDoorStorage: hasDoorStorage };
-          await AsyncStorage.setItem(`@shelf_config_${fridgeId}_${compartmentId}`, JSON.stringify(config));
+        // 1. 선반 구성 불러오기 (비로그인 모드일 때만 로컬스토리지 활용)
+        if (!isLoggedIn) {
+          const configStr = await AsyncStorage.getItem(`@shelf_config_${fridgeId}_${compartmentId}`);
+          if (configStr) {
+            const config = JSON.parse(configStr);
+            if (config.insideShelves) setInsideShelves(config.insideShelves);
+            if (config.doorShelves) setDoorShelves(config.doorShelves);
+            if (config.hasDoorStorage !== undefined) setHasDoorStorage(config.hasDoorStorage);
+          } else {
+            const config = { insideShelves: insideShelves, doorShelves: doorShelves, hasDoorStorage: hasDoorStorage };
+            await AsyncStorage.setItem(`@shelf_config_${fridgeId}_${compartmentId}`, JSON.stringify(config));
+          }
         }
 
         // 2. 식재료 로드
@@ -158,6 +160,26 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
 
           if (serverComp) {
             setServerCompartmentId(serverComp.id);
+            
+            // 서버에서 저장된 선반 구성 로드
+            if (serverComp.insideShelves) {
+              try {
+                setInsideShelves(JSON.parse(serverComp.insideShelves));
+              } catch (e) {
+                console.error('Failed to parse insideShelves from server', e);
+              }
+            }
+            if (serverComp.doorShelves) {
+              try {
+                setDoorShelves(JSON.parse(serverComp.doorShelves));
+              } catch (e) {
+                console.error('Failed to parse doorShelves from server', e);
+              }
+            }
+            if (serverComp.hasDoorStorage !== undefined) {
+              setHasDoorStorage(serverComp.hasDoorStorage);
+            }
+
             const mapped = serverComp.ingredients.map(ing => {
               const deserialized = deserializeMemo(ing.memo);
               return {
@@ -205,8 +227,12 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
     hasDoor: boolean
   ) => {
     try {
-      const config = { insideShelves: inside, doorShelves: door, hasDoorStorage: hasDoor };
-      await AsyncStorage.setItem(`@shelf_config_${fridgeId}_${compartmentId}`, JSON.stringify(config));
+      if (isLoggedIn && serverCompartmentId !== null) {
+        await updateCompartmentShelves(Number(fridgeId), serverCompartmentId, inside, door, hasDoor);
+      } else {
+        const config = { insideShelves: inside, doorShelves: door, hasDoorStorage: hasDoor };
+        await AsyncStorage.setItem(`@shelf_config_${fridgeId}_${compartmentId}`, JSON.stringify(config));
+      }
     } catch (e) {
       console.error('Failed to save shelf config', e);
     }
