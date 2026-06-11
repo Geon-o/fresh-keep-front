@@ -145,12 +145,29 @@ let weatherCache: {
     humidity: number | null;
     city: string | null;
     loading: boolean;
+    isFallback: boolean;
   };
   locationPermission: 'granted' | 'denied' | 'undetermined';
   timestamp: number;
 } | null = null;
 
 const CACHE_DURATION = 30 * 60 * 1000; // 캐싱 유효 기간: 30분
+
+// 월별 대한민국 평균 기온 및 습도 데이터 (날씨 API 통신 실패 시 UI 일관성을 위해 사용)
+const MONTHLY_AVERAGE_WEATHER: { [key: number]: { temp: number; humidity: number } } = {
+  1: { temp: -1, humidity: 55 },
+  2: { temp: 1, humidity: 55 },
+  3: { temp: 7, humidity: 57 },
+  4: { temp: 13, humidity: 56 },
+  5: { temp: 19, humidity: 60 },
+  6: { temp: 23, humidity: 68 },
+  7: { temp: 26, humidity: 78 },
+  8: { temp: 27, humidity: 76 },
+  9: { temp: 22, humidity: 70 },
+  10: { temp: 16, humidity: 63 },
+  11: { temp: 8, humidity: 60 },
+  12: { temp: 1, humidity: 56 }
+};
 
 interface SeasonalIngredient {
   name: string;
@@ -231,6 +248,7 @@ export default function RefrigeratorVisual({
     humidity: number | null;
     city: string | null;
     loading: boolean;
+    isFallback: boolean;
   }>({
     index: 50,
     level: '주의',
@@ -241,6 +259,7 @@ export default function RefrigeratorVisual({
     humidity: null,
     city: null,
     loading: true,
+    isFallback: false,
   });
 
   // 식재료 실시간 로드 (서버 vs 로컬 분기)
@@ -812,6 +831,7 @@ export default function RefrigeratorVisual({
         humidity,
         city,
         loading: false,
+        isFallback: false,
       };
       setWeatherInfo(newWeather);
       
@@ -823,20 +843,18 @@ export default function RefrigeratorVisual({
     } catch (e) {
       console.warn('Real-time weather query completely failed, fallback to offline simulation:', e);
       
-      // Fallback: 날짜 기반 의사 난수 지수 생성
       const today = new Date();
-      const year = today.getFullYear();
       const month = today.getMonth() + 1;
-      const date = today.getDate();
 
-      let base = 35;
-      if (month === 12 || month === 1 || month === 2) base = 20;
-      else if (month >= 3 && month <= 5) base = 45;
-      else if (month >= 6 && month <= 8) base = 80;
-      else if (month >= 9 && month <= 11) base = 55;
+      // 1. 월별 평균 기상 데이터를 폴백 값으로 매칭하여 온도/습도 항상 디스플레이
+      const avgWeather = MONTHLY_AVERAGE_WEATHER[month] || { temp: 15, humidity: 60 };
+      const temp = avgWeather.temp;
+      const humidity = avgWeather.humidity;
 
-      const pseudoRandomOffset = ((year * 7 + month * 13 + date * 31) % 15) - 7;
-      const index = Math.max(0, Math.min(100, base + pseudoRandomOffset));
+      // 2. 실시간 모드와 동일한 예측 공식을 적용하여 지수의 일관성 유지
+      const tempFactor = Math.pow(Math.max(0, Math.min(40, temp)) / 40, 2) * 70;
+      const humidityFactor = ((Math.max(20, Math.min(100, humidity)) - 20) / 80) * 30;
+      const index = Math.round(tempFactor + humidityFactor);
 
       let level: '관심' | '주의' | '경고' | '위험' = '주의';
       let color = theme.ddayImminent;
@@ -866,10 +884,11 @@ export default function RefrigeratorVisual({
         color,
         bgColor: color + '12',
         description,
-        temp: null,
-        humidity: null,
+        temp,
+        humidity,
         city: city || '위생 예보',
         loading: false,
+        isFallback: true,
       };
       setWeatherInfo(newWeather);
       setLocationPermission('granted'); // 폴백 모드이므로 정상 표시
@@ -957,7 +976,7 @@ export default function RefrigeratorVisual({
                 </Text>
                 {weatherInfo.temp !== null && weatherInfo.humidity !== null && (
                   <Text style={[styles.weatherConditionText, { color: theme.textTertiary }]}>
-                    현재 기온: {weatherInfo.temp}°C | 습도: {weatherInfo.humidity}%
+                    현재 기온: {weatherInfo.temp}°C{weatherInfo.isFallback ? ' (평균)' : ''} | 습도: {weatherInfo.humidity}%{weatherInfo.isFallback ? ' (평균)' : ''}
                   </Text>
                 )}
                 <View style={[styles.progressBarBg, { backgroundColor: theme.borderLight }]}>
