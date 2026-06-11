@@ -42,13 +42,15 @@ export default function Index() {
   });
 
   // 로그인 여부에 따라 최종 노출할 냉장고 배열 결정
-  const refrigerators = isLoggedIn && Array.isArray(serverFridges)
-    ? serverFridges.map(f => ({
-        id: String(f.id),
-        type: convertTypeToFrontend(f.type),
-        name: f.name,
-      }))
-    : localRefrigerators;
+  const refrigerators = React.useMemo(() => {
+    return isLoggedIn && Array.isArray(serverFridges)
+      ? serverFridges.map(f => ({
+          id: String(f.id),
+          type: convertTypeToFrontend(f.type),
+          name: f.name,
+        }))
+      : localRefrigerators;
+  }, [isLoggedIn, serverFridges, localRefrigerators]);
 
   // 앱 로드 시 로컬 저장소에서 냉장고 목록 불러오기 (로컬 백업 보존)
   useEffect(() => {
