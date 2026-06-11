@@ -44,7 +44,7 @@ export default function RefrigeratorVisual({
           const allIngredients: Ingredient[] = [];
 
           layouts.forEach((layout, index) => {
-            if (!layout) return;
+            if (!layout || !Array.isArray(layout.compartments)) return;
             const fridge = refrigerators[index];
             layout.compartments.forEach(comp => {
               comp.ingredients.forEach(ing => {
@@ -83,6 +83,11 @@ export default function RefrigeratorVisual({
     };
     loadIngredients();
   }, [menuVisible, refrigerators, isLoggedIn]);
+
+  // 냉장고 목록 크기나 로그인 상태가 바뀌면 캐러셀 인덱스를 0으로 초기화
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [refrigerators.length, isLoggedIn]);
 
   // 특정 냉장고의 칸 요약 뱃지 계산
   const getCompartmentSummary = (fridgeId: string, compartmentId: string) => {

@@ -76,6 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const isVoluntaryLogout = React.useRef(false);
 
   // 1. 앱 구동 시 SecureStore에서 토큰을 읽어 로그인 상태 복원
   useEffect(() => {
@@ -149,7 +150,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoggedIn(false);
     setUser(null);
     queryClient.clear();
-    Alert.alert('세션 만료', '로그인 세션이 만료되었습니다. 다시 로그인해 주세요.');
+    if (!isVoluntaryLogout.current) {
+      Alert.alert('세션 만료', '로그인 세션이 만료되었습니다. 다시 로그인해 주세요.');
+    }
   };
 
   // 사용자 프로필 정보 조회
@@ -253,6 +256,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // 3. 로그아웃 처리
   const logout = async () => {
     setIsLoading(true);
+    isVoluntaryLogout.current = true;
     try {
       // SecureStore 비우기
       await clearAuthTokens();
@@ -266,6 +270,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Logout error', e);
     } finally {
       setIsLoading(false);
+      setTimeout(() => {
+        isVoluntaryLogout.current = false;
+      }, 1000);
     }
   };
 
