@@ -3,6 +3,7 @@ import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensio
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
+import * as WebBrowser from 'expo-web-browser';
 import { FridgeType, Ingredient } from '../types';
 import { SAMPLE_INGREDIENTS, CATEGORY_EMOJI } from './CompartmentDetail';
 import { useAuth } from '../context/AuthContext';
@@ -637,13 +638,23 @@ export default function RefrigeratorVisual({
   const currentMonth = new Date().getMonth() + 1;
   const seasonalIngredients = SEASONAL_INGREDIENTS.filter(item => item.months.includes(currentMonth));
 
-  // 유튜브 이동 핸들러
-  const handleOpenYoutube = (query: string) => {
+  // 유튜브 이동 핸들러 (인앱 브라우저를 띄워 뒤로가기/닫기 시 앱으로 즉각 복귀 가능)
+  const handleOpenYoutube = async (query: string) => {
     const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
-    Linking.openURL(url).catch(err => {
-      console.error("Failed to open YouTube URL", err);
-      Alert.alert("알림 ⚠️", "유튜브 링크를 열 수 없습니다.");
-    });
+    try {
+      await WebBrowser.openBrowserAsync(url, {
+        readerMode: false,
+        dismissButtonStyle: 'close',
+        toolbarColor: '#FFFFFF',
+        enableBarCollapsing: true,
+      });
+    } catch (err) {
+      console.warn("Failed to open in WebBrowser, trying Linking fallback:", err);
+      Linking.openURL(url).catch(fallbackErr => {
+        console.error("Failed to open YouTube URL", fallbackErr);
+        Alert.alert("알림 ⚠️", "유튜브 링크를 열 수 없습니다.");
+      });
+    }
   };
 
   // 기기 GPS 위치 권한 요청 및 실시간 날씨 연동 식중독 지수 조회
