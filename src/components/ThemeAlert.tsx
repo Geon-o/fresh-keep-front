@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, Modal, TouchableOpacity, Alert, AlertButton, Dimensions, Platform } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
 
 type AlertConfig = {
   visible: boolean;
@@ -36,6 +37,7 @@ export function ThemeAlertPortal() {
     title: '',
     message: '',
   });
+  const { theme } = useTheme();
 
   useEffect(() => {
     setGlobalAlertConfig = (newConfig: AlertConfig) => {
@@ -65,21 +67,21 @@ export function ThemeAlertPortal() {
     if (title.includes('삭제') || title.includes('경고') || title.includes('실패') || title.includes('오류') || title.includes('만료')) {
       return {
         emoji: '⚠️',
-        color: '#EF4444', // Red
-        bg: '#FEF2F2',
+        color: theme.danger,
+        bg: theme.dangerLight,
       };
     }
     if (title.includes('완료') || title.includes('성공') || title.includes('동기화 완료')) {
       return {
         emoji: '✅',
-        color: '#10B981', // Green
-        bg: '#ECFDF5',
+        color: theme.success,
+        bg: theme.successLight,
       };
     }
     return {
       emoji: 'ℹ️',
-      color: '#4F46E5', // Indigo (Theme Color)
-      bg: '#EEF2FF',
+      color: theme.primary,
+      bg: theme.primaryLight,
     };
   };
 
@@ -92,17 +94,17 @@ export function ThemeAlertPortal() {
       visible={config.visible}
       onRequestClose={() => handleButtonPress()}
     >
-      <View style={styles.overlay}>
-        <View style={styles.alertCard}>
+      <View style={[styles.overlay, { backgroundColor: theme.overlay }]}>
+        <View style={[styles.alertCard, { backgroundColor: theme.surface, shadowColor: theme.shadow }]}>
           {/* 상태 표시 아이콘 배지 */}
           <View style={[styles.iconContainer, { backgroundColor: headerStyle.bg }]}>
             <Text style={[styles.iconText, { color: headerStyle.color }]}>{headerStyle.emoji}</Text>
           </View>
 
           {/* 타이틀 및 메시지 */}
-          <Text style={styles.titleText}>{config.title}</Text>
+          <Text style={[styles.titleText, { color: theme.textPrimary }]}>{config.title}</Text>
           {config.message ? (
-            <Text style={styles.messageText}>{config.message}</Text>
+            <Text style={[styles.messageText, { color: theme.textSecondary }]}>{config.message}</Text>
           ) : null}
 
           {/* 버튼 리스트 */}
@@ -111,15 +113,15 @@ export function ThemeAlertPortal() {
               const isDestructive = btn.style === 'destructive' || btn.text?.includes('삭제');
               const isCancel = btn.style === 'cancel' || btn.text?.includes('취소') || btn.text?.includes('나중에');
 
-              let buttonStyle = styles.primaryButton;
-              let textStyle = styles.primaryButtonText;
+              let buttonStyle = [styles.primaryButton, { backgroundColor: theme.primary }] as any;
+              let textStyle = [styles.primaryButtonText, { color: theme.primaryOnPrimary }] as any;
 
               if (isDestructive) {
-                buttonStyle = styles.destructiveButton;
-                textStyle = styles.destructiveButtonText;
+                buttonStyle = [styles.destructiveButton, { backgroundColor: theme.danger }];
+                textStyle = [styles.destructiveButtonText, { color: '#FFFFFF' }];
               } else if (isCancel) {
-                buttonStyle = styles.cancelButton;
-                textStyle = styles.cancelButtonText;
+                buttonStyle = [styles.cancelButton, { backgroundColor: theme.surfaceTertiary }];
+                textStyle = [styles.cancelButtonText, { color: theme.textSecondary }];
               }
 
               return (

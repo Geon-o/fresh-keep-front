@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { StyleSheet, TouchableOpacity, View, ScrollView } from 'react-native';
 import { FridgeType } from '../types';
 import { Text } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
 
 interface RefrigeratorSelectorProps {
   onSelect: (type: FridgeType) => void;
@@ -9,83 +10,95 @@ interface RefrigeratorSelectorProps {
 
 export default function RefrigeratorSelector({ onSelect }: RefrigeratorSelectorProps) {
   const [selected, setSelected] = useState<FridgeType>('four-door');
+  const { theme } = useTheme();
 
   const handleStart = () => {
     onSelect(selected);
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-      <Text style={styles.title}>우리 집 냉장고의 형태를 선택해 주세요! ❄️</Text>
+    <ScrollView 
+      style={{ backgroundColor: theme.surface }}
+      contentContainerStyle={[styles.container, { backgroundColor: theme.surface }]} 
+      showsVerticalScrollIndicator={false}
+    >
+      <Text style={[styles.title, { color: theme.textPrimary }]}>우리 집 냉장고의 형태를 선택해 주세요! ❄️</Text>
 
       <View style={styles.cardContainer}>
         {/* 4문형 */}
         <TouchableOpacity
-          style={{
-            ...styles.card,
-            ...(selected === 'four-door' ? styles.cardSelected : {}),
-          }}
+          style={[
+            styles.card,
+            { backgroundColor: theme.surface, borderColor: theme.borderLight },
+            selected === 'four-door' && { borderColor: theme.primary, backgroundColor: theme.primaryLight }
+          ]}
           activeOpacity={0.8}
           onPress={() => setSelected('four-door')}
         >
           {/* 미니 냉장고 그래픽 */}
-          <View style={styles.miniFridge}>
+          <View style={[styles.miniFridge, { backgroundColor: theme.fridgeFrame }]}>
             <View style={styles.fourDoorTop}>
-              <View style={[styles.door, styles.fridgeDoor, { borderTopLeftRadius: 6 }]} />
-              <View style={[styles.door, styles.fridgeDoor, { borderTopRightRadius: 6 }]} />
+              <View style={[styles.door, { backgroundColor: theme.fridgeDoor }, { borderTopLeftRadius: 6 }]} />
+              <View style={[styles.door, { backgroundColor: theme.fridgeDoor }, { borderTopRightRadius: 6 }]} />
             </View>
             <View style={styles.fourDoorBottom}>
-              <View style={[styles.door, styles.freezerDoor, { borderBottomLeftRadius: 6 }]} />
-              <View style={[styles.door, styles.freezerDoor, { borderBottomRightRadius: 6 }]} />
+              <View style={[styles.door, { backgroundColor: theme.freezerDoor }, { borderBottomLeftRadius: 6 }]} />
+              <View style={[styles.door, { backgroundColor: theme.freezerDoor }, { borderBottomRightRadius: 6 }]} />
             </View>
           </View>
-          <Text style={styles.cardTitle}>4문형 냉장고</Text>
-          <Text style={styles.cardDesc}>상단 양문 냉장실 / 하단 양문 냉동실 구조</Text>
+          <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>4문형 냉장고</Text>
+          <Text style={[styles.cardDesc, { color: theme.textSecondary }]}>상단 양문 냉장실 / 하단 양문 냉동실 구조</Text>
         </TouchableOpacity>
 
         {/* 양문형 */}
         <TouchableOpacity
-          style={{
-            ...styles.card,
-            ...(selected === 'side-by-side' ? styles.cardSelected : {}),
-          }}
+          style={[
+            styles.card,
+            { backgroundColor: theme.surface, borderColor: theme.borderLight },
+            selected === 'side-by-side' && { borderColor: theme.primary, backgroundColor: theme.primaryLight }
+          ]}
           activeOpacity={0.8}
           onPress={() => setSelected('side-by-side')}
         >
           {/* 미니 냉장고 그래픽 */}
-          <View style={styles.miniFridge}>
+          <View style={[styles.miniFridge, { backgroundColor: theme.fridgeFrame }]}>
             <View style={styles.sideBySide}>
-              <View style={[styles.door, styles.freezerDoor, { borderTopLeftRadius: 6, borderBottomLeftRadius: 6 }]} />
-              <View style={[styles.door, styles.fridgeDoor, { borderTopRightRadius: 6, borderBottomRightRadius: 6 }]} />
+              <View style={[styles.door, { backgroundColor: theme.freezerDoor }, { borderTopLeftRadius: 6, borderBottomLeftRadius: 6 }]} />
+              <View style={[styles.door, { backgroundColor: theme.fridgeDoor }, { borderTopRightRadius: 6, borderBottomRightRadius: 6 }]} />
             </View>
           </View>
-          <Text style={styles.cardTitle}>양문형 (세로 2문)</Text>
-          <Text style={styles.cardDesc}>좌측 냉동실 / 우측 냉장실 구조</Text>
+          <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>양문형 (세로 2문)</Text>
+          <Text style={[styles.cardDesc, { color: theme.textSecondary }]}>좌측 냉동실 / 우측 냉장실 구조</Text>
         </TouchableOpacity>
 
         {/* 일반 2문형 */}
         <TouchableOpacity
-          style={{
-            ...styles.card,
-            ...(selected === 'two-door' ? styles.cardSelected : {}),
-          }}
+          style={[
+            styles.card,
+            { backgroundColor: theme.surface, borderColor: theme.borderLight },
+            selected === 'two-door' && { borderColor: theme.primary, backgroundColor: theme.primaryLight }
+          ]}
           activeOpacity={0.8}
           onPress={() => setSelected('two-door')}
         >
           {/* 미니 냉장고 그래픽 */}
-          <View style={styles.miniFridge}>
+          <View style={[styles.miniFridge, { backgroundColor: theme.fridgeFrame }]}>
             <View style={styles.twoDoor}>
-              <View style={[styles.door, styles.freezerDoor, { height: '35%', borderTopLeftRadius: 6, borderTopRightRadius: 6 }]} />
-              <View style={[styles.door, styles.fridgeDoor, { height: '60%', borderBottomLeftRadius: 6, borderBottomRightRadius: 6 }]} />
+              <View style={[styles.door, { backgroundColor: theme.freezerDoor }, { height: '35%', borderTopLeftRadius: 6, borderTopRightRadius: 6 }]} />
+              <View style={[styles.door, { backgroundColor: theme.fridgeDoor }, { height: '60%', borderBottomLeftRadius: 6, borderBottomRightRadius: 6 }]} />
             </View>
           </View>
-          <Text style={styles.cardTitle}>일반 2문형 (가로 2문)</Text>
-          <Text style={styles.cardDesc}>상단 냉동실 / 하단 냉장실 구조</Text>
+          <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>일반 2문형 (가로 2문)</Text>
+          <Text style={[styles.cardDesc, { color: theme.textSecondary }]}>상단 냉동실 / 하단 냉장실 구조</Text>
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.button} activeOpacity={0.9} onPress={handleStart}>
-        <Text style={styles.buttonText}>이 냉장고로 시작하기</Text>
+      <TouchableOpacity 
+        style={[styles.button, { backgroundColor: theme.primary, shadowColor: theme.primary }]} 
+        activeOpacity={0.9} 
+        onPress={handleStart}
+      >
+        <Text style={[styles.buttonText, { color: theme.primaryOnPrimary }]}>이 냉장고로 시작하기</Text>
       </TouchableOpacity>
     </ScrollView>
   );

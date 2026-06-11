@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, ScrollView, Platform, Alert, TextInput, Modal } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, Text, ScrollView, Platform, Alert, TextInput, Modal, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ingredient, IngredientCategory } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { getFridgeLayout, updateCompartmentShelves } from '../api/fridgeService';
 import { addIngredient, updateIngredient, deleteIngredient } from '../api/ingredientService';
 import { serializeMemo, deserializeMemo } from '../utils/memoSerializer';
+import { useTheme } from '../context/ThemeContext';
+import { ThemeColors } from '../theme';
 
 interface CompartmentDetailProps {
   compartmentId: string;
@@ -95,6 +97,8 @@ const DEFAULT_DOOR_SHELVES = [
 export default function CompartmentDetail({ compartmentId, compartmentLabel, onBack, fridgeId }: CompartmentDetailProps) {
   const { isLoggedIn } = useAuth();
   const [serverCompartmentId, setServerCompartmentId] = useState<number | null>(null);
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => createStyles(theme), [theme]);
 
   // 선반 동적 배열 상태 관리 (초기값은 비워두고 useEffect에서 로드)
   const [insideShelves, setInsideShelves] = useState<{ id: string; label: string }[]>([]);
@@ -105,6 +109,9 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
 
   // 문쪽 보관실 사용 여부 상태 관리
   const [hasDoorStorage, setHasDoorStorage] = useState(true);
+
+  // 로딩 상태 관리 (Flicker/레이아웃 시프트 방지)
+  const [isLoading, setIsLoading] = useState(true);
 
   // 모달 제어 관련 상태
   const [modalVisible, setModalVisible] = useState(false);
@@ -127,6 +134,7 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
   // 선반 구성 및 식재료 불러오기 (서버 vs 로컬 분기)
   useEffect(() => {
     const loadData = async () => {
+      setIsLoading(true);
       try {
         // 1. 선반 구성 불러오기 (비로그인 모드일 때만 로컬스토리지 활용)
         if (!isLoggedIn) {
@@ -238,6 +246,8 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
         }
       } catch (e) {
         console.error('Failed to load data', e);
+      } finally {
+        setIsLoading(false);
       }
     };
     loadData();
@@ -706,10 +716,10 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
     const diff = expiry.getTime() - today.getTime();
     const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
 
-    if (days < 0) return { text: `만료 D+${Math.abs(days)}`, color: '#FF5252' };
-    if (days === 0) return { text: '오늘만료', color: '#FF9800' };
-    if (days <= 3) return { text: `D-${days}`, color: '#FF9800' };
-    return { text: `D-${days}`, color: '#4CAF50' };
+    if (days < 0) return { text: `만료 D+${Math.abs(days)}`, color: theme.ddayExpired };
+    if (days === 0) return { text: '오늘만료', color: theme.ddayImminent };
+    if (days <= 3) return { text: `D-${days}`, color: theme.ddayImminent };
+    return { text: `D-${days}`, color: theme.ddaySafe };
   };
 
   // 개별 식재료 뱃지 렌더러 (상세 모달용 - 클릭 시 수정)
@@ -720,7 +730,7 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
     return (
       <TouchableOpacity
         key={item.id}
-        style={styles.itemBadge}
+        style={[styles.itemBadge, { borderLeftWidth: 3.5, borderLeftColor: dDay.color, paddingLeft: 8 }]}
         activeOpacity={0.7}
         onPress={() => handleOpenEditModal(item)}
       >
@@ -742,7 +752,7 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
     return (
       <TouchableOpacity
         key={item.id}
-        style={styles.itemBadge}
+        style={[styles.itemBadge, { borderLeftWidth: 3.5, borderLeftColor: dDay.color, paddingLeft: 8 }]}
         activeOpacity={0.7}
         onPress={() => handleOpenShelfDetailModal(shelfId, shelfLabel)}
       >
@@ -766,138 +776,149 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
         <Text style={styles.headerTitle}>{compartmentLabel} 내부</Text>
       </View>
 
-      {/* 설정 바: 문쪽 보관실 사용 설정 */}
-      <View style={styles.settingsBar}>
-        <Text style={styles.settingsLabel}>문쪽 보관실 사용</Text>
-        <View style={styles.toggleGroup}>
-          <TouchableOpacity
-            style={{ ...styles.toggleButton, ...(hasDoorStorage ? styles.toggleButtonActive : {}) }}
-            onPress={() => handleToggleDoorStorage(true)}
-            activeOpacity={0.7}
-          >
-            <Text style={{ ...styles.toggleButtonText, ...(hasDoorStorage ? styles.toggleButtonTextActive : {}) }}>있음</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={{ ...styles.toggleButton, ...(!hasDoorStorage ? styles.toggleButtonActive : {}) }}
-            onPress={() => handleToggleDoorStorage(false)}
-            activeOpacity={0.7}
-          >
-            <Text style={{ ...styles.toggleButtonText, ...(!hasDoorStorage ? styles.toggleButtonTextActive : {}) }}>없음</Text>
-          </TouchableOpacity>
+      {isLoading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }}>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={{ marginTop: 16, color: theme.textSecondary, fontSize: 14, fontWeight: '500' }}>
+            보관실 설정을 불러오는 중...
+          </Text>
         </View>
-      </View>
-
-      <View style={styles.body}>
-        {/* 좌측: 안쪽 보관실 (선반) */}
-        <View style={[styles.sectionInside, hasDoorStorage ? { marginRight: 8 } : { marginRight: 0, flex: 1 }]}>
-          <View style={styles.sectionHeaderInside}>
-            <Text style={styles.sectionTitle}>안쪽 보관실</Text>
-          </View>
-          
-          <View style={styles.shelfContainer}>
-            <View style={styles.shelfScrollContent}>
-              {insideShelves.map((shelf) => (
-                <View key={shelf.id} style={styles.shelf}>
-                  <View style={styles.shelfHeaderRow}>
-                    <TouchableOpacity
-                      onPress={() => handleOpenShelfDetailModal(shelf.id, shelf.label)}
-                      activeOpacity={0.7}
-                      style={{ flex: 1 }}
-                    >
-                      <Text style={styles.shelfLabel}>{shelf.label} 〉</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.deleteButton}
-                      onPress={() => handleDeleteShelf(shelf.id, shelf.label, 'inside')}
-                    >
-                      <Text style={styles.deleteButtonText}>✕</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <View style={styles.shelfItemsContainer}>
-                    <ScrollView
-                      showsVerticalScrollIndicator={true}
-                      contentContainerStyle={styles.shelfItemsScroll}
-                      scrollEnabled={true}
-                    >
-                      {getItemsBySubLocation(shelf.id).map(item => renderItemBadgePreview(item, shelf.id, shelf.label))}
-                      {getItemsBySubLocation(shelf.id).length === 0 && (
-                        <TouchableOpacity onPress={() => handleOpenShelfDetailModal(shelf.id, shelf.label)}>
-                          <Text style={styles.emptyText}>비어 있음</Text>
-                        </TouchableOpacity>
-                      )}
-                    </ScrollView>
-                  </View>
-                </View>
-              ))}
-            </View>
-
-            {/* 선반 추가 버튼 */}
-            <TouchableOpacity
-              style={styles.addShelfButton}
-              activeOpacity={0.7}
-              onPress={() => handleAddShelf('inside')}
-            >
-              <Text style={styles.addShelfButtonText}>+ 선반 추가</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* 우측: 문쪽 보관실 (선반) */}
-        {hasDoorStorage && (
-          <View style={styles.sectionDoor}>
-            <View style={styles.sectionHeaderDoor}>
-              <Text style={styles.sectionTitle}>문쪽 보관실</Text>
-            </View>
-
-            <View style={styles.pocketContainer}>
-              <View style={styles.pocketScrollContent}>
-                {doorShelves.map((shelf) => (
-                  <View key={shelf.id} style={styles.pocket}>
-                    <View style={styles.shelfHeaderRow}>
-                      <TouchableOpacity
-                        onPress={() => handleOpenShelfDetailModal(shelf.id, shelf.label)}
-                        activeOpacity={0.7}
-                        style={{ flex: 1 }}
-                      >
-                        <Text style={styles.pocketLabel}>{shelf.label} 〉</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.deleteButton}
-                        onPress={() => handleDeleteShelf(shelf.id, shelf.label, 'door')}
-                      >
-                        <Text style={styles.deleteButtonText}>✕</Text>
-                      </TouchableOpacity>
-                    </View>
-                    <View style={styles.shelfItemsContainer}>
-                      <ScrollView
-                        showsVerticalScrollIndicator={true}
-                        contentContainerStyle={styles.shelfItemsScroll}
-                        scrollEnabled={true}
-                      >
-                        {getItemsBySubLocation(shelf.id).map(item => renderItemBadgePreview(item, shelf.id, shelf.label))}
-                        {getItemsBySubLocation(shelf.id).length === 0 && (
-                          <TouchableOpacity onPress={() => handleOpenShelfDetailModal(shelf.id, shelf.label)}>
-                            <Text style={styles.emptyText}>비어 있음</Text>
-                          </TouchableOpacity>
-                        )}
-                      </ScrollView>
-                    </View>
-                  </View>
-                ))}
-              </View>
-
-              {/* 선반 추가 버튼 */}
+      ) : (
+        <>
+          {/* 설정 바: 문쪽 보관실 사용 설정 */}
+          <View style={styles.settingsBar}>
+            <Text style={styles.settingsLabel}>문쪽 보관실 사용</Text>
+            <View style={styles.toggleGroup}>
               <TouchableOpacity
-                style={styles.addShelfButton}
+                style={{ ...styles.toggleButton, ...(hasDoorStorage ? styles.toggleButtonActive : {}) }}
+                onPress={() => handleToggleDoorStorage(true)}
                 activeOpacity={0.7}
-                onPress={() => handleAddShelf('door')}
               >
-                <Text style={styles.addShelfButtonText}>+ 선반 추가</Text>
+                <Text style={{ ...styles.toggleButtonText, ...(hasDoorStorage ? styles.toggleButtonTextActive : {}) }}>있음</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ ...styles.toggleButton, ...(!hasDoorStorage ? styles.toggleButtonActive : {}) }}
+                onPress={() => handleToggleDoorStorage(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={{ ...styles.toggleButtonText, ...(!hasDoorStorage ? styles.toggleButtonTextActive : {}) }}>없음</Text>
               </TouchableOpacity>
             </View>
           </View>
-        )}
-      </View>
+
+          <View style={styles.body}>
+            {/* 좌측: 안쪽 보관실 (선반) */}
+            <View style={[styles.sectionInside, hasDoorStorage ? { marginRight: 8 } : { marginRight: 0, flex: 1 }]}>
+              <View style={styles.sectionHeaderInside}>
+                <Text style={styles.sectionTitle}>안쪽 보관실</Text>
+              </View>
+              
+              <View style={styles.shelfContainer}>
+                <View style={styles.shelfScrollContent}>
+                  {insideShelves.map((shelf) => (
+                    <View key={shelf.id} style={styles.shelf}>
+                      <View style={styles.shelfHeaderRow}>
+                        <TouchableOpacity
+                          onPress={() => handleOpenShelfDetailModal(shelf.id, shelf.label)}
+                          activeOpacity={0.7}
+                          style={{ flex: 1 }}
+                        >
+                          <Text style={styles.shelfLabel}>{shelf.label} 〉</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.deleteButton}
+                          onPress={() => handleDeleteShelf(shelf.id, shelf.label, 'inside')}
+                        >
+                          <Text style={styles.deleteButtonText}>✕</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <View style={styles.shelfItemsContainer}>
+                        <ScrollView
+                          showsVerticalScrollIndicator={true}
+                          contentContainerStyle={styles.shelfItemsScroll}
+                          scrollEnabled={true}
+                        >
+                          {getItemsBySubLocation(shelf.id).map(item => renderItemBadgePreview(item, shelf.id, shelf.label))}
+                          {getItemsBySubLocation(shelf.id).length === 0 && (
+                            <TouchableOpacity onPress={() => handleOpenShelfDetailModal(shelf.id, shelf.label)}>
+                              <Text style={styles.emptyText}>비어 있음</Text>
+                            </TouchableOpacity>
+                          )}
+                        </ScrollView>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+
+                {/* 선반 추가 버튼 */}
+                <TouchableOpacity
+                  style={styles.addShelfButton}
+                  activeOpacity={0.7}
+                  onPress={() => handleAddShelf('inside')}
+                >
+                  <Text style={styles.addShelfButtonText}>+ 선반 추가</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* 우측: 문쪽 보관실 (선반) */}
+            {hasDoorStorage && (
+              <View style={styles.sectionDoor}>
+                <View style={styles.sectionHeaderDoor}>
+                  <Text style={styles.sectionTitle}>문쪽 보관실</Text>
+                </View>
+
+                <View style={styles.pocketContainer}>
+                  <View style={styles.pocketScrollContent}>
+                    {doorShelves.map((shelf) => (
+                      <View key={shelf.id} style={styles.pocket}>
+                        <View style={styles.shelfHeaderRow}>
+                          <TouchableOpacity
+                            onPress={() => handleOpenShelfDetailModal(shelf.id, shelf.label)}
+                            activeOpacity={0.7}
+                            style={{ flex: 1 }}
+                          >
+                            <Text style={styles.pocketLabel}>{shelf.label} 〉</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.deleteButton}
+                            onPress={() => handleDeleteShelf(shelf.id, shelf.label, 'door')}
+                          >
+                            <Text style={styles.deleteButtonText}>✕</Text>
+                          </TouchableOpacity>
+                        </View>
+                        <View style={styles.shelfItemsContainer}>
+                          <ScrollView
+                            showsVerticalScrollIndicator={true}
+                            contentContainerStyle={styles.shelfItemsScroll}
+                            scrollEnabled={true}
+                          >
+                            {getItemsBySubLocation(shelf.id).map(item => renderItemBadgePreview(item, shelf.id, shelf.label))}
+                            {getItemsBySubLocation(shelf.id).length === 0 && (
+                              <TouchableOpacity onPress={() => handleOpenShelfDetailModal(shelf.id, shelf.label)}>
+                                <Text style={styles.emptyText}>비어 있음</Text>
+                              </TouchableOpacity>
+                            )}
+                          </ScrollView>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+
+                  {/* 선반 추가 버튼 */}
+                  <TouchableOpacity
+                    style={styles.addShelfButton}
+                    activeOpacity={0.7}
+                    onPress={() => handleAddShelf('door')}
+                  >
+                    <Text style={styles.addShelfButtonText}>+ 선반 추가</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </View>
+        </>
+      )}
 
       {/* 식재료 등록/수정 모달 */}
       <Modal
@@ -1194,618 +1215,644 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    width: '100%',
-    backgroundColor: '#FAFAFA',
-  },
-  settingsBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#ECEFF1',
-  },
-  settingsLabel: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#455A64',
-  },
-  toggleGroup: {
-    flexDirection: 'row',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 20,
-    padding: 3,
-  },
-  toggleButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  toggleButtonActive: {
-    backgroundColor: '#3F51B5',
-  },
-  toggleButtonText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#90A4AE',
-  },
-  toggleButtonTextActive: {
-    color: '#FFFFFF',
-  },
-  header: {
-    width: '100%',
-    height: 64,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#ECEFF1',
-  },
-  backButton: {
-    width: 80,
-    justifyContent: 'center',
-  },
-  backButtonText: {
-    fontSize: 14,
-    color: '#3F51B5', // 미드나잇 블루 테마색
-    fontWeight: 'bold',
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#37474F',
-    textAlign: 'right',
-  },
-  body: {
-    flex: 1,
-    flexDirection: 'row',
-    padding: 16,
-  },
-  sectionInside: {
-    flex: 5.8,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#ECEFF1',
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  sectionDoor: {
-    flex: 4.2,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#ECEFF1',
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  sectionHeaderInside: {
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    backgroundColor: '#E3F2FD',
-    borderBottomWidth: 1,
-    borderBottomColor: '#BBDEFB',
-  },
-  sectionHeaderDoor: {
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    backgroundColor: '#E0F7FA',
-    borderBottomWidth: 1,
-    borderBottomColor: '#B2EBF2',
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#37474F',
-    textAlign: 'center',
-  },
-  shelfContainer: {
-    flex: 1,
-    backgroundColor: '#ECEFF1',
-    padding: 8,
-  },
-  shelfScrollContent: {
-    flex: 1,
-    gap: 12,
-    paddingBottom: 16,
-  },
-  shelf: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    borderBottomWidth: 5,
-    borderBottomColor: '#CFD8DC',
-    padding: 10,
-    height: 160,
-  },
-  shelfHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  shelfLabel: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: '#78909C',
-  },
-  deleteButton: {
-    padding: 4,
-  },
-  deleteButtonText: {
-    fontSize: 12,
-    color: '#B0BEC5',
-    fontWeight: 'bold',
-  },
-  pocketContainer: {
-    flex: 1,
-    backgroundColor: '#ECEFF1',
-    padding: 8,
-  },
-  pocketScrollContent: {
-    flex: 1,
-    gap: 12,
-    paddingBottom: 16,
-  },
-  pocket: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    borderBottomWidth: 5,
-    borderBottomColor: '#CFD8DC',
-    padding: 10,
-    height: 160,
-  },
-  pocketLabel: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: '#78909C',
-  },
-  itemBadge: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#FAFAFA',
-    borderWidth: 1,
-    borderColor: '#ECEFF1',
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    width: '100%',
-    height: 34,
-    marginBottom: 6,
-  },
-  itemText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#37474F',
-    maxWidth: '65%',
-  },
-  itemDDay: {
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-  emptyText: {
-    fontSize: 12,
-    color: '#B0BEC5',
-    textAlign: 'center',
-    width: '100%',
-    marginTop: 10,
-  },
-  addShelfButton: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#CFD8DC',
-    borderStyle: 'dashed',
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
-  },
-  addShelfButtonText: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#78909C',
-  },
-  shelfItemsContainer: {
-    flex: 1,
-    marginTop: 6,
-  },
-  shelfItemsScroll: {
-    flexDirection: 'column',
-    alignItems: 'stretch',
-    paddingBottom: 8,
-  },
-  addIngredientBadge: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#3F51B5',
-    borderStyle: 'dashed',
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    height: 34,
-    width: '100%',
-    marginBottom: 10,
-  },
-  addIngredientBadgeText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#3F51B5',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    width: '95%',
-    maxWidth: 500,
-    maxHeight: '90%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 10,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#ECEFF1',
-    paddingBottom: 12,
-    marginBottom: 16,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#37474F',
-  },
-  modalCloseButton: {
-    padding: 4,
-  },
-  modalCloseText: {
-    fontSize: 18,
-    color: '#78909C',
-    fontWeight: 'bold',
-  },
-  formScroll: {
-    maxHeight: '80%',
-  },
-  formGroup: {
-    marginBottom: 16,
-  },
-  formLabel: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#546E7A',
-    marginBottom: 6,
-  },
-  input: {
-    borderWidth: 1.5,
-    borderColor: '#CFD8DC',
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    fontSize: 14,
-    color: '#37474F',
-    backgroundColor: '#FAFAFA',
-  },
-  categoryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    rowGap: 8,
-  },
-  categoryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderWidth: 1.5,
-    borderColor: '#ECEFF1',
-    borderRadius: 12,
-    paddingVertical: 10,
-    width: '48.5%', // 2 columns (perfectly symmetrical for 10 items)
-    justifyContent: 'center',
-    gap: 6,
-  },
-  categoryButtonActive: {
-    backgroundColor: '#3F51B5',
-    borderColor: '#3F51B5',
-  },
-  categoryButtonText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: '#546E7A',
-  },
-  categoryButtonTextActive: {
-    color: '#FFFFFF',
-  },
-  quantityUnitRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  quantityCounter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#CFD8DC',
-    borderRadius: 10,
-    backgroundColor: '#FAFAFA',
-    overflow: 'hidden',
-  },
-  counterButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    backgroundColor: '#ECEFF1',
-  },
-  counterButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#37474F',
-  },
-  counterValue: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#37474F',
-    paddingHorizontal: 16,
-    minWidth: 40,
-    textAlign: 'center',
-  },
-  unitSelector: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    flex: 1,
-  },
-  unitPill: {
-    backgroundColor: '#F5F5F5',
-    borderWidth: 1,
-    borderColor: '#ECEFF1',
-    borderRadius: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-  },
-  unitPillActive: {
-    backgroundColor: '#3F51B5',
-    borderColor: '#3F51B5',
-  },
-  unitPillText: {
-    fontSize: 11,
-    color: '#546E7A',
-    fontWeight: 'bold',
-  },
-  unitPillTextActive: {
-    color: '#FFFFFF',
-  },
-  unitInput: {
-    borderWidth: 1,
-    borderColor: '#CFD8DC',
-    borderRadius: 8,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    fontSize: 11,
-    width: 60,
-    color: '#37474F',
-    backgroundColor: '#FAFAFA',
-    textAlign: 'center',
-  },
-  presetRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 8,
-  },
-  presetButton: {
-    flex: 1,
-    backgroundColor: '#E8EAF6',
-    borderRadius: 8,
-    paddingVertical: 8,
-    alignItems: 'center',
-  },
-  presetButtonText: {
-    fontSize: 11,
-    color: '#3F51B5',
-    fontWeight: 'bold',
-  },
-  textArea: {
-    height: 60,
-    textAlignVertical: 'top',
-  },
-  modalFooter: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    borderTopWidth: 1,
-    borderTopColor: '#ECEFF1',
-    paddingTop: 12,
-    marginTop: 16,
-    gap: 8,
-  },
-  footerButton: {
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    minWidth: 80,
-  },
-  buttonCancel: {
-    backgroundColor: '#ECEFF1',
-  },
-  buttonDelete: {
-    backgroundColor: '#FF5252',
-    marginRight: 'auto',
-  },
-  buttonSave: {
-    backgroundColor: '#3F51B5',
-  },
-  buttonTextCancel: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#546E7A',
-  },
-  buttonTextDelete: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  buttonTextSave: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  shelfDetailRow: {
-    flexDirection: 'column',
-    backgroundColor: '#FAFAFA',
-    borderWidth: 1.5,
-    borderColor: '#ECEFF1',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-    gap: 10,
-  },
-  shelfDetailTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    width: '100%',
-  },
-  shelfDetailNameSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
-    marginRight: 8,
-  },
-  shelfDetailNameContainer: {
-    flex: 1,
-  },
-  shelfDetailNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  shelfDetailName: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#37474F',
-  },
-  dDayBadge: {
-    borderWidth: 1,
-    borderRadius: 6,
-    paddingVertical: 2,
-    paddingHorizontal: 6,
-  },
-  dDayBadgeText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  shelfDetailMemo: {
-    fontSize: 12,
-    color: '#78909C',
-    marginTop: 2,
-  },
-  shelfDetailEditBtn: {
-    backgroundColor: '#E8EAF6',
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  shelfDetailEditBtnText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: '#3F51B5',
-  },
-  shelfDetailBottomRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#ECEFF1',
-  },
-  shelfDetailInfoBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#ECEFF1',
-  },
-  expiryHighlightedBadge: {
-    borderColor: '#C5CAE9',
-    backgroundColor: '#E8EAF6',
-  },
-  shelfDetailInfoLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#90A4AE',
-  },
-  shelfDetailQuantity: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#546E7A',
-  },
-  shelfDetailExpiryDate: {
-    fontSize: 11,
-    color: '#78909C',
-  },
-  shelfDetailExpiryDateHighlighted: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#3F51B5',
-  },
-  shelfDetailDDay: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    marginLeft: 2,
-  },
-  shelfDetailActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  shelfDetailDeleteBtn: {
-    backgroundColor: '#FFEBEE',
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  shelfDetailDeleteBtnText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#FF5252',
-  },
-});
+function createStyles(theme: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      width: '100%',
+      backgroundColor: theme.background,
+    },
+    settingsBar: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+      backgroundColor: theme.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.borderLight,
+    },
+    settingsLabel: {
+      fontSize: 14,
+      fontWeight: 'bold',
+      color: theme.textSecondary,
+    },
+    toggleGroup: {
+      flexDirection: 'row',
+      backgroundColor: theme.toggleBg,
+      borderRadius: 20,
+      padding: 3,
+    },
+    toggleButton: {
+      paddingVertical: 6,
+      paddingHorizontal: 16,
+      borderRadius: 18,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    toggleButtonActive: {
+      backgroundColor: theme.primary,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 3,
+      elevation: 2,
+    },
+    toggleButtonText: {
+      fontSize: 12,
+      fontWeight: 'bold',
+      color: theme.toggleInactiveText,
+    },
+    toggleButtonTextActive: {
+      color: theme.primaryOnPrimary,
+    },
+    header: {
+      width: '100%',
+      height: 64,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-end',
+      paddingHorizontal: 16,
+      paddingBottom: 12,
+      backgroundColor: theme.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.borderLight,
+    },
+    backButton: {
+      width: 80,
+      justifyContent: 'center',
+    },
+    backButtonText: {
+      fontSize: 14,
+      color: theme.primaryText,
+      fontWeight: 'bold',
+    },
+    headerTitle: {
+      flex: 1,
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: theme.textPrimary,
+      textAlign: 'right',
+    },
+    body: {
+      flex: 1,
+      flexDirection: 'row',
+      padding: 16,
+    },
+    sectionInside: {
+      flex: 5.8,
+      backgroundColor: theme.surface,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: theme.borderLight,
+      overflow: 'hidden',
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.03,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    sectionDoor: {
+      flex: 4.2,
+      backgroundColor: theme.surface,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: theme.borderLight,
+      overflow: 'hidden',
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.03,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    sectionHeaderInside: {
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      backgroundColor: theme.fridgeDoor,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.fridgeDoorBorder,
+    },
+    sectionHeaderDoor: {
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      backgroundColor: theme.freezerDoor,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.freezerDoorBorder,
+    },
+    sectionTitle: {
+      fontSize: 14,
+      fontWeight: 'bold',
+      color: theme.textPrimary,
+      textAlign: 'center',
+    },
+    shelfContainer: {
+      flex: 1,
+      backgroundColor: theme.surfaceSecondary,
+      padding: 8,
+    },
+    shelfScrollContent: {
+      flex: 1,
+      gap: 12,
+      paddingBottom: 16,
+    },
+    shelf: {
+      backgroundColor: theme.surface,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.glassBorder,
+      borderBottomWidth: 5,
+      borderBottomColor: theme.metallicTrim,
+      padding: 10,
+      height: 170,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    shelfHeaderRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    shelfLabel: {
+      fontSize: 11,
+      fontWeight: 'bold',
+      color: theme.textTertiary,
+    },
+    deleteButton: {
+      padding: 4,
+    },
+    deleteButtonText: {
+      fontSize: 12,
+      color: theme.textMuted,
+      fontWeight: 'bold',
+    },
+    pocketContainer: {
+      flex: 1,
+      backgroundColor: theme.surfaceSecondary,
+      padding: 8,
+    },
+    pocketScrollContent: {
+      flex: 1,
+      gap: 12,
+      paddingBottom: 16,
+    },
+    pocket: {
+      backgroundColor: theme.surface,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.glassBorder,
+      borderBottomWidth: 5,
+      borderBottomColor: theme.metallicTrim,
+      padding: 10,
+      height: 170,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    pocketLabel: {
+      fontSize: 11,
+      fontWeight: 'bold',
+      color: theme.textTertiary,
+    },
+    itemBadge: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: theme.surface, // 깔끔한 화이트/슬레이트 카드
+      borderWidth: 1,
+      borderColor: theme.borderLight,
+      borderRadius: 10,
+      paddingVertical: 8,
+      paddingHorizontal: 10,
+      width: '100%',
+      height: 40,
+      marginBottom: 8,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.04,
+      shadowRadius: 4,
+      elevation: 1.5,
+    },
+    itemText: {
+      fontSize: 12,
+      fontWeight: 'bold',
+      color: theme.textPrimary,
+      maxWidth: '65%',
+    },
+    itemDDay: {
+      fontSize: 11,
+      fontWeight: 'bold',
+    },
+    emptyText: {
+      fontSize: 12,
+      color: theme.textMuted,
+      textAlign: 'center',
+      width: '100%',
+      marginTop: 10,
+    },
+    addShelfButton: {
+      backgroundColor: theme.surface,
+      borderWidth: 1,
+      borderColor: theme.borderLight,
+      borderStyle: 'dashed',
+      borderRadius: 10,
+      paddingVertical: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 4,
+    },
+    addShelfButtonText: {
+      fontSize: 13,
+      fontWeight: 'bold',
+      color: theme.textTertiary,
+    },
+    shelfItemsContainer: {
+      flex: 1,
+      marginTop: 6,
+    },
+    shelfItemsScroll: {
+      flexDirection: 'column',
+      alignItems: 'stretch',
+      paddingBottom: 8,
+    },
+    addIngredientBadge: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: theme.surface,
+      borderWidth: 1.5,
+      borderColor: theme.primary,
+      borderStyle: 'dashed',
+      borderRadius: 8,
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+      height: 34,
+      width: '100%',
+      marginBottom: 10,
+    },
+    addIngredientBadgeText: {
+      fontSize: 12,
+      fontWeight: 'bold',
+      color: theme.primary,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: theme.modalOverlay,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+    },
+    modalContent: {
+      width: '95%',
+      maxWidth: 500,
+      maxHeight: '90%',
+      backgroundColor: theme.surface,
+      borderRadius: 20,
+      padding: 20,
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.15,
+      shadowRadius: 16,
+      elevation: 10,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      borderBottomWidth: 1,
+      borderBottomColor: theme.borderLight,
+      paddingBottom: 12,
+      marginBottom: 16,
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: theme.textPrimary,
+    },
+    modalCloseButton: {
+      padding: 4,
+    },
+    modalCloseText: {
+      fontSize: 18,
+      color: theme.textTertiary,
+      fontWeight: 'bold',
+    },
+    formScroll: {
+      maxHeight: '80%',
+    },
+    formGroup: {
+      marginBottom: 16,
+    },
+    formLabel: {
+      fontSize: 13,
+      fontWeight: 'bold',
+      color: theme.textSecondary,
+      marginBottom: 6,
+    },
+    input: {
+      borderWidth: 1.5,
+      borderColor: theme.borderLight,
+      borderRadius: 10,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      fontSize: 14,
+      color: theme.textPrimary,
+      backgroundColor: theme.surfaceSecondary,
+    },
+    categoryGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-between',
+      rowGap: 8,
+    },
+    categoryButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.surfaceTertiary,
+      borderWidth: 1.5,
+      borderColor: theme.borderLight,
+      borderRadius: 12,
+      paddingVertical: 10,
+      width: '48.5%', // 2 columns (perfectly symmetrical for 10 items)
+      justifyContent: 'center',
+      gap: 6,
+    },
+    categoryButtonActive: {
+      backgroundColor: theme.primary,
+      borderColor: theme.primary,
+    },
+    categoryButtonText: {
+      fontSize: 11,
+      fontWeight: 'bold',
+      color: theme.textSecondary,
+    },
+    categoryButtonTextActive: {
+      color: theme.primaryOnPrimary,
+    },
+    quantityUnitRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
+    },
+    quantityCounter: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1.5,
+      borderColor: theme.borderLight,
+      borderRadius: 10,
+      backgroundColor: theme.surfaceSecondary,
+      overflow: 'hidden',
+    },
+    counterButton: {
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      backgroundColor: theme.surfaceTertiary,
+    },
+    counterButtonText: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      color: theme.textPrimary,
+    },
+    counterValue: {
+      fontSize: 14,
+      fontWeight: 'bold',
+      color: theme.textPrimary,
+      paddingHorizontal: 16,
+      minWidth: 40,
+      textAlign: 'center',
+    },
+    unitSelector: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 6,
+      flex: 1,
+    },
+    unitPill: {
+      backgroundColor: theme.surfaceTertiary,
+      borderWidth: 1,
+      borderColor: theme.borderLight,
+      borderRadius: 10,
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+    },
+    unitPillActive: {
+      backgroundColor: theme.primary,
+      borderColor: theme.primary,
+    },
+    unitPillText: {
+      fontSize: 11,
+      color: theme.textSecondary,
+      fontWeight: 'bold',
+    },
+    unitPillTextActive: {
+      color: theme.primaryOnPrimary,
+    },
+    unitInput: {
+      borderWidth: 1,
+      borderColor: theme.borderLight,
+      borderRadius: 8,
+      paddingVertical: 4,
+      paddingHorizontal: 8,
+      fontSize: 11,
+      width: 60,
+      color: theme.textPrimary,
+      backgroundColor: theme.surfaceSecondary,
+      textAlign: 'center',
+    },
+    presetRow: {
+      flexDirection: 'row',
+      gap: 8,
+      marginTop: 8,
+    },
+    presetButton: {
+      flex: 1,
+      backgroundColor: theme.primaryLight,
+      borderRadius: 8,
+      paddingVertical: 8,
+      alignItems: 'center',
+    },
+    presetButtonText: {
+      fontSize: 11,
+      color: theme.primaryText,
+      fontWeight: 'bold',
+    },
+    textArea: {
+      height: 60,
+      textAlignVertical: 'top',
+    },
+    modalFooter: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      borderTopWidth: 1,
+      borderTopColor: theme.borderLight,
+      paddingTop: 12,
+      marginTop: 16,
+      gap: 8,
+    },
+    footerButton: {
+      borderRadius: 10,
+      paddingVertical: 10,
+      paddingHorizontal: 18,
+      justifyContent: 'center',
+      alignItems: 'center',
+      minWidth: 80,
+    },
+    buttonCancel: {
+      backgroundColor: theme.surfaceTertiary,
+    },
+    buttonDelete: {
+      backgroundColor: theme.danger,
+      marginRight: 'auto',
+    },
+    buttonSave: {
+      backgroundColor: theme.primary,
+    },
+    buttonTextCancel: {
+      fontSize: 13,
+      fontWeight: 'bold',
+      color: theme.textSecondary,
+    },
+    buttonTextDelete: {
+      fontSize: 13,
+      fontWeight: 'bold',
+      color: theme.primaryOnPrimary,
+    },
+    buttonTextSave: {
+      fontSize: 13,
+      fontWeight: 'bold',
+      color: theme.primaryOnPrimary,
+    },
+    shelfDetailRow: {
+      flexDirection: 'column',
+      backgroundColor: theme.surfaceSecondary,
+      borderWidth: 1.5,
+      borderColor: theme.borderLight,
+      borderRadius: 12,
+      padding: 12,
+      marginBottom: 8,
+      gap: 10,
+    },
+    shelfDetailTopRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      width: '100%',
+    },
+    shelfDetailNameSection: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      flex: 1,
+      marginRight: 8,
+    },
+    shelfDetailNameContainer: {
+      flex: 1,
+    },
+    shelfDetailNameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      flexWrap: 'wrap',
+    },
+    shelfDetailName: {
+      fontSize: 15,
+      fontWeight: 'bold',
+      color: theme.textPrimary,
+    },
+    dDayBadge: {
+      borderWidth: 1,
+      borderRadius: 6,
+      paddingVertical: 2,
+      paddingHorizontal: 6,
+    },
+    dDayBadgeText: {
+      fontSize: 10,
+      fontWeight: 'bold',
+    },
+    shelfDetailMemo: {
+      fontSize: 12,
+      color: theme.textTertiary,
+      marginTop: 2,
+    },
+    shelfDetailEditBtn: {
+      backgroundColor: theme.primaryLight,
+      borderRadius: 8,
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+    },
+    shelfDetailEditBtnText: {
+      fontSize: 11,
+      fontWeight: 'bold',
+      color: theme.primaryText,
+    },
+    shelfDetailBottomRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingTop: 8,
+      borderTopWidth: 1,
+      borderTopColor: theme.borderLight,
+    },
+    shelfDetailInfoBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: theme.surface,
+      paddingVertical: 4,
+      paddingHorizontal: 8,
+      borderRadius: 6,
+      borderWidth: 1,
+      borderColor: theme.borderLight,
+    },
+    expiryHighlightedBadge: {
+      borderColor: theme.primaryBorder,
+      backgroundColor: theme.primaryLight,
+    },
+    shelfDetailInfoLabel: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: theme.textMuted,
+    },
+    shelfDetailQuantity: {
+      fontSize: 12,
+      fontWeight: 'bold',
+      color: theme.textSecondary,
+    },
+    shelfDetailExpiryDate: {
+      fontSize: 11,
+      color: theme.textTertiary,
+    },
+    shelfDetailExpiryDateHighlighted: {
+      fontSize: 14,
+      fontWeight: 'bold',
+      color: theme.primaryText,
+    },
+    shelfDetailDDay: {
+      fontSize: 11,
+      fontWeight: 'bold',
+      marginLeft: 2,
+    },
+    shelfDetailActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    shelfDetailDeleteBtn: {
+      backgroundColor: theme.dangerLight,
+      borderRadius: 8,
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    shelfDetailDeleteBtnText: {
+      fontSize: 12,
+      fontWeight: 'bold',
+      color: theme.danger,
+    },
+  });
+}

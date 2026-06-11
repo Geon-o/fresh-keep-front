@@ -5,19 +5,32 @@ import { queryClient } from "../src/api/queryClient";
 import { AuthProvider } from "../src/context/AuthContext";
 import { ThemeAlertPortal } from "../src/components/ThemeAlert";
 import * as SplashScreen from 'expo-splash-screen';
+import { ThemeProvider, useTheme } from "../src/context/ThemeContext";
 
 // 앱 시작 시 자동 스플래시 스크린 숨김을 방지하고 수동으로 제어
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
   return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
+  );
+}
+
+function AppContent() {
+  const { isDark } = useTheme();
+  
+  return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <StatusBar style="dark" />
+        <StatusBar style={isDark ? 'light' : 'dark'} />
         <Stack screenOptions={{ headerShown: false }} />
         <ThemeAlertPortal />
       </AuthProvider>
     </QueryClientProvider>
   );
 }
+
+
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Modal, TouchableOpacity, Text, Alert, Platform, TextInput, KeyboardAvoidingView, ActivityIndicator, useColorScheme } from 'react-native';
+import { StyleSheet, View, Modal, TouchableOpacity, Text, Alert, Platform, TextInput, KeyboardAvoidingView, ActivityIndicator, Animated, Easing } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
@@ -13,24 +13,24 @@ import SettingsView from '../src/components/SettingsView';
 import RefrigeratorSelector from '../src/components/RefrigeratorSelector';
 import { useAuth } from '../src/context/AuthContext';
 import { getFridges, createFridge, deleteFridge, updateFridge, convertTypeToFrontend } from '../src/api/fridgeService';
+import { useTheme } from '../src/context/ThemeContext';
 
 export default function Index() {
   const { isLoggedIn, user, logout } = useAuth();
   const queryClient = useQueryClient();
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const { theme } = useTheme();
 
   const splashTheme = {
-    background: isDark ? '#000000' : '#FFFFFF',
-    text: isDark ? '#FFFFFF' : '#0F172A',
-    subText: isDark ? '#94A3B8' : '#64748B',
-    icon: isDark ? '#38BDF8' : '#4F46E5',
-    spinner: isDark ? '#FFFFFF' : '#4F46E5',
+    background: theme.splashBg,
+    text: theme.splashText,
+    subText: theme.splashSubText,
+    icon: theme.splashIcon,
+    spinner: theme.splashSpinner,
   };
 
   // 1. 네비게이션 및 활성 인덱스 상태
-  const [activeTab, setActiveTab] = useState<'home' | 'settings'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'ingredients' | 'fridge' | 'settings'>('home');
   const [activeIndex, setActiveIndex] = useState(0);
 
   // 2. 냉장고 형태/추가 선택 모달 상태
@@ -84,6 +84,117 @@ export default function Index() {
 
   // 스플래시 오버레이를 띄울지 여부 (로딩 중이거나 최소 시간이 지나지 않았을 때)
   const showSplashOverlay = isRefrigeratorsLoading || !isMinTimeElapsed;
+
+  // 스플래시 오버레이 애니메이션 효과 기획 (부유, 회전, 호흡 맥박)
+  const rotateAnim = React.useRef(new Animated.Value(0)).current;
+  const pulseAnim = React.useRef(new Animated.Value(1)).current;
+  const floatAnim = React.useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (showSplashOverlay) {
+      // 1. 회전 애니메이션 (부드럽고 느리게 - 12초 주기)
+      const rotateAnimation = Animated.loop(
+        Animated.timing(rotateAnim, {
+          toValue: 1,
+          duration: 12000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
+      );
+
+      // 2. 맥박(호흡) 애니메이션 (2초 수축, 2초 팽창)
+      const pulseAnimation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.12,
+            duration: 2000,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1.0,
+            duration: 2000,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      );
+
+      // 3. 부유(위아래 흔들림) 애니메이션 (자연스러운 둥둥 떠있는 느낌)
+      const floatAnimation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(floatAnim, {
+            toValue: -8, // 위로 8px
+            duration: 2500,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(floatAnim, {
+            toValue: 8, // 아래로 8px
+            duration: 2500,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(floatAnim, {
+            toValue: 0,
+            duration: 2500,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      );
+
+      rotateAnimation.start();
+      pulseAnimation.start();
+      floatAnimation.start();
+
+      return () => {
+        rotateAnimation.stop();
+        pulseAnimation.stop();
+        floatAnimation.stop();
+      };
+    }
+  }, [showSplashOverlay]);
+
+  const spin = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  // 탭바 스프링 애니메이션 (햅틱 반응형 피드백)
+  const homeTabScale = React.useRef(new Animated.Value(1.12)).current;
+  const ingredientsTabScale = React.useRef(new Animated.Value(0.95)).current;
+  const fridgeTabScale = React.useRef(new Animated.Value(0.95)).current;
+  const settingsTabScale = React.useRef(new Animated.Value(0.95)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(homeTabScale, {
+        toValue: activeTab === 'home' ? 1.12 : 0.95,
+        friction: 6,
+        tension: 80,
+        useNativeDriver: true,
+      }),
+      Animated.spring(ingredientsTabScale, {
+        toValue: activeTab === 'ingredients' ? 1.12 : 0.95,
+        friction: 6,
+        tension: 80,
+        useNativeDriver: true,
+      }),
+      Animated.spring(fridgeTabScale, {
+        toValue: activeTab === 'fridge' ? 1.12 : 0.95,
+        friction: 6,
+        tension: 80,
+        useNativeDriver: true,
+      }),
+      Animated.spring(settingsTabScale, {
+        toValue: activeTab === 'settings' ? 1.12 : 0.95,
+        friction: 6,
+        tension: 80,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [activeTab]);
 
   // 로그인 여부에 따라 최종 노출할 냉장고 배열 결정
   const refrigerators = React.useMemo(() => {
@@ -286,7 +397,7 @@ export default function Index() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       {activeCompartment !== null ? (
         <CompartmentDetail
           compartmentId={activeCompartment.id}
@@ -298,8 +409,9 @@ export default function Index() {
         <View style={styles.mainWrapper}>
           {/* 상단 탭 콘텐츠 */}
           <View style={styles.contentWrapper}>
-            {activeTab === 'home' ? (
+            {activeTab === 'home' || activeTab === 'ingredients' || activeTab === 'fridge' ? (
               <RefrigeratorVisual
+                mode={activeTab as 'home' | 'ingredients' | 'fridge'}
                 refrigerators={refrigerators}
                 onPressCompartment={handlePressCompartment}
                 activeIndex={activeIndex}
@@ -322,30 +434,82 @@ export default function Index() {
 
           {/* 하단 탭 바 (Bottom Navigation Bar) */}
           <View style={styles.tabBarContainer}>
-            <View style={styles.tabBar}>
-              <TouchableOpacity
-                style={[styles.tabItem, activeTab === 'home' && styles.tabItemActive]}
-                activeOpacity={0.7}
-                onPress={() => setActiveTab('home')}
-              >
-                <Ionicons
-                  name={activeTab === 'home' ? 'home' : 'home-outline'}
-                  size={24}
-                  color={activeTab === 'home' ? '#FFFFFF' : '#64748B'}
-                />
-              </TouchableOpacity>
+            <View style={[styles.tabBar, { 
+              backgroundColor: theme.glassBg,
+              borderColor: theme.glassBorder,
+              shadowColor: theme.shadow
+            }]}>
+              {/* 홈 */}
+              <Animated.View style={{ transform: [{ scale: homeTabScale }] }}>
+                <TouchableOpacity
+                  style={[
+                    styles.tabItem, 
+                    activeTab === 'home' && [styles.tabItemActive, { backgroundColor: theme.primary }]
+                  ]}
+                  activeOpacity={0.7}
+                  onPress={() => setActiveTab('home')}
+                >
+                  <Ionicons
+                    name={activeTab === 'home' ? 'home' : 'home-outline'}
+                    size={24}
+                    color={activeTab === 'home' ? theme.primaryOnPrimary : theme.tabIconInactive}
+                  />
+                </TouchableOpacity>
+              </Animated.View>
 
-              <TouchableOpacity
-                style={[styles.tabItem, activeTab === 'settings' && styles.tabItemActive]}
-                activeOpacity={0.7}
-                onPress={() => setActiveTab('settings')}
-              >
-                <Ionicons
-                  name={activeTab === 'settings' ? 'settings' : 'settings-outline'}
-                  size={24}
-                  color={activeTab === 'settings' ? '#FFFFFF' : '#64748B'}
-                />
-              </TouchableOpacity>
+              {/* 식재료 목록 */}
+              <Animated.View style={{ transform: [{ scale: ingredientsTabScale }] }}>
+                <TouchableOpacity
+                  style={[
+                    styles.tabItem, 
+                    activeTab === 'ingredients' && [styles.tabItemActive, { backgroundColor: theme.primary }]
+                  ]}
+                  activeOpacity={0.7}
+                  onPress={() => setActiveTab('ingredients')}
+                >
+                  <Ionicons
+                    name={activeTab === 'ingredients' ? 'restaurant' : 'restaurant-outline'}
+                    size={24}
+                    color={activeTab === 'ingredients' ? theme.primaryOnPrimary : theme.tabIconInactive}
+                  />
+                </TouchableOpacity>
+              </Animated.View>
+
+              {/* 냉장고 보관소 */}
+              <Animated.View style={{ transform: [{ scale: fridgeTabScale }] }}>
+                <TouchableOpacity
+                  style={[
+                    styles.tabItem, 
+                    activeTab === 'fridge' && [styles.tabItemActive, { backgroundColor: theme.primary }]
+                  ]}
+                  activeOpacity={0.7}
+                  onPress={() => setActiveTab('fridge')}
+                >
+                  <Ionicons
+                    name={activeTab === 'fridge' ? 'cube' : 'cube-outline'}
+                    size={24}
+                    color={activeTab === 'fridge' ? theme.primaryOnPrimary : theme.tabIconInactive}
+                  />
+                </TouchableOpacity>
+              </Animated.View>
+
+              {/* 설정 */}
+              <Animated.View style={{ transform: [{ scale: settingsTabScale }] }}>
+                <TouchableOpacity
+                  style={[
+                    styles.tabItem, 
+                    activeTab === 'settings' && [styles.tabItemActive, { backgroundColor: theme.primary }]
+                  ]}
+                  activeOpacity={0.7}
+                  onPress={() => setActiveTab('settings')}
+                >
+                  <Ionicons
+                    name={activeTab === 'settings' ? 'settings' : 'settings-outline'}
+                    size={24}
+                    color={activeTab === 'settings' ? theme.primaryOnPrimary : theme.tabIconInactive}
+                  />
+                </TouchableOpacity>
+              </Animated.View>
             </View>
           </View>
         </View>
@@ -358,19 +522,19 @@ export default function Index() {
         animationType="slide"
         onRequestClose={() => setSelectorVisible(false)}
       >
-        <View style={styles.selectorModalOverlay}>
+        <View style={[styles.selectorModalOverlay, { backgroundColor: theme.modalOverlay }]}>
           <TouchableOpacity
             style={styles.backdrop}
             activeOpacity={1}
             onPress={() => setSelectorVisible(false)}
           />
-          <View style={styles.selectorModalContent}>
-            <View style={styles.selectorModalHeader}>
-              <Text style={styles.selectorModalTitle}>
+          <View style={[styles.selectorModalContent, { backgroundColor: theme.surface, shadowColor: theme.shadow }]}>
+            <View style={[styles.selectorModalHeader, { borderBottomColor: theme.borderLight }]}>
+              <Text style={[styles.selectorModalTitle, { color: theme.textPrimary }]}>
                 {selectorMode === 'add' ? '냉장고 추가 등록' : '냉장고 형태 수정'}
               </Text>
               <TouchableOpacity onPress={() => setSelectorVisible(false)} style={styles.selectorCloseButton}>
-                <Text style={styles.selectorCloseButtonText}>✕</Text>
+                <Text style={[styles.selectorCloseButtonText, { color: theme.textTertiary }]}>✕</Text>
               </TouchableOpacity>
             </View>
             <RefrigeratorSelector
@@ -396,24 +560,24 @@ export default function Index() {
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.renameModalOverlay}
+          style={[styles.renameModalOverlay, { backgroundColor: theme.modalOverlay }]}
         >
           <TouchableOpacity
             style={styles.backdrop}
             activeOpacity={1}
             onPress={() => setRenameModalVisible(false)}
           />
-          <View style={styles.renameModalContent}>
-            <Text style={styles.renameModalTitle}>냉장고 이름 변경 ✏️</Text>
-            <Text style={styles.renameModalDesc}>지정하고 싶으신 냉장고 이름을 입력해 주세요.</Text>
+          <View style={[styles.renameModalContent, { backgroundColor: theme.surface, shadowColor: theme.shadow }]}>
+            <Text style={[styles.renameModalTitle, { color: theme.textPrimary }]}>냉장고 이름 변경 ✏️</Text>
+            <Text style={[styles.renameModalDesc, { color: theme.textTertiary }]}>지정하고 싶으신 냉장고 이름을 입력해 주세요.</Text>
 
-            <View style={styles.renameInputContainer}>
+            <View style={[styles.renameInputContainer, { borderColor: theme.border, backgroundColor: theme.surfaceSecondary }]}>
               <TextInput
-                style={styles.renameInput}
+                style={[styles.renameInput, { color: theme.textPrimary }]}
                 value={renameValue}
                 onChangeText={setRenameValue}
                 placeholder="예: 우리집 메인 냉장고"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={theme.textMuted}
                 maxLength={20}
                 autoFocus
               />
@@ -423,26 +587,34 @@ export default function Index() {
                   activeOpacity={0.7}
                   onPress={() => setRenameValue('')}
                 >
-                  <Ionicons name="close-circle" size={18} color="#94A3B8" />
+                  <Ionicons name="close-circle" size={18} color={theme.textMuted} />
                 </TouchableOpacity>
               )}
             </View>
 
             <View style={styles.renameButtonRow}>
               <TouchableOpacity
-                style={styles.renameCancelButton}
+                style={[styles.renameCancelButton, { backgroundColor: theme.surfaceTertiary }]}
                 activeOpacity={0.8}
                 onPress={() => setRenameModalVisible(false)}
               >
-                <Text style={styles.renameCancelButtonText}>취소</Text>
+                <Text style={[styles.renameCancelButtonText, { color: theme.textSecondary }]}>취소</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.renameSaveButton, isSaveDisabled && styles.renameSaveButtonDisabled]}
+                style={[
+                  styles.renameSaveButton, 
+                  { backgroundColor: theme.primary },
+                  isSaveDisabled && { backgroundColor: theme.primaryBorder }
+                ]}
                 activeOpacity={0.8}
                 disabled={isSaveDisabled}
                 onPress={() => activeFridge && handleRenameFridge(activeFridge.id, renameValue)}
               >
-                <Text style={[styles.renameSaveButtonText, isSaveDisabled && styles.renameSaveButtonTextDisabled]}>저장</Text>
+                <Text style={[
+                  styles.renameSaveButtonText, 
+                  { color: theme.primaryOnPrimary },
+                  isSaveDisabled && { color: theme.textMuted }
+                ]}>저장</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -452,13 +624,20 @@ export default function Index() {
       {showSplashOverlay && (
         <View style={[styles.splashOverlayContainer, { backgroundColor: splashTheme.background }]}>
           <View style={styles.splashLogoContainer}>
-            <Ionicons name="snow-outline" size={72} color={splashTheme.icon} />
-            <Text style={[styles.splashAppName, { color: splashTheme.text }]}>FreshKeep</Text>
-            <Text style={[styles.splashAppDesc, { color: splashTheme.subText }]}>신선함을 오래오래, 스마트 냉장고 관리</Text>
-          </View>
-          <View style={styles.splashLoadingContainer}>
-            <ActivityIndicator size="small" color={splashTheme.spinner} />
-            <Text style={[styles.splashLoadingText, { color: splashTheme.subText }]}>데이터를 동기화하는 중입니다...</Text>
+            <Animated.View 
+              style={{ 
+                transform: [
+                  { translateY: floatAnim }, 
+                  { rotate: spin }, 
+                  { scale: pulseAnim }
+                ] 
+              }}
+            >
+              <Ionicons name="snow-outline" size={96} color={splashTheme.icon} />
+            </Animated.View>
+            <Text style={[styles.splashAppDesc, { color: splashTheme.subText, marginTop: 28, fontSize: 15 }]}>
+              신선함을 오래오래, 스마트 냉장고 관리
+            </Text>
           </View>
         </View>
       )}
