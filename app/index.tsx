@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Modal, TouchableOpacity, Text, Alert, Platform, TextInput, KeyboardAvoidingView, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, Modal, TouchableOpacity, Text, Alert, Platform, TextInput, KeyboardAvoidingView, ActivityIndicator, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
@@ -18,6 +18,16 @@ export default function Index() {
   const { isLoggedIn, user, logout } = useAuth();
   const queryClient = useQueryClient();
   const router = useRouter();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+
+  const splashTheme = {
+    background: isDark ? '#000000' : '#FFFFFF',
+    text: isDark ? '#FFFFFF' : '#0F172A',
+    subText: isDark ? '#94A3B8' : '#64748B',
+    icon: isDark ? '#38BDF8' : '#4F46E5',
+    spinner: isDark ? '#FFFFFF' : '#4F46E5',
+  };
 
   // 1. 네비게이션 및 활성 인덱스 상태
   const [activeTab, setActiveTab] = useState<'home' | 'settings'>('home');
@@ -440,15 +450,15 @@ export default function Index() {
       </Modal>
       {/* 100% 신뢰성 있는 인앱 비주얼 스플래시 스크린 */}
       {showSplashOverlay && (
-        <View style={styles.splashOverlayContainer}>
+        <View style={[styles.splashOverlayContainer, { backgroundColor: splashTheme.background }]}>
           <View style={styles.splashLogoContainer}>
-            <Ionicons name="snow-outline" size={72} color="#FFFFFF" />
-            <Text style={styles.splashAppName}>FreshKeep</Text>
-            <Text style={styles.splashAppDesc}>신선함을 오래오래, 스마트 냉장고 관리</Text>
+            <Ionicons name="snow-outline" size={72} color={splashTheme.icon} />
+            <Text style={[styles.splashAppName, { color: splashTheme.text }]}>FreshKeep</Text>
+            <Text style={[styles.splashAppDesc, { color: splashTheme.subText }]}>신선함을 오래오래, 스마트 냉장고 관리</Text>
           </View>
           <View style={styles.splashLoadingContainer}>
-            <ActivityIndicator size="small" color="#FFFFFF" />
-            <Text style={styles.splashLoadingText}>데이터를 동기화하는 중입니다...</Text>
+            <ActivityIndicator size="small" color={splashTheme.spinner} />
+            <Text style={[styles.splashLoadingText, { color: splashTheme.subText }]}>데이터를 동기화하는 중입니다...</Text>
           </View>
         </View>
       )}
@@ -467,7 +477,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#4F46E5', // 브랜드 인디고 블루
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 80,
