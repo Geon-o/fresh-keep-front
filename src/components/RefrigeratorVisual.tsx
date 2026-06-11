@@ -1,10 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, Modal, ScrollView, useWindowDimensions, Alert } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
 import { FridgeType, Ingredient } from '../types';
 import { SAMPLE_INGREDIENTS, CATEGORY_EMOJI } from './CompartmentDetail';
-import RefrigeratorSelector from './RefrigeratorSelector';
 import { useAuth } from '../context/AuthContext';
 import { getFridgeLayout } from '../api/fridgeService';
 import { deserializeMemo, convertServerLocationToLocal } from '../utils/memoSerializer';
@@ -12,26 +10,21 @@ import { deserializeMemo, convertServerLocationToLocal } from '../utils/memoSeri
 interface RefrigeratorVisualProps {
   refrigerators: { id: string; type: FridgeType; name: string }[];
   onPressCompartment: (id: string, label: string, fridgeId: string) => void;
-  onAddFridge: (type: FridgeType) => void;
-  onChangeFridgeType: (fridgeId: string, type: FridgeType) => void;
-  onDeleteFridge: (fridgeId: string) => void;
+  activeIndex: number;
+  setActiveIndex: (index: number) => void;
+  onOpenAddSelector: () => void;
 }
 
 export default function RefrigeratorVisual({
   refrigerators,
   onPressCompartment,
-  onAddFridge,
-  onChangeFridgeType,
-  onDeleteFridge
+  activeIndex,
+  setActiveIndex,
+  onOpenAddSelector
 }: RefrigeratorVisualProps) {
   const { width: screenWidth } = useWindowDimensions();
-  const router = useRouter();
-  const { isLoggedIn, user, logout } = useAuth();
-  const [menuVisible, setMenuVisible] = useState(false);
-  const [selectorVisible, setSelectorVisible] = useState(false);
-  const [selectorMode, setSelectorMode] = useState<'add' | 'edit'>('add');
+  const { isLoggedIn } = useAuth();
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
-  const [activeIndex, setActiveIndex] = useState(0);
 
   // 식재료 실시간 로드 (서버 vs 로컬 분기)
   useEffect(() => {
@@ -48,7 +41,6 @@ export default function RefrigeratorVisual({
             const fridge = refrigerators[index];
             layout.compartments.forEach(comp => {
               comp.ingredients.forEach(ing => {
-                // 백엔드 memo 필드 파싱 (카테고리 및 선반정보 역직렬화)
                 const deserialized = deserializeMemo(ing.memo);
                 allIngredients.push({
                   id: String(ing.id),
@@ -82,7 +74,7 @@ export default function RefrigeratorVisual({
       }
     };
     loadIngredients();
-  }, [menuVisible, refrigerators, isLoggedIn]);
+  }, [refrigerators, isLoggedIn]);
 
   // 냉장고 목록 크기나 로그인 상태가 바뀌면 캐러셀 인덱스를 0으로 초기화
   useEffect(() => {
@@ -114,55 +106,12 @@ export default function RefrigeratorVisual({
     pages.push({ type: 'add' });
   }
 
-  // 현재 노출 중인 활성 냉장고
-  const activeFridge = pages[activeIndex]?.type === 'fridge' ? pages[activeIndex].data : null;
-
   // 가로 스크롤 시 활성 슬라이드 인덱스 동적 갱신
   const handleScroll = (event: any) => {
     const x = event.nativeEvent.contentOffset.x;
     const index = Math.round(x / screenWidth);
     if (index !== activeIndex) {
       setActiveIndex(index);
-    }
-  };
-
-  // 냉장고 삭제 처리 및 안내 팝업
-  const handleDeleteConfirm = () => {
-    if (!activeFridge) return;
-    const performDelete = () => {
-      onDeleteFridge(activeFridge.id);
-      setMenuVisible(false);
-      // 삭제 후 첫 페이지로 자동 이동 (인덱스 보정)
-      setActiveIndex(0);
-    };
-
-    Alert.alert(
-      '냉장고 삭제 ❌',
-      `[${activeFridge.name}]와 보관 중인 모든 식재료 데이터가 함께 영구 삭제됩니다. 삭제하시겠습니까?`,
-      [
-        { text: '취소', style: 'cancel' },
-        { text: '삭제', style: 'destructive', onPress: performDelete }
-      ]
-    );
-  };
-
-  // 냉장고 타입 변경 처리
-  const handleEditFridgeType = () => {
-    if (!activeFridge) return;
-    setSelectorMode('edit');
-    setMenuVisible(false);
-    setTimeout(() => {
-      setSelectorVisible(true);
-    }, 100);
-  };
-
-  // 냉장고 추가 모드 활성화
-  const handleOpenAddSelector = () => {
-    if (!isLoggedIn) {
-      router.push('/login');
-    } else {
-      setSelectorMode('add');
-      setSelectorVisible(true);
     }
   };
 
@@ -285,19 +234,6 @@ export default function RefrigeratorVisual({
 
   return (
     <View style={styles.container}>
-      {/* 상단 헤더 바 */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.hamburgerButton}
-          activeOpacity={0.7}
-          onPress={() => setMenuVisible(true)}
-        >
-          <View style={styles.hamburgerLine} />
-          <View style={styles.hamburgerLine} />
-          <View style={styles.hamburgerLine} />
-        </TouchableOpacity>
-      </View>
-
       {/* 가로 슬라이더(Carousel) 영역 */}
       <View style={styles.carouselWrapper}>
         <ScrollView
@@ -315,7 +251,7 @@ export default function RefrigeratorVisual({
                   <TouchableOpacity
                     style={styles.addFridgeBox}
                     activeOpacity={0.8}
-                    onPress={handleOpenAddSelector}
+                    onPress={onOpenAddSelector}
                   >
                     <View style={styles.addIconCircle}>
                       <Text style={styles.addIconText}>+</Text>
@@ -354,128 +290,6 @@ export default function RefrigeratorVisual({
           ))}
         </View>
       )}
-
-      {/* 냉장고 설정 모달 (바텀 시트 스타일) */}
-      <Modal
-        visible={selectorVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSelectorVisible(false)}
-      >
-        <View style={styles.selectorModalOverlay}>
-          <TouchableOpacity
-            style={styles.backdrop}
-            activeOpacity={1}
-            onPress={() => setSelectorVisible(false)}
-          />
-          <View style={styles.selectorModalContent}>
-            <View style={styles.selectorModalHeader}>
-              <Text style={styles.selectorModalTitle}>
-                {selectorMode === 'add' ? '냉장고 추가 등록' : `냉장고 형태 수정`}
-              </Text>
-              <TouchableOpacity onPress={() => setSelectorVisible(false)} style={styles.selectorCloseButton}>
-                <Text style={styles.selectorCloseButtonText}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            <RefrigeratorSelector
-              onSelect={(selectedType) => {
-                if (selectorMode === 'add') {
-                  onAddFridge(selectedType);
-                } else if (activeFridge) {
-                  onChangeFridgeType(activeFridge.id, selectedType);
-                }
-                setSelectorVisible(false);
-              }}
-            />
-          </View>
-        </View>
-      </Modal>
-
-      {/* 사이드 서랍 메뉴 모달 */}
-      <Modal
-        visible={menuVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setMenuVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity
-            style={styles.backdrop}
-            activeOpacity={1}
-            onPress={() => setMenuVisible(false)}
-          />
-
-          <View style={styles.drawerPanel}>
-            <View style={styles.drawerHeader}>
-              <Text style={styles.drawerTitle}>메뉴 ⚙️</Text>
-              <TouchableOpacity onPress={() => setMenuVisible(false)} style={styles.closeButton}>
-                <Text style={styles.closeButtonText}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
-             <View style={styles.drawerBody}>
-              {/* 사용자 인증 연동 */}
-              {isLoggedIn && (
-                <>
-                  <View style={styles.userContainer}>
-                    <View style={styles.userProfile}>
-                      <Text style={styles.userEmoji}>👤</Text>
-                      <View>
-                        <Text style={styles.userName}>{user?.name || '사용자'}님</Text>
-                        <Text style={styles.userEmail}>{user?.email || ''}</Text>
-                      </View>
-                    </View>
-                    <TouchableOpacity
-                      style={[styles.menuItem, { marginTop: 8 }]}
-                      activeOpacity={0.7}
-                      onPress={async () => {
-                        setMenuVisible(false);
-                        await logout();
-                      }}
-                    >
-                      <Text style={styles.menuItemText}>🔓 로그아웃</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <View style={styles.drawerDivider} />
-                </>
-              )}
-
-              {activeFridge ? (
-                <>
-                  <Text style={styles.drawerSectionLabel}>{activeFridge.name} 설정</Text>
-                  <TouchableOpacity
-                    style={styles.menuItem}
-                    activeOpacity={0.7}
-                    onPress={handleEditFridgeType}
-                  >
-                    <Text style={styles.menuItemText}>🔄 현재 냉장고 타입 변경하기</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.menuItem, { borderColor: '#FFCDD2', backgroundColor: '#FFEBEE' }]}
-                    activeOpacity={0.7}
-                    onPress={handleDeleteConfirm}
-                  >
-                    <Text style={[styles.menuItemText, { color: '#D32F2F' }]}>❌ 현재 냉장고 삭제하기</Text>
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <Text style={styles.drawerSectionLabel}>선택된 냉장고가 없습니다</Text>
-              )}
-
-              <View style={styles.drawerDivider} />
-
-              <TouchableOpacity style={[styles.menuItem, styles.disabledMenuItem]} activeOpacity={1}>
-                <Text style={styles.menuItemTextDisabled}>📦 식재료 전체보기 (준비중)</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={[styles.menuItem, styles.disabledMenuItem]} activeOpacity={1}>
-                <Text style={styles.menuItemTextDisabled}>🔔 유통기한 알림설정 (준비중)</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -485,27 +299,6 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     backgroundColor: '#FAFAFA',
-  },
-  header: {
-    width: '100%',
-    height: 64,
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'flex-end',
-    paddingHorizontal: 20,
-    paddingBottom: 8,
-    backgroundColor: 'transparent',
-  },
-  hamburgerButton: {
-    width: 24,
-    height: 16,
-    justifyContent: 'space-between',
-  },
-  hamburgerLine: {
-    width: '100%',
-    height: 2,
-    backgroundColor: '#37474F',
-    borderRadius: 1,
   },
   carouselWrapper: {
     flex: 1,
@@ -528,7 +321,7 @@ const styles = StyleSheet.create({
     width: '85%',
     height: '80%',
     maxHeight: 520,
-    backgroundColor: '#37474F', // 진회색 메탈릭 외곽 프레임
+    backgroundColor: '#37474F', // 진회색 외곽 프레임
     borderRadius: 20,
     padding: 8,
     gap: 6,
@@ -677,167 +470,5 @@ const styles = StyleSheet.create({
     color: '#90A4AE',
     textAlign: 'center',
     lineHeight: 18,
-  },
-  selectorModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  selectorModalContent: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '90%',
-    paddingBottom: 24,
-  },
-  selectorModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 18,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ECEFF1',
-  },
-  selectorModalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#37474F',
-  },
-  selectorCloseButton: {
-    padding: 6,
-  },
-  selectorCloseButtonText: {
-    fontSize: 20,
-    color: '#757575',
-    fontWeight: 'bold',
-  },
-  modalOverlay: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-  },
-  drawerPanel: {
-    width: '70%',
-    height: '100%',
-    backgroundColor: '#FFFFFF',
-    padding: 24,
-    paddingTop: 50,
-    shadowColor: '#000',
-    shadowOffset: { width: -5, height: 0 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 16,
-  },
-  drawerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ECEFF1',
-    paddingBottom: 16,
-  },
-  drawerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#37474F',
-  },
-  closeButton: {
-    padding: 6,
-  },
-  closeButtonText: {
-    fontSize: 20,
-    color: '#757575',
-  },
-  drawerBody: {
-    gap: 16,
-  },
-  drawerSectionLabel: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#78909C',
-    marginBottom: -4,
-  },
-  drawerDivider: {
-    height: 1,
-    backgroundColor: '#ECEFF1',
-    marginVertical: 8,
-  },
-  menuItem: {
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: '#F5F5F5',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  disabledMenuItem: {
-    backgroundColor: '#FAFAFA',
-    borderColor: '#ECEFF1',
-    opacity: 0.6,
-  },
-  menuItemText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#37474F',
-  },
-  menuItemTextDisabled: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#9E9E9E',
-  },
-  userContainer: {
-    padding: 4,
-    marginBottom: 4,
-  },
-  userProfile: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 8,
-  },
-  userEmoji: {
-    fontSize: 22,
-    backgroundColor: '#F1F5F9',
-    padding: 6,
-    borderRadius: 18,
-    overflow: 'hidden',
-    textAlign: 'center',
-  },
-  userName: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#1E293B',
-  },
-  userEmail: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 2,
-  },
-  loginGuide: {
-    fontSize: 12,
-    color: '#64748B',
-    marginBottom: 10,
-    lineHeight: 18,
-  },
-  loginButton: {
-    backgroundColor: '#6366F1',
-    borderColor: '#4F46E5',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loginButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
   },
 });
