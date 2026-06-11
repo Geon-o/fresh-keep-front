@@ -72,6 +72,9 @@ export default function Index() {
     }
   }, [isRefrigeratorsLoading, isMinTimeElapsed]);
 
+  // 스플래시 오버레이를 띄울지 여부 (로딩 중이거나 최소 시간이 지나지 않았을 때)
+  const showSplashOverlay = isRefrigeratorsLoading || !isMinTimeElapsed;
+
   // 로그인 여부에 따라 최종 노출할 냉장고 배열 결정
   const refrigerators = React.useMemo(() => {
     return isLoggedIn && Array.isArray(serverFridges)
@@ -286,21 +289,14 @@ export default function Index() {
           {/* 상단 탭 콘텐츠 */}
           <View style={styles.contentWrapper}>
             {activeTab === 'home' ? (
-              isRefrigeratorsLoading ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color="#4F46E5" />
-                  <Text style={styles.loadingText}>냉장고 정보를 불러오는 중입니다...</Text>
-                </View>
-              ) : (
-                <RefrigeratorVisual
-                  refrigerators={refrigerators}
-                  onPressCompartment={handlePressCompartment}
-                  activeIndex={activeIndex}
-                  setActiveIndex={setActiveIndex}
-                  onOpenAddSelector={handleOpenAddSelector}
-                  onOpenRenameModal={handleOpenRenameModal}
-                />
-              )
+              <RefrigeratorVisual
+                refrigerators={refrigerators}
+                onPressCompartment={handlePressCompartment}
+                activeIndex={activeIndex}
+                setActiveIndex={setActiveIndex}
+                onOpenAddSelector={handleOpenAddSelector}
+                onOpenRenameModal={handleOpenRenameModal}
+              />
             ) : (
               <SettingsView
                 activeFridge={activeFridge}
@@ -442,6 +438,20 @@ export default function Index() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      {/* 100% 신뢰성 있는 인앱 비주얼 스플래시 스크린 */}
+      {showSplashOverlay && (
+        <View style={styles.splashOverlayContainer}>
+          <View style={styles.splashLogoContainer}>
+            <Ionicons name="snow-outline" size={72} color="#FFFFFF" />
+            <Text style={styles.splashAppName}>FreshKeep</Text>
+            <Text style={styles.splashAppDesc}>신선함을 오래오래, 스마트 냉장고 관리</Text>
+          </View>
+          <View style={styles.splashLoadingContainer}>
+            <ActivityIndicator size="small" color="#FFFFFF" />
+            <Text style={styles.splashLoadingText}>데이터를 동기화하는 중입니다...</Text>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -451,17 +461,48 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FAFAFA',
   },
-  loadingContainer: {
+  splashOverlayContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#4F46E5', // 브랜드 인디고 블루
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 80,
+    zIndex: 9999, // 최상단에 고정
+  },
+  splashLogoContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FAFAFA',
   },
-  loadingText: {
-    marginTop: 12,
+  splashAppName: {
+    fontSize: 38,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    marginTop: 16,
+    letterSpacing: 2,
+    textAlign: 'center',
+  },
+  splashAppDesc: {
     fontSize: 14,
-    color: '#64748B',
+    color: '#C7D2FE',
+    marginTop: 8,
     fontWeight: '500',
+    textAlign: 'center',
+  },
+  splashLoadingContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  splashLoadingText: {
+    fontSize: 12,
+    color: '#E0E7FF',
+    marginTop: 12,
+    fontWeight: '500',
+    textAlign: 'center',
   },
   mainWrapper: {
     flex: 1,
