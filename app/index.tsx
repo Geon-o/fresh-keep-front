@@ -448,6 +448,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: 4,
+    backgroundColor: 'transparent',
+    overflow: 'hidden',
+    ...Platform.select({
+      web: {
+        outlineStyle: 'none',
+        outlineWidth: 0,
+      } as any,
+    }),
   },
   tabItemActive: {
     backgroundColor: '#4F46E5',
