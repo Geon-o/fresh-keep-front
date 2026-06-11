@@ -275,36 +275,32 @@ export default function Index() {
           </View>
 
           {/* 하단 탭 바 (Bottom Navigation Bar) */}
-          <View style={styles.tabBar}>
-            <TouchableOpacity
-              style={styles.tabItem}
-              activeOpacity={0.7}
-              onPress={() => setActiveTab('home')}
-            >
-              <Ionicons
-                name={activeTab === 'home' ? 'home' : 'home-outline'}
-                size={22}
-                color={activeTab === 'home' ? '#4F46E5' : '#94A3B8'}
-              />
-              <Text style={[styles.tabLabel, activeTab === 'home' && styles.tabLabelActive]}>
-                홈
-              </Text>
-            </TouchableOpacity>
+          <View style={styles.tabBarContainer}>
+            <View style={styles.tabBar}>
+              <TouchableOpacity
+                style={[styles.tabItem, activeTab === 'home' && styles.tabItemActive]}
+                activeOpacity={0.7}
+                onPress={() => setActiveTab('home')}
+              >
+                <Ionicons
+                  name={activeTab === 'home' ? 'home' : 'home-outline'}
+                  size={24}
+                  color={activeTab === 'home' ? '#FFFFFF' : '#64748B'}
+                />
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.tabItem}
-              activeOpacity={0.7}
-              onPress={() => setActiveTab('settings')}
-            >
-              <Ionicons
-                name={activeTab === 'settings' ? 'settings' : 'settings-outline'}
-                size={22}
-                color={activeTab === 'settings' ? '#4F46E5' : '#94A3B8'}
-              />
-              <Text style={[styles.tabLabel, activeTab === 'settings' && styles.tabLabelActive]}>
-                설정
-              </Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.tabItem, activeTab === 'settings' && styles.tabItemActive]}
+                activeOpacity={0.7}
+                onPress={() => setActiveTab('settings')}
+              >
+                <Ionicons
+                  name={activeTab === 'settings' ? 'settings' : 'settings-outline'}
+                  size={24}
+                  color={activeTab === 'settings' ? '#FFFFFF' : '#64748B'}
+                />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       )}
@@ -421,35 +417,40 @@ const styles = StyleSheet.create({
   contentWrapper: {
     flex: 1,
   },
-  tabBar: {
-    height: 64,
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingBottom: Platform.OS === 'ios' ? 8 : 4,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    elevation: 8,
-  },
-  tabItem: {
-    flex: 1,
+  tabBarContainer: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 32 : 24,
+    left: 0,
+    right: 0,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    borderRadius: 30,
+    paddingHorizontal: 8,
     paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(226, 232, 240, 0.8)',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 8,
+    alignItems: 'center',
   },
-  tabLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#94A3B8',
-    marginTop: 4,
+  tabItem: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 4,
   },
-  tabLabelActive: {
-    color: '#4F46E5',
+  tabItemActive: {
+    backgroundColor: '#4F46E5',
   },
   selectorModalOverlay: {
     flex: 1,
