@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions, TextInput, FlatList, Platform, ActivityIndicator } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions, TextInput, FlatList, Platform, ActivityIndicator, Linking, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
@@ -151,6 +151,44 @@ let weatherCache: {
 } | null = null;
 
 const CACHE_DURATION = 30 * 60 * 1000; // 캐싱 유효 기간: 30분
+
+interface SeasonalIngredient {
+  name: string;
+  emoji: string;
+  recommendDish: string;
+  searchQuery: string;
+  months: number[];
+}
+
+const SEASONAL_INGREDIENTS: SeasonalIngredient[] = [
+  // 봄 (3 ~ 5월)
+  { name: '달래', emoji: '🌱', recommendDish: '달래양념장 & 달래된장찌개', searchQuery: '달래 요리법 섭취방법', months: [3, 4, 5] },
+  { name: '냉이', emoji: '🌿', recommendDish: '냉이된장국 & 냉이무침', searchQuery: '냉이 요리법 섭취방법', months: [3, 4, 5] },
+  { name: '더덕', emoji: '🍠', recommendDish: '더덕구이 & 더덕무침', searchQuery: '더덕 요리법 섭취방법', months: [3, 4, 5] },
+  { name: '취나물', emoji: '🍃', recommendDish: '취나물무침 & 취나물밥', searchQuery: '취나물 요리법 섭취방법', months: [3, 4, 5] },
+  { name: '딸기', emoji: '🍓', recommendDish: '딸기 샐러드 & 딸기청', searchQuery: '딸기 요리법 섭취방법', months: [3, 4, 5, 12, 1, 2] },
+
+  // 여름 (6 ~ 8월)
+  { name: '토마토', emoji: '🍅', recommendDish: '토마토 달걀볶음 & 마리네이드', searchQuery: '토마토 요리법 섭취방법', months: [6, 7, 8] },
+  { name: '감자', emoji: '🥔', recommendDish: '감자전 & 감자조림', searchQuery: '감자 요리법 섭취방법', months: [6, 7, 8] },
+  { name: '매실', emoji: '🟢', recommendDish: '매실청 & 매실장아찌', searchQuery: '매실 요리법 섭취방법', months: [6, 7] },
+  { name: '참외', emoji: '🍈', recommendDish: '참외 샐러드 & 참외장아찌', searchQuery: '참외 요리법 섭취방법', months: [6, 7, 8] },
+  { name: '복숭아', emoji: '🍑', recommendDish: '복숭아 통조림 & 그릭복숭아', searchQuery: '복숭아 요리법 섭취방법', months: [7, 8] },
+
+  // 가을 (9 ~ 11월)
+  { name: '대하', emoji: '🦐', recommendDish: '대하 소금구이 & 감바스', searchQuery: '대하 요리법 섭취방법', months: [9, 10, 11] },
+  { name: '꽃게', emoji: '🦀', recommendDish: '꽃게탕 & 간장게장', searchQuery: '꽃게 요리법 섭취방법', months: [9, 10, 11] },
+  { name: '늙은호박', emoji: '🎃', recommendDish: '호박죽 & 호박전', searchQuery: '늙은호박 요리법 섭취방법', months: [10, 11] },
+  { name: '무', emoji: '🥬', recommendDish: '무생채 & 소고기뭇국', searchQuery: '가을무 요리법 섭취방법', months: [10, 11, 12] },
+  { name: '고구마', emoji: '🍠', recommendDish: '군고구마 & 고구마맛탕', searchQuery: '고구마 요리법 섭취방법', months: [8, 9, 10] },
+
+  // 겨울 (12 ~ 2월)
+  { name: '굴', emoji: '🦪', recommendDish: '굴전 & 굴국밥', searchQuery: '굴 요리법 섭취방법', months: [12, 1, 2] },
+  { name: '삼치', emoji: '🐟', recommendDish: '삼치구이 & 삼치조림', searchQuery: '삼치 요리법 섭취방법', months: [12, 1, 2] },
+  { name: '꼬막', emoji: '🐚', recommendDish: '꼬막무침 & 꼬막비빔밥', searchQuery: '꼬막 요리법 섭취방법', months: [11, 12, 1, 2] },
+  { name: '한라봉', emoji: '🍊', recommendDish: '한라봉 에이드 & 한라봉샐러드', searchQuery: '한라봉 요리법 섭취방법', months: [1, 2] },
+  { name: '시금치', emoji: '🥬', recommendDish: '시금치 나물 & 시금치 프리타타', searchQuery: '시금치 요리법 섭취방법', months: [12, 1, 2] }
+];
 
 
 interface RefrigeratorVisualProps {
@@ -567,6 +605,19 @@ export default function RefrigeratorVisual({
       const ddayB = getDDayInfo(b.expiryDate);
       return ddayA.days - ddayB.days;
     });
+
+  // 현재 월 기준 제철 식재료 목록 필터링
+  const currentMonth = new Date().getMonth() + 1;
+  const seasonalIngredients = SEASONAL_INGREDIENTS.filter(item => item.months.includes(currentMonth));
+
+  // 유튜브 이동 핸들러
+  const handleOpenYoutube = (query: string) => {
+    const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+    Linking.openURL(url).catch(err => {
+      console.error("Failed to open YouTube URL", err);
+      Alert.alert("알림 ⚠️", "유튜브 링크를 열 수 없습니다.");
+    });
+  };
 
   // 기기 GPS 위치 권한 요청 및 실시간 날씨 연동 식중독 지수 조회
   const requestLocationAndFetchWeather = async () => {
@@ -1014,6 +1065,50 @@ export default function RefrigeratorVisual({
                 </Text>
               </View>
             )}
+          </View>
+
+          {/* 제철 식재료 추천 */}
+          <View style={[styles.sectionContainer, { marginBottom: 40 }]}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={[styles.sectionTitle, { paddingHorizontal: 0, marginBottom: 0, color: theme.textPrimary }]}>
+                지금 먹으면 가장 맛있는 제철 식재료 🌟
+              </Text>
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.urgentScrollContainer}
+            >
+              {seasonalIngredients.map((item, idx) => (
+                <TouchableOpacity
+                  key={`seasonal_${idx}`}
+                  style={[
+                    styles.seasonalCard,
+                    {
+                      backgroundColor: theme.surface,
+                      borderColor: theme.borderLight,
+                    }
+                  ]}
+                  activeOpacity={0.8}
+                  onPress={() => handleOpenYoutube(item.searchQuery)}
+                >
+                  <View style={[styles.urgentEmojiBadge, { backgroundColor: theme.surfaceTertiary, width: 44, height: 44, borderRadius: 15, marginBottom: 8 }]}>
+                    <Text style={{ fontSize: 24 }}>{item.emoji}</Text>
+                  </View>
+                  <Text style={[styles.seasonalTitle, { color: theme.textPrimary }]} numberOfLines={1}>
+                    {item.name}
+                  </Text>
+                  <Text style={[styles.seasonalRecommend, { color: theme.textSecondary }]} numberOfLines={2}>
+                    추천: {item.recommendDish}
+                  </Text>
+                  <View style={[styles.youtubeLinkButton, { backgroundColor: '#FF0000' }]}>
+                    <Ionicons name="logo-youtube" size={12} color="#FFFFFF" />
+                    <Text style={styles.youtubeLinkText}>영상 보기</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
         </ScrollView>
       )}
@@ -1770,5 +1865,41 @@ const styles = StyleSheet.create({
   emptyStateText: {
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  seasonalCard: {
+    width: 140,
+    height: 165,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  seasonalTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    width: '100%',
+  },
+  seasonalRecommend: {
+    fontSize: 10,
+    textAlign: 'center',
+    width: '100%',
+    lineHeight: 13,
+    marginVertical: 4,
+  },
+  youtubeLinkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginTop: 2,
+  },
+  youtubeLinkText: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
 });
