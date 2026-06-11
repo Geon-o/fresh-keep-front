@@ -13,7 +13,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://vincent-lease-approved-season.trycloudflare.com"
+        "EXPO_PUBLIC_API_URL": "https://casio-james-smoke-comm.trycloudflare.com"
       }
     },
     "production": {}
