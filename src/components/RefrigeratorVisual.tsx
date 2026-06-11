@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
 import { FridgeType, Ingredient } from '../types';
 import { SAMPLE_INGREDIENTS, CATEGORY_EMOJI } from './CompartmentDetail';
 import { useAuth } from '../context/AuthContext';
@@ -13,6 +14,7 @@ interface RefrigeratorVisualProps {
   activeIndex: number;
   setActiveIndex: (index: number) => void;
   onOpenAddSelector: () => void;
+  onOpenRenameModal: () => void;
 }
 
 export default function RefrigeratorVisual({
@@ -20,7 +22,8 @@ export default function RefrigeratorVisual({
   onPressCompartment,
   activeIndex,
   setActiveIndex,
-  onOpenAddSelector
+  onOpenAddSelector,
+  onOpenRenameModal
 }: RefrigeratorVisualProps) {
   const { width: screenWidth } = useWindowDimensions();
   const { isLoggedIn } = useAuth();
@@ -266,7 +269,16 @@ export default function RefrigeratorVisual({
             const fridge = page.data;
             return (
               <View key={fridge.id} style={[styles.slideContainer, { width: screenWidth }]}>
-                <Text style={styles.fridgeNameTitle}>{fridge.name}</Text>
+                <View style={styles.fridgeNameContainer}>
+                  <Text style={styles.fridgeNameTitle}>{fridge.name}</Text>
+                  <TouchableOpacity
+                    style={styles.pencilIconButton}
+                    activeOpacity={0.7}
+                    onPress={onOpenRenameModal}
+                  >
+                    <Ionicons name="pencil-sharp" size={16} color="#37474F" />
+                  </TouchableOpacity>
+                </View>
                 {fridge.type === 'four-door' && renderFourDoor(fridge.id)}
                 {fridge.type === 'side-by-side' && renderSideBySide(fridge.id)}
                 {fridge.type === 'two-door' && renderTwoDoor(fridge.id)}
@@ -310,12 +322,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingBottom: 24,
   },
+  fridgeNameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginBottom: 20,
+  },
   fridgeNameTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#37474F',
-    marginBottom: 20,
     textAlign: 'center',
+  },
+  pencilIconButton: {
+    padding: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 6,
+    backgroundColor: '#ECEFF1',
   },
   fridgeFrame: {
     width: '85%',

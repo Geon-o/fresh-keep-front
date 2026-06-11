@@ -77,6 +77,8 @@ export default function Index() {
   // 현재 노출 중인 활성 냉장고
   const activeFridge = pages[activeIndex]?.type === 'fridge' ? pages[activeIndex].data : null;
 
+  const isSaveDisabled = renameValue.trim() === '' || renameValue === (activeFridge?.name || '');
+
   // 새 냉장고 추가 (최대 3개 제한)
   const handleAddFridge = async (type: FridgeType) => {
     if (refrigerators.length >= 3) return;
@@ -255,13 +257,13 @@ export default function Index() {
                 activeIndex={activeIndex}
                 setActiveIndex={setActiveIndex}
                 onOpenAddSelector={handleOpenAddSelector}
+                onOpenRenameModal={handleOpenRenameModal}
               />
             ) : (
               <SettingsView
                 activeFridge={activeFridge}
                 onEditFridgeType={handleOpenEditSelector}
                 onDeleteFridge={handleDeleteConfirm}
-                onRenameFridge={handleOpenRenameModal}
                 isLoggedIn={isLoggedIn}
                 user={user}
                 onLogout={logout}
@@ -361,15 +363,26 @@ export default function Index() {
             <Text style={styles.renameModalTitle}>냉장고 이름 변경 ✏️</Text>
             <Text style={styles.renameModalDesc}>지정하고 싶으신 냉장고 이름을 입력해 주세요.</Text>
 
-            <TextInput
-              style={styles.renameInput}
-              value={renameValue}
-              onChangeText={setRenameValue}
-              placeholder="예: 우리집 메인 냉장고"
-              placeholderTextColor="#94A3B8"
-              maxLength={20}
-              autoFocus
-            />
+            <View style={styles.renameInputContainer}>
+              <TextInput
+                style={styles.renameInput}
+                value={renameValue}
+                onChangeText={setRenameValue}
+                placeholder="예: 우리집 메인 냉장고"
+                placeholderTextColor="#94A3B8"
+                maxLength={20}
+                autoFocus
+              />
+              {renameValue.length > 0 && (
+                <TouchableOpacity
+                  style={styles.renameClearButton}
+                  activeOpacity={0.7}
+                  onPress={() => setRenameValue('')}
+                >
+                  <Ionicons name="close-circle" size={18} color="#94A3B8" />
+                </TouchableOpacity>
+              )}
+            </View>
 
             <View style={styles.renameButtonRow}>
               <TouchableOpacity
@@ -380,11 +393,12 @@ export default function Index() {
                 <Text style={styles.renameCancelButtonText}>취소</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.renameSaveButton}
+                style={[styles.renameSaveButton, isSaveDisabled && styles.renameSaveButtonDisabled]}
                 activeOpacity={0.8}
+                disabled={isSaveDisabled}
                 onPress={() => activeFridge && handleRenameFridge(activeFridge.id, renameValue)}
               >
-                <Text style={styles.renameSaveButtonText}>변경</Text>
+                <Text style={[styles.renameSaveButtonText, isSaveDisabled && styles.renameSaveButtonTextDisabled]}>저장</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -516,16 +530,27 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     lineHeight: 18,
   },
-  renameInput: {
-    height: 48,
+  renameInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
     borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    marginBottom: 20,
+    paddingRight: 12,
+  },
+  renameInput: {
+    flex: 1,
+    height: 48,
     paddingHorizontal: 16,
     fontSize: 15,
     color: '#0F172A',
-    backgroundColor: '#F8FAFC',
-    marginBottom: 20,
+  },
+  renameClearButton: {
+    padding: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   renameButtonRow: {
     flexDirection: 'row',
@@ -552,9 +577,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  renameSaveButtonDisabled: {
+    backgroundColor: '#C7D2FE',
+  },
   renameSaveButtonText: {
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '600',
+  },
+  renameSaveButtonTextDisabled: {
+    color: '#E0E7FF',
   },
 });
