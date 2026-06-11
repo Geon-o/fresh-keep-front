@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Modal, TouchableOpacity, Text, Alert, Platform } from 'react-native';
+import { StyleSheet, View, Modal, TouchableOpacity, Text, Alert, Platform, TextInput, KeyboardAvoidingView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -25,6 +25,10 @@ export default function Index() {
   // 2. 냉장고 형태/추가 선택 모달 상태
   const [selectorVisible, setSelectorVisible] = useState(false);
   const [selectorMode, setSelectorMode] = useState<'add' | 'edit'>('add');
+
+  // 2.5. 냉장고 이름 변경 모달 상태
+  const [renameModalVisible, setRenameModalVisible] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
 
   // 3. 로컬 모드 냉장고 목록 상태
   const [localRefrigerators, setLocalRefrigerators] = useState<{ id: string; type: FridgeType; name: string }[]>([]);
@@ -123,6 +127,40 @@ export default function Index() {
     }
   };
 
+  // 기존 냉장고의 이름 변경
+  const handleRenameFridge = async (fridgeId: string, newName: string) => {
+    const trimmedName = newName.trim();
+    if (!trimmedName) {
+      Alert.alert('경고 ⚠️', '냉장고 이름을 입력해 주세요.');
+      return;
+    }
+    if (trimmedName.length > 20) {
+      Alert.alert('경고 ⚠️', '냉장고 이름은 최대 20자까지 설정 가능합니다.');
+      return;
+    }
+
+    if (isLoggedIn) {
+      try {
+        const target = refrigerators.find(f => f.id === fridgeId);
+        if (target) {
+          await updateFridge(Number(fridgeId), trimmedName, target.type);
+          queryClient.invalidateQueries({ queryKey: ['fridges'] });
+        }
+      } catch (e) {
+        console.error('Failed to rename refrigerator on server', e);
+      }
+    } else {
+      try {
+        const updated = localRefrigerators.map(f => f.id === fridgeId ? { ...f, name: trimmedName } : f);
+        setLocalRefrigerators(updated);
+        await AsyncStorage.setItem('@refrigerators', JSON.stringify(updated));
+      } catch (e) {
+        console.error('Failed to rename local refrigerator', e);
+      }
+    }
+    setRenameModalVisible(false);
+  };
+
   // 냉장고 삭제 및 해당 냉장고의 식재료 제거
   const handleDeleteFridge = async (fridgeId: string) => {
     if (isLoggedIn) {
@@ -186,6 +224,13 @@ export default function Index() {
     setSelectorVisible(true);
   };
 
+  // 냉장고 이름 변경 모달 활성화
+  const handleOpenRenameModal = () => {
+    if (!activeFridge) return;
+    setRenameValue(activeFridge.name);
+    setRenameModalVisible(true);
+  };
+
   const handlePressCompartment = (id: string, label: string, fridgeId: string) => {
     setActiveCompartment({ id, label, fridgeId });
   };
@@ -216,6 +261,7 @@ export default function Index() {
                 activeFridge={activeFridge}
                 onEditFridgeType={handleOpenEditSelector}
                 onDeleteFridge={handleDeleteConfirm}
+                onRenameFridge={handleOpenRenameModal}
                 isLoggedIn={isLoggedIn}
                 user={user}
                 onLogout={logout}
@@ -293,6 +339,56 @@ export default function Index() {
             />
           </View>
         </View>
+      </Modal>
+
+      {/* 냉장고 이름 변경 모달 다이얼로그 */}
+      <Modal
+        visible={renameModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRenameModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.renameModalOverlay}
+        >
+          <TouchableOpacity
+            style={styles.backdrop}
+            activeOpacity={1}
+            onPress={() => setRenameModalVisible(false)}
+          />
+          <View style={styles.renameModalContent}>
+            <Text style={styles.renameModalTitle}>냉장고 이름 변경 ✏️</Text>
+            <Text style={styles.renameModalDesc}>지정하고 싶으신 냉장고 이름을 입력해 주세요.</Text>
+
+            <TextInput
+              style={styles.renameInput}
+              value={renameValue}
+              onChangeText={setRenameValue}
+              placeholder="예: 우리집 메인 냉장고"
+              placeholderTextColor="#94A3B8"
+              maxLength={20}
+              autoFocus
+            />
+
+            <View style={styles.renameButtonRow}>
+              <TouchableOpacity
+                style={styles.renameCancelButton}
+                activeOpacity={0.8}
+                onPress={() => setRenameModalVisible(false)}
+              >
+                <Text style={styles.renameCancelButtonText}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.renameSaveButton}
+                activeOpacity={0.8}
+                onPress={() => activeFridge && handleRenameFridge(activeFridge.id, renameValue)}
+              >
+                <Text style={styles.renameSaveButtonText}>변경</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -384,5 +480,81 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: '#757575',
     fontWeight: 'bold',
+  },
+  // 이름 변경 모달 스타일
+  renameModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  renameModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    width: '90%',
+    maxWidth: 360,
+    padding: 24,
+    alignItems: 'stretch',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  renameModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0F172A',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  renameModalDesc: {
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 18,
+  },
+  renameInput: {
+    height: 48,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    fontSize: 15,
+    color: '#0F172A',
+    backgroundColor: '#F8FAFC',
+    marginBottom: 20,
+  },
+  renameButtonRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  renameCancelButton: {
+    flex: 1,
+    backgroundColor: '#F1F5F9',
+    height: 48,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  renameCancelButtonText: {
+    color: '#475569',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  renameSaveButton: {
+    flex: 1,
+    backgroundColor: '#4F46E5',
+    height: 48,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  renameSaveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

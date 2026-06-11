@@ -7,6 +7,7 @@ interface SettingsViewProps {
   activeFridge: { id: string; name: string; type: FridgeType } | null;
   onEditFridgeType: () => void;
   onDeleteFridge: () => void;
+  onRenameFridge: () => void;
   isLoggedIn: boolean;
   user: { id: number; name: string; email: string; provider: string } | null;
   onLogout: () => void;
@@ -17,6 +18,7 @@ export default function SettingsView({
   activeFridge,
   onEditFridgeType,
   onDeleteFridge,
+  onRenameFridge,
   isLoggedIn,
   user,
   onLogout,
@@ -64,7 +66,17 @@ export default function SettingsView({
           </View>
           
           <View style={styles.buttonGroup}>
-            <TouchableOpacity style={styles.actionRow} activeOpacity={0.7} onPress={onEditFridgeType}>
+            <TouchableOpacity style={styles.actionRow} activeOpacity={0.7} onPress={onRenameFridge}>
+              <View style={styles.actionLeft}>
+                <View style={[styles.iconBadge, { backgroundColor: '#EEF2FF' }]}>
+                  <Ionicons name="create-outline" size={18} color="#4F46E5" />
+                </View>
+                <Text style={styles.actionText}>현재 냉장고 이름 변경</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.actionRow, { borderTopWidth: 1, borderTopColor: '#F8FAFC' }]} activeOpacity={0.7} onPress={onEditFridgeType}>
               <View style={styles.actionLeft}>
                 <View style={[styles.iconBadge, { backgroundColor: '#EEF2FF' }]}>
                   <Ionicons name="swap-horizontal" size={18} color="#4F46E5" />
