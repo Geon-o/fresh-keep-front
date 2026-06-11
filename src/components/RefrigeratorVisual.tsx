@@ -180,31 +180,39 @@ interface SeasonalIngredient {
 const SEASONAL_INGREDIENTS: SeasonalIngredient[] = [
   // 봄 (3 ~ 5월)
   { name: '달래', emoji: '🌱', recommendDish: '달래양념장 & 달래된장찌개', searchQuery: '달래 요리법 섭취방법', months: [3, 4, 5] },
-  { name: '냉이', emoji: '🌿', recommendDish: '냉이된장국 & 냉이무침', searchQuery: '냉이 요리법 섭취방법', months: [3, 4, 5] },
-  { name: '더덕', emoji: '🍠', recommendDish: '더덕구이 & 더덕무침', searchQuery: '더덕 요리법 섭취방법', months: [3, 4, 5] },
-  { name: '취나물', emoji: '🍃', recommendDish: '취나물무침 & 취나물밥', searchQuery: '취나물 요리법 섭취방법', months: [3, 4, 5] },
-  { name: '딸기', emoji: '🍓', recommendDish: '딸기 샐러드 & 딸기청', searchQuery: '딸기 요리법 섭취방법', months: [3, 4, 5, 12, 1, 2] },
+  { name: '냉이', emoji: '🌿', recommendDish: '냉이된장국 & 냉이무침', searchQuery: '냉이 요리법 섭취방법', months: [3, 4] },
+  { name: '두릅', emoji: '🌲', recommendDish: '두릅숙회 & 두릅전', searchQuery: '두릅 요리법 섭취방법', months: [4, 5] },
+  { name: '쑥', emoji: '🍃', recommendDish: '쑥국 & 쑥버무리', searchQuery: '쑥 요리법 섭취방법', months: [3, 4] },
+  { name: '주꾸미', emoji: '🐙', recommendDish: '주꾸미 샤브샤브 & 주꾸미볶음', searchQuery: '주꾸미 요리법 섭취방법', months: [3, 4, 5] },
+  { name: '바지락', emoji: '🐚', recommendDish: '바지락칼국수 & 바지락술찜', searchQuery: '바지락 요리법 섭취방법', months: [3, 4, 5] },
+  { name: '미나리', emoji: '🌱', recommendDish: '미나리전 & 미나리무침', searchQuery: '미나리 요리법 섭취방법', months: [3, 4, 5] },
 
   // 여름 (6 ~ 8월)
-  { name: '토마토', emoji: '🍅', recommendDish: '토마토 달걀볶음 & 마리네이드', searchQuery: '토마토 요리법 섭취방법', months: [6, 7, 8] },
-  { name: '감자', emoji: '🥔', recommendDish: '감자전 & 감자조림', searchQuery: '감자 요리법 섭취방법', months: [6, 7, 8] },
-  { name: '매실', emoji: '🟢', recommendDish: '매실청 & 매실장아찌', searchQuery: '매실 요리법 섭취방법', months: [6, 7] },
   { name: '참외', emoji: '🍈', recommendDish: '참외 샐러드 & 참외장아찌', searchQuery: '참외 요리법 섭취방법', months: [6, 7, 8] },
-  { name: '복숭아', emoji: '🍑', recommendDish: '복숭아 통조림 & 그릭복숭아', searchQuery: '복숭아 요리법 섭취방법', months: [7, 8] },
+  { name: '수박', emoji: '🍉', recommendDish: '수박 화채 & 땡모반', searchQuery: '수박 요리법 섭취방법', months: [6, 7, 8] },
+  { name: '매실', emoji: '🟢', recommendDish: '매실청 & 매실장아찌', searchQuery: '매실 요리법 섭취방법', months: [6, 7] },
+  { name: '복숭아', emoji: '🍑', recommendDish: '복숭아 조림 & 그릭복숭아', searchQuery: '복숭아 요리법 섭취방법', months: [7, 8] },
+  { name: '감자', emoji: '🥔', recommendDish: '감자전 & 찌개감자조림', searchQuery: '감자 요리법 섭취방법', months: [6, 7, 8, 9] },
+  { name: '옥수수', emoji: '🌽', recommendDish: '찐옥수수 & 마약옥수수', searchQuery: '옥수수 요리법 섭취방법', months: [7, 8, 9] },
+  { name: '갈치', emoji: '🐟', recommendDish: '갈치조림 & 갈치구이', searchQuery: '갈치 요리법 섭취방법', months: [7, 8, 9, 10] },
 
   // 가을 (9 ~ 11월)
-  { name: '대하', emoji: '🦐', recommendDish: '대하 소금구이 & 감바스', searchQuery: '대하 요리법 섭취방법', months: [9, 10, 11] },
   { name: '꽃게', emoji: '🦀', recommendDish: '꽃게탕 & 간장게장', searchQuery: '꽃게 요리법 섭취방법', months: [9, 10, 11] },
+  { name: '대하', emoji: '🦐', recommendDish: '대하 소금구이 & 감바스', searchQuery: '대하 요리법 섭취방법', months: [9, 10, 11] },
+  { name: '전어', emoji: '🐟', recommendDish: '전어구이 & 전어회무침', searchQuery: '전어 요리법 섭취방법', months: [9, 10, 11] },
   { name: '늙은호박', emoji: '🎃', recommendDish: '호박죽 & 호박전', searchQuery: '늙은호박 요리법 섭취방법', months: [10, 11] },
+  { name: '고구마', emoji: '🍠', recommendDish: '군고구마 & 고구마맛탕', searchQuery: '고구마 요리법 섭취방법', months: [8, 9, 10, 11] },
   { name: '무', emoji: '🥬', recommendDish: '무생채 & 소고기뭇국', searchQuery: '가을무 요리법 섭취방법', months: [10, 11, 12] },
-  { name: '고구마', emoji: '🍠', recommendDish: '군고구마 & 고구마맛탕', searchQuery: '고구마 요리법 섭취방법', months: [8, 9, 10] },
+  { name: '은행', emoji: '🌰', recommendDish: '구운은행 & 은행밥', searchQuery: '은행 요리법 섭취방법', months: [9, 10, 11] },
 
   // 겨울 (12 ~ 2월)
-  { name: '굴', emoji: '🦪', recommendDish: '굴전 & 굴국밥', searchQuery: '굴 요리법 섭취방법', months: [12, 1, 2] },
-  { name: '삼치', emoji: '🐟', recommendDish: '삼치구이 & 삼치조림', searchQuery: '삼치 요리법 섭취방법', months: [12, 1, 2] },
+  { name: '굴', emoji: '🦪', recommendDish: '굴전 & 굴국밥', searchQuery: '굴 요리법 섭취방법', months: [11, 12, 1, 2] },
   { name: '꼬막', emoji: '🐚', recommendDish: '꼬막무침 & 꼬막비빔밥', searchQuery: '꼬막 요리법 섭취방법', months: [11, 12, 1, 2] },
-  { name: '한라봉', emoji: '🍊', recommendDish: '한라봉 에이드 & 한라봉샐러드', searchQuery: '한라봉 요리법 섭취방법', months: [1, 2] },
-  { name: '시금치', emoji: '🥬', recommendDish: '시금치 나물 & 시금치 프리타타', searchQuery: '시금치 요리법 섭취방법', months: [12, 1, 2] }
+  { name: '삼치', emoji: '🐟', recommendDish: '삼치구이 & 삼치조림', searchQuery: '삼치 요리법 섭취방법', months: [10, 11, 12, 1, 2] },
+  { name: '한라봉', emoji: '🍊', recommendDish: '한라봉 에이드 & 한라봉샐러드', searchQuery: '한라봉 요리법 섭취방법', months: [1, 2, 3] },
+  { name: '시금치', emoji: '🥬', recommendDish: '시금치 나물 & 시금치 된장국', searchQuery: '시금치 요리법 섭취방법', months: [12, 1, 2, 3] },
+  { name: '과메기', emoji: '🐟', recommendDish: '과메기 쌈 & 과메기 조림', searchQuery: '과메기 요리법 섭취방법', months: [11, 12, 1] },
+  { name: '우엉', emoji: '🥖', recommendDish: '우엉조림 & 우엉차', searchQuery: '우엉 요리법 섭취방법', months: [1, 2, 3] }
 ];
 
 
