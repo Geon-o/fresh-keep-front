@@ -639,8 +639,10 @@ export default function RefrigeratorVisual({
   const seasonalIngredients = SEASONAL_INGREDIENTS.filter(item => item.months.includes(currentMonth));
 
   // 유튜브 이동 핸들러 (인앱 브라우저를 띄워 뒤로가기/닫기 시 앱으로 즉각 복귀 가능)
+  // * 주의: YouTube 직접 URL은 모바일 OS가 인터셉트하여 강제로 네이티브 유튜브 앱을 실행시키므로, 
+  //   인앱 브라우저 강제 유지를 위해 구글 동영상 검색(tbm=vid) 페이지로 우회 연동합니다.
   const handleOpenYoutube = async (query: string) => {
-    const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+    const url = `https://www.google.com/search?q=${encodeURIComponent(query)}&tbm=vid`;
     try {
       await WebBrowser.openBrowserAsync(url, {
         readerMode: false,
@@ -651,8 +653,8 @@ export default function RefrigeratorVisual({
     } catch (err) {
       console.warn("Failed to open in WebBrowser, trying Linking fallback:", err);
       Linking.openURL(url).catch(fallbackErr => {
-        console.error("Failed to open YouTube URL", fallbackErr);
-        Alert.alert("알림 ⚠️", "유튜브 링크를 열 수 없습니다.");
+        console.error("Failed to open URL", fallbackErr);
+        Alert.alert("알림 ⚠️", "동영상 검색 링크를 열 수 없습니다.");
       });
     }
   };
