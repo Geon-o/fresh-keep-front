@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Modal, TouchableOpacity, Text, Alert, Platform, TextInput, KeyboardAvoidingView } from 'react-native';
+import { StyleSheet, View, Modal, TouchableOpacity, Text, Alert, Platform, TextInput, KeyboardAvoidingView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -32,14 +32,20 @@ export default function Index() {
 
   // 3. 로컬 모드 냉장고 목록 상태
   const [localRefrigerators, setLocalRefrigerators] = useState<{ id: string; type: FridgeType; name: string }[]>([]);
+  const [isLocalLoading, setIsLocalLoading] = useState(true);
   const [activeCompartment, setActiveCompartment] = useState<{ id: string; label: string; fridgeId: string } | null>(null);
 
   // 4. 서버 모드 냉장고 목록 조회 (로그인 시에만 활성화)
-  const { data: serverFridges } = useQuery({
+  const { data: serverFridges, isLoading: isServerLoading } = useQuery({
     queryKey: ['fridges'],
     queryFn: getFridges,
     enabled: isLoggedIn,
   });
+
+  // 로그인 여부에 따라 로딩 상태 도출
+  const isRefrigeratorsLoading = isLoggedIn
+    ? (isServerLoading || serverFridges === undefined)
+    : isLocalLoading;
 
   // 로그인 여부에 따라 최종 노출할 냉장고 배열 결정
   const refrigerators = React.useMemo(() => {
@@ -62,6 +68,8 @@ export default function Index() {
         }
       } catch (e) {
         console.error('Failed to load local refrigerators', e);
+      } finally {
+        setIsLocalLoading(false);
       }
     };
     loadLocalRefrigerators();
@@ -253,14 +261,21 @@ export default function Index() {
           {/* 상단 탭 콘텐츠 */}
           <View style={styles.contentWrapper}>
             {activeTab === 'home' ? (
-              <RefrigeratorVisual
-                refrigerators={refrigerators}
-                onPressCompartment={handlePressCompartment}
-                activeIndex={activeIndex}
-                setActiveIndex={setActiveIndex}
-                onOpenAddSelector={handleOpenAddSelector}
-                onOpenRenameModal={handleOpenRenameModal}
-              />
+              isRefrigeratorsLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#4F46E5" />
+                  <Text style={styles.loadingText}>냉장고 정보를 불러오는 중입니다...</Text>
+                </View>
+              ) : (
+                <RefrigeratorVisual
+                  refrigerators={refrigerators}
+                  onPressCompartment={handlePressCompartment}
+                  activeIndex={activeIndex}
+                  setActiveIndex={setActiveIndex}
+                  onOpenAddSelector={handleOpenAddSelector}
+                  onOpenRenameModal={handleOpenRenameModal}
+                />
+              )
             ) : (
               <SettingsView
                 activeFridge={activeFridge}
@@ -410,6 +425,18 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FAFAFA',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FAFAFA',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#64748B',
+    fontWeight: '500',
   },
   mainWrapper: {
     flex: 1,
