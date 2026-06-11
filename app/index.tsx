@@ -48,9 +48,19 @@ export default function Index() {
     ? isServerLoading
     : isLocalLoading;
 
-  // 냉장고 목록 로딩 완료 시 스플래시 스크린 숨김 처리
+  // 스플래시 스크린 최소 노출 시간을 위한 상태 (1.5초)
+  const [isMinTimeElapsed, setIsMinTimeElapsed] = useState(false);
+
   useEffect(() => {
-    if (!isRefrigeratorsLoading) {
+    const timer = setTimeout(() => {
+      setIsMinTimeElapsed(true);
+    }, 1500); // 1.5초 강제 대기
+    return () => clearTimeout(timer);
+  }, []);
+
+  // 냉장고 목록 로딩 완료 및 최소 노출 시간 경과 시 스플래시 스크린 숨김 처리
+  useEffect(() => {
+    if (!isRefrigeratorsLoading && isMinTimeElapsed) {
       const hideSplash = async () => {
         try {
           await SplashScreen.hideAsync();
@@ -60,7 +70,7 @@ export default function Index() {
       };
       hideSplash();
     }
-  }, [isRefrigeratorsLoading]);
+  }, [isRefrigeratorsLoading, isMinTimeElapsed]);
 
   // 로그인 여부에 따라 최종 노출할 냉장고 배열 결정
   const refrigerators = React.useMemo(() => {
