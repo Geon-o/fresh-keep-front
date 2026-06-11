@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Modal, TouchableOpacity, Text, Alert, Platform, TextInput, KeyboardAvoidingView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SplashScreen from 'expo-splash-screen';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -44,8 +45,22 @@ export default function Index() {
 
   // 로그인 여부에 따라 로딩 상태 도출
   const isRefrigeratorsLoading = isLoggedIn
-    ? (isServerLoading || serverFridges === undefined)
+    ? isServerLoading
     : isLocalLoading;
+
+  // 냉장고 목록 로딩 완료 시 스플래시 스크린 숨김 처리
+  useEffect(() => {
+    if (!isRefrigeratorsLoading) {
+      const hideSplash = async () => {
+        try {
+          await SplashScreen.hideAsync();
+        } catch (e) {
+          // 이미 닫혔거나 에러 발생 시 무시
+        }
+      };
+      hideSplash();
+    }
+  }, [isRefrigeratorsLoading]);
 
   // 로그인 여부에 따라 최종 노출할 냉장고 배열 결정
   const refrigerators = React.useMemo(() => {
