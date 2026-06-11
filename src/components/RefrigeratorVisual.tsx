@@ -321,6 +321,7 @@ const styles = StyleSheet.create({
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingTop: 48,
     paddingBottom: 24,
   },
   fridgeNameContainer: {
