@@ -81,24 +81,27 @@ const CATEGORIES: { key: IngredientCategory; label: string; emoji: string }[] = 
   { key: 'etc', label: '기타', emoji: '' },
 ];
 
+const DEFAULT_INSIDE_SHELVES = [
+  { id: 'shelf_1', label: '선반 1단' },
+  { id: 'shelf_2', label: '선반 2단' },
+  { id: 'shelf_3', label: '선반 3단' },
+];
+
+const DEFAULT_DOOR_SHELVES = [
+  { id: 'pocket_1', label: '선반 1단' },
+  { id: 'pocket_2', label: '선반 2단' },
+];
+
 export default function CompartmentDetail({ compartmentId, compartmentLabel, onBack, fridgeId }: CompartmentDetailProps) {
   const { isLoggedIn } = useAuth();
   const [serverCompartmentId, setServerCompartmentId] = useState<number | null>(null);
 
-  // 선반 동적 배열 상태 관리
-  const [insideShelves, setInsideShelves] = useState<{ id: string; label: string }[]>([
-    { id: 'shelf_1', label: '선반 1단' },
-    { id: 'shelf_2', label: '선반 2단' },
-    { id: 'shelf_3', label: '선반 3단' },
-  ]);
+  // 선반 동적 배열 상태 관리 (초기값은 비워두고 useEffect에서 로드)
+  const [insideShelves, setInsideShelves] = useState<{ id: string; label: string }[]>([]);
+  const [doorShelves, setDoorShelves] = useState<{ id: string; label: string }[]>([]);
 
-  const [doorShelves, setDoorShelves] = useState<{ id: string; label: string }[]>([
-    { id: 'pocket_1', label: '선반 1단' },
-    { id: 'pocket_2', label: '선반 2단' },
-  ]);
-
-  // 해당 칸 식재료 상태 관리
-  const [ingredients, setIngredients] = useState<Ingredient[]>(SAMPLE_INGREDIENTS[compartmentId] || []);
+  // 해당 칸 식재료 상태 관리 (초기값은 비워두고 useEffect에서 로드)
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
 
   // 문쪽 보관실 사용 여부 상태 관리
   const [hasDoorStorage, setHasDoorStorage] = useState(true);
@@ -130,11 +133,14 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
           const configStr = await AsyncStorage.getItem(`@shelf_config_${fridgeId}_${compartmentId}`);
           if (configStr) {
             const config = JSON.parse(configStr);
-            if (config.insideShelves) setInsideShelves(config.insideShelves);
-            if (config.doorShelves) setDoorShelves(config.doorShelves);
-            if (config.hasDoorStorage !== undefined) setHasDoorStorage(config.hasDoorStorage);
+            setInsideShelves(config.insideShelves || DEFAULT_INSIDE_SHELVES);
+            setDoorShelves(config.doorShelves || DEFAULT_DOOR_SHELVES);
+            setHasDoorStorage(config.hasDoorStorage !== undefined ? config.hasDoorStorage : true);
           } else {
-            const config = { insideShelves: insideShelves, doorShelves: doorShelves, hasDoorStorage: hasDoorStorage };
+            setInsideShelves(DEFAULT_INSIDE_SHELVES);
+            setDoorShelves(DEFAULT_DOOR_SHELVES);
+            setHasDoorStorage(true);
+            const config = { insideShelves: DEFAULT_INSIDE_SHELVES, doorShelves: DEFAULT_DOOR_SHELVES, hasDoorStorage: true };
             await AsyncStorage.setItem(`@shelf_config_${fridgeId}_${compartmentId}`, JSON.stringify(config));
           }
         }
@@ -167,17 +173,27 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
                 setInsideShelves(JSON.parse(serverComp.insideShelves));
               } catch (e) {
                 console.error('Failed to parse insideShelves from server', e);
+                setInsideShelves(DEFAULT_INSIDE_SHELVES);
               }
+            } else {
+              setInsideShelves(DEFAULT_INSIDE_SHELVES);
             }
+
             if (serverComp.doorShelves) {
               try {
                 setDoorShelves(JSON.parse(serverComp.doorShelves));
               } catch (e) {
                 console.error('Failed to parse doorShelves from server', e);
+                setDoorShelves(DEFAULT_DOOR_SHELVES);
               }
+            } else {
+              setDoorShelves(DEFAULT_DOOR_SHELVES);
             }
-            if (serverComp.hasDoorStorage !== undefined) {
+
+            if (serverComp.hasDoorStorage !== undefined && serverComp.hasDoorStorage !== null) {
               setHasDoorStorage(serverComp.hasDoorStorage);
+            } else {
+              setHasDoorStorage(true);
             }
 
             const mapped = serverComp.ingredients.map(ing => {
@@ -196,9 +212,16 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
               };
             });
             setIngredients(mapped);
-          } else if (layout.compartments.length > 0) {
-            // 매칭 실패 시 첫 번째 구획 사용
-            setServerCompartmentId(layout.compartments[0].id);
+          } else {
+            // 매칭 실패 시 기본값 세팅
+            setInsideShelves(DEFAULT_INSIDE_SHELVES);
+            setDoorShelves(DEFAULT_DOOR_SHELVES);
+            setHasDoorStorage(true);
+            setIngredients([]);
+            if (layout.compartments.length > 0) {
+              // 매칭 실패 시 첫 번째 구획 사용
+              setServerCompartmentId(layout.compartments[0].id);
+            }
           }
         } else {
           // 로컬 로드
