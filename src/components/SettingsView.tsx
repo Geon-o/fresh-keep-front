@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Platform, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { FridgeType } from '../types';
 import { useTheme } from '../context/ThemeContext';
@@ -14,6 +14,49 @@ interface SettingsViewProps {
   onLogin: () => void;
 }
 
+const SERVICE_TERMS = `제1조 (목적)
+본 약관은 FreshKeep(이하 "서비스")이 제공하는 모바일 앱 및 제반 서비스의 이용 조건, 절차 및 회원과 서비스 간의 권리, 의무에 관한 기본 사항을 규정함을 목적으로 합니다.
+
+제2조 (회원가입 및 계정 관리)
+1. 회원은 소셜 인증(이메일, 이름 등 제공)을 통해 본 서비스의 회원으로 등록할 수 있습니다.
+2. 회원은 본인의 로그인 계정 정보를 안전하게 관리하여야 하며, 제3자의 무단 사용이 의심될 경우 지체 없이 서비스에 알려 조치를 받아야 합니다.
+
+제3조 (서비스 제공 및 중단)
+1. 서비스는 식품 유통기한 추적, 보관실 레이아웃 시각화, 식중독 지수 위생 예보, 제철 식재료 검색 가이드를 제공합니다.
+2. 시스템 점검, 통신 장애 등 부득이한 사유 발생 시 서비스 제공이 일시 중단될 수 있으며, 이 경우 사전에 공지합니다.
+
+제4조 (회원의 의무 및 이용 제한)
+1. 회원은 타인의 계정 정보나 식재료 정보를 무단 도용해서는 안 됩니다.
+2. 서비스의 정상적인 운영을 방해하는 해킹, 비정상적 트래픽 유발 등의 행위 시 서비스 이용이 제한되거나 법적 책임이 따를 수 있습니다.
+
+제5조 (면책 조항)
+본 서비스의 식중독 지수 예보 및 유통기한 알림은 보조적 기상 통계 및 입력 데이터에 기반하며, 실제 식재료의 개별 신선도와 부패 상태에 따른 최종 섭취 적합 여부는 회원의 직접 확인 및 주의 의무 하에 결정됩니다. 서비스는 이로 인해 발생한 위생 문제에 책임을 지지 않습니다.`;
+
+const PRIVACY_POLICY = `개인정보 처리방침
+
+FreshKeep은 회원의 개인정보를 소중하게 처리하며, 관련 개인정보보호법에 규정된 의무를 준수합니다.
+
+1. 수집하는 개인정보의 항목
+서비스는 편리한 연동 및 회원 관리를 위해 아래의 정보를 수집합니다.
+- 필수 수집 항목: 소셜 계정의 이메일 주소, 이름, 고유 식별키(ID), 프로필 이미지
+- 자동 생성 수집 항목: 기기 OS 타입, 푸시 알림 토큰(수신 동의 시)
+
+2. 개인정보의 수집 및 이용 목적
+수집된 정보는 다음의 한정된 목적을 위해서만 활용됩니다.
+- 회원 식별 및 가입 확인
+- 다중 기기 간 냉장고 데이터 실시간 동기화
+- 개인별 유통기한 리포트 제공 및 시스템 알림 발송
+
+3. 개인정보의 보유 및 이용 기간
+- 회원의 개인정보는 회원 탈퇴 시 지체 없이 파기됩니다.
+- 단, 회원 정보 오용 방지 및 관계 법령(전자상거래 등에서의 소비자보호에 관한 법률 등)의 규정에 의하여 보존할 필요가 있는 경우 해당 기간 동안 안전하게 보관합니다.
+
+4. 개인정보의 제3자 제공 및 위탁
+서비스는 회원의 동의 없이 개인정보를 외부에 무단 제공하거나 제3자에게 위탁하지 않습니다. 단, 법적 요구 등 법률에 따른 정당한 요구가 있을 경우에는 예외로 합니다.
+
+5. 회원의 권리와 행사 방법
+회원은 언제든지 앱 내 설정을 통해 탈퇴하거나 수집된 정보의 열람 및 정정을 청구할 수 있습니다.`;
+
 export default function SettingsView({
   activeFridge,
   onEditFridgeType,
@@ -24,6 +67,22 @@ export default function SettingsView({
   onLogin
 }: SettingsViewProps) {
   const { theme, themeMode, setThemeMode, isDark } = useTheme();
+  
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalContent, setModalContent] = useState('');
+
+  const handleOpenTerms = (type: 'service' | 'privacy') => {
+    if (type === 'service') {
+      setModalTitle('서비스 이용약관 📄');
+      setModalContent(SERVICE_TERMS);
+    } else {
+      setModalTitle('개인정보 처리방침 🔒');
+      setModalContent(PRIVACY_POLICY);
+    }
+    setModalVisible(true);
+  };
+
   return (
     <ScrollView 
       style={[styles.container, { backgroundColor: theme.background }]} 
@@ -170,38 +229,30 @@ export default function SettingsView({
         </View>
       )}
 
-      {/* 3. 기타 기능 (준비중) */}
-      <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>추가 서비스</Text>
-      <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.borderLight, shadowColor: theme.shadow }]}>
-        <View style={styles.disabledRow}>
+      {/* 3. 약관 및 정책 영역 */}
+      <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>약관 및 정책</Text>
+      <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.borderLight, shadowColor: theme.shadow, paddingVertical: 6 }]}>
+        <TouchableOpacity style={styles.actionRow} activeOpacity={0.7} onPress={() => handleOpenTerms('service')}>
           <View style={styles.actionLeft}>
-            <View style={[styles.iconBadge, { backgroundColor: theme.surfaceTertiary }]}>
-              <Ionicons name="cube-outline" size={18} color={theme.textMuted} />
+            <View style={[styles.iconBadge, { backgroundColor: theme.primaryLight }]}>
+              <Ionicons name="document-text-outline" size={18} color={theme.primary} />
             </View>
-            <View style={{ gap: 4 }}>
-              <Text style={[styles.disabledText, { color: theme.textSecondary }]}>📦 식재료 전체보기</Text>
-              <View style={[styles.skeletonBar, { backgroundColor: theme.borderLight }]} />
-            </View>
+            <Text style={[styles.actionText, { color: theme.textSecondary }]}>서비스 이용약관</Text>
           </View>
-          <View style={[styles.comingSoonBadge, { backgroundColor: theme.primaryLight }]}>
-            <Text style={[styles.comingSoonText, { color: theme.primaryText }]}>준비중</Text>
-          </View>
-        </View>
-        <View style={[styles.divider, { backgroundColor: theme.divider, marginVertical: 12 }]} />
-        <View style={styles.disabledRow}>
+          <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+        </TouchableOpacity>
+
+        <View style={[styles.divider, { backgroundColor: theme.divider, marginVertical: 0 }]} />
+
+        <TouchableOpacity style={styles.actionRow} activeOpacity={0.7} onPress={() => handleOpenTerms('privacy')}>
           <View style={styles.actionLeft}>
-            <View style={[styles.iconBadge, { backgroundColor: theme.surfaceTertiary }]}>
-              <Ionicons name="notifications-outline" size={18} color={theme.textMuted} />
+            <View style={[styles.iconBadge, { backgroundColor: theme.primaryLight }]}>
+              <Ionicons name="shield-checkmark-outline" size={18} color={theme.primary} />
             </View>
-            <View style={{ gap: 4 }}>
-              <Text style={[styles.disabledText, { color: theme.textSecondary }]}>🔔 유통기한 알림설정</Text>
-              <View style={[styles.skeletonBar, { width: 120, backgroundColor: theme.borderLight }]} />
-            </View>
+            <Text style={[styles.actionText, { color: theme.textSecondary }]}>개인정보 처리방침</Text>
           </View>
-          <View style={[styles.comingSoonBadge, { backgroundColor: theme.primaryLight }]}>
-            <Text style={[styles.comingSoonText, { color: theme.primaryText }]}>준비중</Text>
-          </View>
-        </View>
+          <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+        </TouchableOpacity>
       </View>
 
       {/* 4. 로그아웃 버튼 (로그인 시에만 노출) */}
@@ -215,6 +266,35 @@ export default function SettingsView({
           <Text style={[styles.logoutButtonText, { color: theme.textSecondary }]}>로그아웃</Text>
         </TouchableOpacity>
       )}
+
+      {/* 약관 상세 보기 모달 */}
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={[styles.modalOverlay, { backgroundColor: theme.modalOverlay }]}>
+          <View style={[styles.modalContent, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
+              <Text style={[styles.modalTitleText, { color: theme.textPrimary }]}>{modalTitle}</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.modalCloseButton}>
+                <Ionicons name="close" size={24} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalScrollView} contentContainerStyle={styles.modalScrollContent}>
+              <Text style={[styles.modalBodyText, { color: theme.textSecondary }]}>{modalContent}</Text>
+            </ScrollView>
+            <TouchableOpacity 
+              style={[styles.modalConfirmButton, { backgroundColor: theme.primary }]}
+              activeOpacity={0.8}
+              onPress={() => setModalVisible(false)}
+            >
+              <Text style={[styles.modalConfirmButtonText, { color: theme.primaryOnPrimary }]}>확인</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -503,5 +583,60 @@ const styles = StyleSheet.create({
   },
   toggleButtonTextActive: {
     // dynamic colors applied in JS
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    width: '90%',
+    maxHeight: '80%',
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 20,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    marginBottom: 16,
+  },
+  modalTitleText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalScrollView: {
+    maxHeight: 400,
+  },
+  modalScrollContent: {
+    paddingBottom: 16,
+  },
+  modalBodyText: {
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  modalConfirmButton: {
+    paddingVertical: 12,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  modalConfirmButtonText: {
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });
