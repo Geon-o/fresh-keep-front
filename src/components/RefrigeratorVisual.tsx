@@ -216,6 +216,22 @@ const SEASONAL_INGREDIENTS: SeasonalIngredient[] = [
   { name: '우엉', emoji: '🥖', recommendDish: '우엉조림 & 우엉차', searchQuery: '우엉 레시피', months: [1, 2, 3] }
 ];
 
+interface StorageTip {
+  name: string;
+  emoji: string;
+  category: string;
+  tip: string;
+}
+
+const STORAGE_TIPS: StorageTip[] = [
+  { name: '대파', emoji: '🌱', category: '채소', tip: '송송 썰어 키친타월로 물기를 완전히 제거한 후 냉동 보관하면 최대 6개월간 쓸 수 있어요.' },
+  { name: '양파', emoji: '🧅', category: '채소', tip: '망에 하나씩 분리해 넣거나, 껍질을 벗겨 랩으로 개별 포장한 뒤 냉장실 야채칸에 보관하세요.' },
+  { name: '바나나', emoji: '🍌', category: '과일', tip: '꼭지 부분을 랩으로 감싸 보관하면 에틸렌 가스가 차단되어 갈변 속도를 늦출 수 있어요.' },
+  { name: '달걀', emoji: '🥚', category: '유제품', tip: '뾰족한 곳이 아래로 향하게 보관하세요. 둥근 부분에 숨구멍이 있어 신선함이 오래 유지돼요.' },
+  { name: '토마토', emoji: '🍅', category: '채소', tip: '냉장 보관하면 당도가 떨어지고 껍질이 두꺼워집니다. 꼭지를 떼어 그늘진 실온에 보관하세요.' },
+  { name: '감자', emoji: '🥔', category: '채소', tip: '신선한 사과 한 개를 같이 넣어두면, 사과에서 나오는 에틸렌 가스가 감자 싹의 성장을 막아줘요.' },
+  { name: '두부', emoji: '⬜', category: '기타', tip: '밀폐용기에 맑은 물과 소금 한 꼬집을 넣은 뒤 두부를 담가 보관하면 상하는 것을 늦출 수 있어요.' }
+];
 
 interface RefrigeratorVisualProps {
   mode?: 'home' | 'ingredients' | 'fridge';
@@ -1106,7 +1122,7 @@ export default function RefrigeratorVisual({
           </View>
 
           {/* 제철 식재료 추천 */}
-          <View style={[styles.sectionContainer, { marginBottom: 40 }]}>
+          <View style={styles.sectionContainer}>
             <View style={styles.sectionHeaderRow}>
               <Text style={[styles.sectionTitle, { paddingHorizontal: 0, marginBottom: 0, color: theme.textPrimary }]}>
                 지금 먹으면 가장 맛있는 제철 식재료 🌟
@@ -1145,6 +1161,48 @@ export default function RefrigeratorVisual({
                     <Text style={styles.youtubeLinkText}>영상 보기</Text>
                   </View>
                 </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+
+          {/* 알아두면 유용한 식재료 보관 꿀팁! 💡 */}
+          <View style={[styles.sectionContainer, { marginBottom: 40 }]}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={[styles.sectionTitle, { paddingHorizontal: 0, marginBottom: 0, color: theme.textPrimary }]}>
+                장기 보관을 위한 식재료 꿀팁 💡
+              </Text>
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.urgentScrollContainer}
+            >
+              {STORAGE_TIPS.map((item, idx) => (
+                <View
+                  key={`tip_${idx}`}
+                  style={[
+                    styles.tipCard,
+                    {
+                      backgroundColor: theme.surface,
+                      borderColor: theme.borderLight,
+                      shadowColor: theme.shadow,
+                    }
+                  ]}
+                >
+                  <View style={styles.tipCardHeader}>
+                    <View style={[styles.urgentEmojiBadge, { backgroundColor: theme.surfaceTertiary, width: 36, height: 36, borderRadius: 11, marginBottom: 0 }]}>
+                      <Text style={{ fontSize: 18 }}>{item.emoji}</Text>
+                    </View>
+                    <View style={styles.tipCardTitleCol}>
+                      <Text style={[styles.tipCardName, { color: theme.textPrimary }]}>{item.name}</Text>
+                      <Text style={[styles.tipCardCategory, { color: theme.textMuted }]}>{item.category}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.tipCardText, { color: theme.textSecondary }]} numberOfLines={3}>
+                    {item.tip}
+                  </Text>
+                </View>
               ))}
             </ScrollView>
           </View>
@@ -1939,5 +1997,40 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: 'bold',
     color: '#FFFFFF',
+  },
+  tipCard: {
+    width: 260,
+    height: 140,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 16,
+    justifyContent: 'space-between',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  tipCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  tipCardTitleCol: {
+    justifyContent: 'center',
+  },
+  tipCardName: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  tipCardCategory: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  tipCardText: {
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '500',
+    marginTop: 8,
   },
 });
