@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions, TextInput, FlatList, Platform, ActivityIndicator, Linking, Alert, Modal, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import YoutubePlayer from 'react-native-youtube-iframe';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { searchStorageGuides } from '../api/guideService';
@@ -292,6 +293,7 @@ export default function RefrigeratorVisual({
   const [guideModalVisible, setGuideModalVisible] = useState(false);
   const [guideSearchQuery, setGuideSearchQuery] = useState('');
   const [guideSelectedCategory, setGuideSelectedCategory] = useState<string>('all');
+  const [playingVideoName, setPlayingVideoName] = useState<string | null>(null);
 
   // 실시간 AI 하이브리드 캐싱을 위한 추가 상태
   const [apiGuides, setApiGuides] = useState<StorageTip[]>([]);
@@ -700,8 +702,8 @@ export default function RefrigeratorVisual({
   const handleOpenYoutube = async (input: string, name: string) => {
     // 특정 비디오 ID 다이렉트 재생 시 유튜브 앱의 지역/저작권/기기별 차단 오류가 종종 발생하므로,
     // 해당 식재료 명칭의 최적 검색 쿼리를 바탕으로 한 검색 결과 페이지를 제공하여 에러를 100% 원천 예방하고 다양한 정보를 선택해 보게 합니다.
-    const isVideoId = /^[a-zA-Z0-9_-]{11}$/.test(input);
-    const searchQuery = isVideoId ? `${name} 보관법` : input;
+    // 식재료명 뒤에 항상 "보관법"을 붙여 정확한 검색 결과를 제공합니다.
+    const searchQuery = `${name} 보관법`;
     const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(searchQuery)}`;
 
     try {
@@ -1494,7 +1496,10 @@ export default function RefrigeratorVisual({
         visible={guideModalVisible}
         animationType="slide"
         presentationStyle="pageSheet"
-        onRequestClose={() => setGuideModalVisible(false)}
+        onRequestClose={() => {
+          setGuideModalVisible(false);
+          setPlayingVideoName(null);
+        }}
       >
         <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.background }]}>
           {/* 모달 헤더 */}
@@ -1505,7 +1510,10 @@ export default function RefrigeratorVisual({
             </View>
             <TouchableOpacity
               style={[styles.modalCloseButton, { backgroundColor: theme.surfaceSecondary }]}
-              onPress={() => setGuideModalVisible(false)}
+              onPress={() => {
+                setGuideModalVisible(false);
+                setPlayingVideoName(null);
+              }}
             >
               <Ionicons name="close" size={20} color={theme.textPrimary} />
             </TouchableOpacity>
@@ -1629,24 +1637,62 @@ export default function RefrigeratorVisual({
                           </Text>
                         </View>
 
-                        {/* 3. 하단 유튜브 동영상 연동 바 / 버튼 */}
-                        <TouchableOpacity
-                          style={[
-                            styles.guideYoutubeButton,
-                            { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderLight }
-                          ]}
-                          activeOpacity={0.8}
-                          onPress={() => handleOpenYoutube(item.youtubeQuery || item.name, item.name)}
-                        >
-                          <Ionicons name="logo-youtube" size={15} color="#FF0000" />
-                          <Text style={[styles.guideYoutubeText, { color: theme.textPrimary }]} numberOfLines={1}>
-                            {hasVideo 
-                              ? `영상 가이드: ${item.video!.title} (${item.video!.duration})`
-                              : `YouTube에서 "${item.name} 보관법" 검색`
-                            }
-                          </Text>
-                          <Ionicons name="chevron-forward" size={13} color={theme.textMuted} style={{ marginLeft: 'auto' }} />
-                        </TouchableOpacity>
+                        {/* 3. 하단 유튜브 동영상 연동 바 또는 인앱 재생 영역 */}
+                        {hasVideo ? (
+                          playingVideoName === item.name ? (
+                            <View style={{ marginTop: 10, borderRadius: 12, overflow: 'hidden', backgroundColor: '#000' }}>
+                              <YoutubePlayer
+                                height={200}
+                                play={true}
+                                videoId={item.video!.videoId}
+                              />
+                              <TouchableOpacity
+                                style={{
+                                  padding: 10,
+                                  backgroundColor: theme.surfaceSecondary,
+                                  alignItems: 'center',
+                                  flexDirection: 'row',
+                                  justifyContent: 'center',
+                                  gap: 6
+                                }}
+                                onPress={() => setPlayingVideoName(null)}
+                              >
+                                <Ionicons name="chevron-up" size={16} color={theme.textPrimary} />
+                                <Text style={{ color: theme.textPrimary, fontSize: 13, fontWeight: 'bold' }}>영상 재생 닫기</Text>
+                              </TouchableOpacity>
+                            </View>
+                          ) : (
+                            <TouchableOpacity
+                              style={[
+                                styles.guideYoutubeButton,
+                                { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderLight }
+                              ]}
+                              activeOpacity={0.8}
+                              onPress={() => setPlayingVideoName(item.name)}
+                            >
+                              <Ionicons name="logo-youtube" size={15} color="#FF0000" />
+                              <Text style={[styles.guideYoutubeText, { color: theme.textPrimary }]} numberOfLines={1}>
+                                {`인앱 영상 가이드: ${item.video!.title}`}
+                              </Text>
+                              <Ionicons name="play-circle-outline" size={16} color={theme.primary} style={{ marginLeft: 'auto' }} />
+                            </TouchableOpacity>
+                          )
+                        ) : (
+                          <TouchableOpacity
+                            style={[
+                              styles.guideYoutubeButton,
+                              { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderLight }
+                            ]}
+                            activeOpacity={0.8}
+                            onPress={() => handleOpenYoutube(item.youtubeQuery || item.name, item.name)}
+                          >
+                            <Ionicons name="logo-youtube" size={15} color="#FF0000" />
+                            <Text style={[styles.guideYoutubeText, { color: theme.textPrimary }]} numberOfLines={1}>
+                              {`YouTube에서 "${item.name} 보관법" 검색`}
+                            </Text>
+                            <Ionicons name="chevron-forward" size={13} color={theme.textMuted} style={{ marginLeft: 'auto' }} />
+                          </TouchableOpacity>
+                        )}
                       </View>
                     );
                   }}
