@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions, TextInput, FlatList, Platform, ActivityIndicator, Linking, Alert, Modal, SafeAreaView } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions, TextInput, FlatList, Platform, ActivityIndicator, Linking, Alert, Modal, Image, SafeAreaView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
@@ -216,37 +216,45 @@ const SEASONAL_INGREDIENTS: SeasonalIngredient[] = [
   { name: '우엉', emoji: '🥖', recommendDish: '우엉조림 & 우엉차', searchQuery: '우엉 레시피', months: [1, 2, 3] }
 ];
 
+interface YoutubeVideo {
+  title: string;
+  channelName: string;
+  videoId: string;
+  duration: string;
+}
+
 interface StorageTip {
   name: string;
   emoji: string;
   category: string;
   tip: string;
+  video: YoutubeVideo;
 }
 
 const STORAGE_TIPS: StorageTip[] = [
-  { name: '깻잎', emoji: '🍃', category: '채소', tip: '씻지 않은 상태에서 물기를 털어내고 키친타월로 감싸 지퍼백에 세워서 보관하면 무르는 것을 예방해요.' },
-  { name: '시금치', emoji: '🥬', category: '채소', tip: '뿌리 부분이 아래로 가게 세워서 야채 칸에 보관하고, 흙이 묻은 상태라면 신문지에 감싸 수분을 지켜주세요.' },
-  { name: '콩나물', emoji: '🌱', category: '채소', tip: '밀폐 용기에 콩나물이 잠길 정도로 깨끗한 찬물을 붓고, 2~3일에 한 번씩 새로운 물로 교체해 냉장 보관하세요.' },
-  { name: '당근', emoji: '🥕', category: '채소', tip: '흙을 씻어내지 않은 채 신문지에 하나씩 싸서 비닐 팩에 세워 담으면 수분이 보존되어 한 달 내내 싱싱해요.' },
-  { name: '양배추', emoji: '🥬', category: '채소', tip: '심지 부분을 칼로 도려낸 후 물에 젖은 키친타월을 채워 넣고 랩이나 비닐로 단단히 감싸 냉장 보관하세요.' },
-  { name: '고구마', emoji: '🍠', category: '채소', tip: '추위에 약해 냉장고에 넣으면 냉해를 입어 쉽게 썩습니다. 신문지에 펼쳐 수분을 날린 후 실온 보관하세요.' },
-  { name: '아보카도', emoji: '🥑', category: '과일', tip: '덜 익은 것은 실온에 두어 후숙하고, 다 익은 아보카도는 껍질째 랩으로 밀봉하여 냉장 보관하세요.' },
-  { name: '식빵', emoji: '🍞', category: '기타', tip: '실온에서는 쉽게 상하므로 1회 분량씩 랩으로 꼼꼼히 싸서 지퍼백에 담아 냉동한 후 바로 토스팅해 드세요.' },
-  { name: '우유', emoji: '🥛', category: '유제품', tip: '온도 변화에 매우 취약하므로 냉장고 문 쪽 대신 온도가 고르고 시원한 냉장실 내부 깊숙한 곳에 보관하세요.' },
-  { name: '조개류', emoji: '🐚', category: '육류/수산', tip: '소금물에 넣어 해감한 뒤 깨끗이 씻어 한 번 조리할 만큼 소분하여 지퍼백에 밀봉해 냉동 보관하세요.' },
-  { name: '대파', emoji: '🌱', category: '채소', tip: '송송 썰어 키친타월로 물기를 완전히 제거한 후 냉동 보관하면 최대 6개월간 쓸 수 있어요.' },
-  { name: '양파', emoji: '🧅', category: '채소', tip: '망에 하나씩 분리해 넣거나, 껍질을 벗겨 랩으로 개별 포장한 뒤 냉장실 야채칸에 보관하세요. 단, 감자와는 같이 두지 마세요.' },
-  { name: '바나나', emoji: '🍌', category: '과일', tip: '꼭지 부분을 랩으로 감싸 보관하면 에틸렌 가스가 차단되어 갈변 속도를 늦출 수 있어요.' },
-  { name: '달걀', emoji: '🥚', category: '유제품', tip: '뾰족한 곳이 아래로 향하게 보관하세요. 둥근 부분에 숨구멍이 있어 신선함이 오래 유지돼요.' },
-  { name: '토마토', emoji: '🍅', category: '채소', tip: '냉장 보관하면 당도가 떨어지고 껍질이 두꺼워집니다. 꼭지를 떼어 그늘진 실온에 보관하세요.' },
-  { name: '감자', emoji: '🥔', category: '채소', tip: '신선한 사과 한 개를 같이 넣어두면, 사과에서 나오는 에틸렌 가스가 감자 싹의 성장을 막아줘요.' },
-  { name: '두부', emoji: '⬜', category: '기타', tip: '밀폐용기에 맑은 물과 소금 한 꼬집을 넣은 뒤 두부를 담가 보관하면 상하는 것을 늦출 수 있어요.' },
-  { name: '소고기', emoji: '🥩', category: '육류/수산', tip: '단기간 보관 시 올리브오일을 얇게 바르고 랩으로 감싸 신선실이나 김치냉장고에 두면 갈변을 방지할 수 있어요.' },
-  { name: '고등어', emoji: '🐟', category: '육류/수산', tip: '아가미와 내장을 제거하고 깨끗이 씻은 후 물기를 없애고 청주를 뿌려 팩에 밀봉 보관하면 비린내를 차단할 수 있어요.' },
-  { name: '슬라이스 치즈', emoji: '🧀', category: '유제품', tip: '남은 치즈는 지퍼백에 넣어 완전히 밀봉 보관하거나, 종이호일로 개별 감싸 냉장 보관하세요.' },
-  { name: '마늘', emoji: '🧄', category: '채소', tip: '통마늘은 망에 넣어 서늘한 곳에 두고, 다진 마늘은 아이스 트레이에 얼려 한 조각씩 밀폐용기에 보관하세요.' },
-  { name: '버섯', emoji: '🍄', category: '채소', tip: '신문지나 키친타월에 싸서 보관하면 습기를 빨아들여 신선하게 오래 유지됩니다.' },
-  { name: '사과', emoji: '🍎', category: '과일', tip: '사과의 에틸렌 가스는 다른 채소의 숙성을 촉진하므로 반드시 개별 밀봉 보관하세요.' }
+  { name: '대파', emoji: '🌱', category: '채소', tip: '송송 썰어 키친타월로 물기를 완전히 제거한 후 냉동 보관하면 최대 6개월간 쓸 수 있어요.', video: { title: '대파 1년 보관법! 용도별 보관 및 손질 꿀팁', channelName: '살림의 달인', videoId: 'Jpx6hR2tP1U', duration: '07:12' } },
+  { name: '양파', emoji: '🧅', category: '채소', tip: '망에 하나씩 분리해 넣거나, 껍질을 벗겨 랩으로 개별 포장한 뒤 냉장실 야채칸에 보관하세요. 단, 감자와는 같이 두지 마세요.', video: { title: '양파 무르지 않게 보관하는 핵심 비법 2가지', channelName: '자취생 요리연구소', videoId: 'u6N-4Hl57pQ', duration: '06:04' } },
+  { name: '바나나', emoji: '🍌', category: '과일', tip: '꼭지 부분을 랩으로 감싸 보관하면 에틸렌 가스가 차단되어 갈변 속도를 늦출 수 있어요.', video: { title: '바나나 2주 동안 싱싱하게 보관하는 법', channelName: '과일 팩토리', videoId: '6p6N2kG_m_0', duration: '04:15' } },
+  { name: '달걀', emoji: '🥚', category: '유제품', tip: '뾰족한 곳이 아래로 향하게 보관하세요. 둥근 부분에 숨구멍이 있어 신선함이 오래 유지돼요.', video: { title: '달걀 보관의 오해와 진실! 신선한 냉장법', channelName: '푸드 가이드', videoId: 'tEaA0jG9R70', duration: '05:30' } },
+  { name: '토마토', emoji: '🍅', category: '채소', tip: '냉장 보관하면 당도가 떨어지고 껍질이 두꺼워집니다. 꼭지를 떼어 그늘진 실온에 보관하세요.', video: { title: '토마토 냉장고에 넣지 마세요! 올바른 보관법', channelName: '웰빙 주방', videoId: 'K34Z_LwBf08', duration: '05:08' } },
+  { name: '감자', emoji: '🥔', category: '채소', tip: '신선한 사과 한 개를 같이 넣어두면, 사과에서 나오는 에틸렌 가스가 감자 싹의 성장을 막아줘요.', video: { title: '감자 싹 안 나게 사과로 보관하는 황금 비율', channelName: '농부의 꿀팁', videoId: 'Z9q4p-uM51A', duration: '06:42' } },
+  { name: '두부', emoji: '⬜', category: '기타', tip: '밀폐용기에 맑은 물과 소금 한 꼬집을 넣은 뒤 두부를 담가 보관하면 상하는 것을 늦출 수 있어요.', video: { title: '두부 남았을 때 소금물로 5일 더 신선하게!', channelName: '리얼 살림팁', videoId: 'SsnXo5k6q8g', duration: '04:20' } },
+  { name: '소고기', emoji: '🥩', category: '육류/수산', tip: '단기간 보관 시 올리브오일을 얇게 바르고 랩으로 감싸 신선실에 두고, 장기 보관 시 냉동 포장하세요.', video: { title: '소고기 냉동 보관 및 올리브오일 핏물 빼기 비법', channelName: '고기학개론', videoId: 'W1B0z5-v0vI', duration: '08:14' } },
+  { name: '고등어', emoji: '🐟', category: '육류/수산', tip: '아가미와 내장을 제거하고 깨끗이 씻은 후 물기를 없애고 청주를 뿌려 지퍼백에 밀봉하여 냉동 보관하세요.', video: { title: '비린내 ZERO! 고등어 냉동 보관 및 손질법', channelName: '바다 요리사', videoId: 'hN_x7wQ-74Y', duration: '07:05' } },
+  { name: '슬라이스 치즈', emoji: '🧀', category: '유제품', tip: '남은 치즈는 공기가 통하지 않게 지퍼백에 밀봉 보관하거나, 종이호일로 한 장씩 겹쳐 포장해 두세요.', video: { title: '슬라이스 치즈 개별 밀봉과 종이호일 포장법', channelName: '치즈 홀릭', videoId: 'L59pW8GjM4Q', duration: '04:40' } },
+  { name: '마늘', emoji: '🧄', category: '채소', tip: '통마늘은 망에 넣어 통풍 잘되는 곳에 두고, 다진 마늘은 아이스 트레이에 얼려 한 조각씩 밀폐 보관하세요.', video: { title: '깐마늘 한 달 동안 썩지 않게 보관하기', channelName: '마늘 백과사전', videoId: 'y5jA1pU-6t0', duration: '06:12' } },
+  { name: '버섯', emoji: '🍄', category: '채소', tip: '씻지 않고 신문지나 키친타월에 싸서 보관하면 여분의 습기를 빨아들여 신선하게 오래 유지됩니다.', video: { title: '느타리/팽이/표고버섯 수분 제어 보관 가이드', channelName: '건강 식탁', videoId: 'q8pW-t9y5t4', duration: '05:25' } },
+  { name: '사과', emoji: '🍎', category: '과일', tip: '사과의 에틸렌 가스는 다른 채소의 숙성을 촉진해 상하게 하므로 반드시 개별 밀봉 보관하세요.', video: { title: '사과 개별 랩 랩핑 밀봉 이유와 보관 꿀팁', channelName: '과수원 아들', videoId: 'W9jU-t8yQ6Q', duration: '04:55' } },
+  { name: '깻잎', emoji: '🍃', category: '채소', tip: '씻지 않은 상태에서 물기를 털어내고 키친타월로 감싸 지퍼백에 세워서 보관하면 무르는 것을 예방해요.', video: { title: '깻잎 끝까지 초록색으로 보관하는 세로 밀폐법', channelName: '채소 가든', videoId: 'E6tY-q8w5tQ', duration: '03:50' } },
+  { name: '시금치', emoji: '🥬', category: '채소', tip: '뿌리 부분이 아래로 가게 세워서 야채 칸에 보관하고, 흙이 묻은 상태라면 신문지에 감싸 수분을 지켜주세요.', video: { title: '시금치 데치기 전 수분 보전 흙 신문지 보관법', channelName: '그린 라이프', videoId: 'R5pT-y9t4uI', duration: '06:18' } },
+  { name: '콩나물', emoji: '🌱', category: '채소', tip: '밀폐 용기에 콩나물이 잠길 정도로 깨끗한 찬물을 붓고, 2~3일에 한 번씩 새로운 물로 교체해 냉장 보관하세요.', video: { title: '콩나물 물 채워 야채칸에 보관하기 (일주일 신선)', channelName: '반찬의 정석', videoId: 'U8tY-q9u4tE', duration: '04:09' } },
+  { name: '당근', emoji: '🥕', category: '채소', tip: '흙을 씻어내지 않은 채 신문지에 하나씩 싸서 비닐 팩에 세워 담으면 수분이 보존되어 한 달 내내 싱싱해요.', video: { title: '당근 흙 묻은 채로 장기 보관하여 한 달 지키기', channelName: '농가 직송', videoId: 'Y6uI-t8r4eQ', duration: '05:40' } },
+  { name: '양배추', emoji: '🥬', category: '채소', tip: '심지 부분을 칼로 도려낸 후 물에 젖은 키친타월을 채워 넣고 랩이나 비닐로 단단히 감싸 냉장 보관하세요.', video: { title: '양배추 칼로 심지 파내고 물 솜 채워 보관하기', channelName: '쿡 스타일', videoId: 'W8tY-q8r5tE', duration: '07:33' } },
+  { name: '고구마', emoji: '🍠', category: '채소', tip: '추위에 약해 냉장고에 넣으면 냉해를 입어 쉽게 썩습니다. 신문지에 펼쳐 수분을 날린 후 실온 보관하세요.', video: { title: '고구마 냉해 방지와 겨울철 박스 실온 보관법', channelName: '고구마 아재', videoId: 'I6tY-e9r5tQ', duration: '05:15' } },
+  { name: '아보카도', emoji: '🥑', category: '과일', tip: '덜 익은 것은 실온에 두어 후숙하고, 다 익은 아보카도는 껍질째 랩으로 밀봉하여 냉장 보관하세요.', video: { title: '아보카도 상하기 전 완벽한 후숙과 밀봉 냉장법', channelName: '브런치 테이블', videoId: 'O8tY-q8u5tE', duration: '06:22' } },
+  { name: '식빵', emoji: '🍞', category: '기타', tip: '실온에서는 쉽게 상하므로 1회 분량씩 랩으로 꼼꼼히 싸서 지퍼백에 담아 냉동한 후 바로 토스팅해 드세요.', video: { title: '남은 식빵 냉동 보관 가이드 및 토스팅법', channelName: '빵순이 살림', videoId: 'P8tY-q8w5tE', duration: '04:10' } },
+  { name: '우유', emoji: '🥛', category: '유제품', tip: '온도 변화에 매우 취약하므로 냉장고 문 쪽 대신 온도가 고르고 시원한 냉장실 내부 깊숙한 곳에 보관하세요.', video: { title: '우유 유통기한 늘리는 냉장실 보관 명당 위치', channelName: '밀크 로드', videoId: 'Q8tY-q8r5tE', duration: '05:02' } },
+  { name: '조개류', emoji: '🐚', category: '육류/수산', tip: '소금물에 넣어 해감한 뒤 깨끗이 씻어 한 번 조리할 만큼 소분하여 지퍼백에 밀봉해 냉동 보관하세요.', video: { title: '조개 모래 해감 및 소분 냉동 보존 정석', channelName: '어부의 밥상', videoId: 'S8tY-q8u5tE', duration: '07:50' } }
 ];
 
 interface RefrigeratorVisualProps {
@@ -684,9 +692,39 @@ export default function RefrigeratorVisual({
   const seasonalIngredients = SEASONAL_INGREDIENTS.filter(item => item.months.includes(currentMonth));
 
   // 유튜브 이동 핸들러 (인앱 브라우저를 띄워 뒤로가기/닫기 시 앱으로 즉각 복귀 가능)
-  const handleOpenYoutube = async (query: string) => {
-    const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+  const handleOpenYoutube = async (input: string) => {
+    // 11자리 유튜브 비디오 ID 형식인지 체크 (영문 대소문자, 숫자, -, _ 로 구성됨)
+    const isVideoId = /^[a-zA-Z0-9_-]{11}$/.test(input);
+    let url = '';
+    
+    if (isVideoId) {
+      // 비디오 ID인 경우 다이렉트 영상 재생 페이지로 이동
+      url = `https://www.youtube.com/watch?v=${input}`;
+    } else {
+      // 일반 검색어인 경우 유튜브 검색 결과 페이지로 이동
+      url = `https://www.youtube.com/results?search_query=${encodeURIComponent(input)}`;
+    }
+
     try {
+      if (isVideoId) {
+        // 모바일 유튜브 앱 스킴 다이렉트 호출 시도
+        const appUrl = `youtube://watch?v=${input}`;
+        const canOpen = await Linking.canOpenURL(appUrl).catch(() => false);
+        if (canOpen) {
+          await Linking.openURL(appUrl);
+          return;
+        }
+        
+        // 딥링크 앱 스킴 실패 시 https 주소로 Linking.openURL 시도 (OS 차원 앱 연결)
+        try {
+          await Linking.openURL(url);
+          return;
+        } catch (linkErr) {
+          // Linking.openURL 실패 시 인앱브라우저(WebBrowser)로 폴백
+          console.warn("Linking.openURL failed, falling back to WebBrowser:", linkErr);
+        }
+      }
+
       await WebBrowser.openBrowserAsync(url, {
         readerMode: false,
         dismissButtonStyle: 'close',
@@ -694,7 +732,7 @@ export default function RefrigeratorVisual({
         enableBarCollapsing: true,
       });
     } catch (err) {
-      console.warn("Failed to open in WebBrowser, trying Linking fallback:", err);
+      console.warn("Failed to open YouTube URL, trying standard Linking:", err);
       Linking.openURL(url).catch(fallbackErr => {
         console.error("Failed to open YouTube URL", fallbackErr);
         Alert.alert("알림 ⚠️", "유튜브 링크를 열 수 없습니다.");
@@ -1490,33 +1528,44 @@ export default function RefrigeratorVisual({
                 contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40, gap: 12 }}
                 showsVerticalScrollIndicator={false}
                 renderItem={({ item }) => (
-                  <View
+                  <TouchableOpacity
                     style={[
-                      styles.modalTipRowCard,
+                      styles.youtubeVideoCard,
                       {
                         backgroundColor: theme.surface,
                         borderColor: theme.borderLight,
-                        shadowColor: theme.shadow,
                       }
                     ]}
+                    activeOpacity={0.85}
+                    onPress={() => handleOpenYoutube(item.video.videoId)}
                   >
-                    <View style={styles.modalTipRowHeader}>
-                      <View style={[styles.urgentEmojiBadge, { backgroundColor: theme.surfaceTertiary, width: 32, height: 32, borderRadius: 10, marginBottom: 0 }]}>
-                        <Text style={{ fontSize: 16 }}>{item.emoji}</Text>
-                      </View>
-                      <Text style={[styles.modalTipRowName, { color: theme.textPrimary }]} numberOfLines={1}>
-                        {item.name}
-                      </Text>
-                      <View style={[styles.categoryBadge, { backgroundColor: theme.surfaceTertiary }]}>
-                        <Text style={[styles.modalTipRowCategory, { color: theme.textMuted }]}>{item.category}</Text>
+                    <View style={styles.videoThumbnailContainer}>
+                      <Image
+                        style={styles.videoThumbnail}
+                        source={{ uri: `https://img.youtube.com/vi/${item.video.videoId}/mqdefault.jpg` }}
+                      />
+                      <View style={styles.videoDurationBadge}>
+                        <Text style={styles.videoDurationText}>{item.video.duration}</Text>
                       </View>
                     </View>
-                    <View style={styles.modalTipRowBody}>
-                      <Text style={[styles.modalTipRowText, { color: theme.textSecondary }]}>
-                        {item.tip}
+
+                    <View style={styles.videoInfoCol}>
+                      <View style={styles.videoHeaderRow}>
+                        <Text style={[styles.videoNameTag, { color: theme.primary, backgroundColor: theme.primaryLight }]}>
+                          {item.name}
+                        </Text>
+                        <Text style={[styles.videoCategoryText, { color: theme.textMuted }]}>
+                          {item.category}
+                        </Text>
+                      </View>
+                      <Text style={[styles.videoTitleText, { color: theme.textPrimary }]} numberOfLines={2}>
+                        {item.video.title}
+                      </Text>
+                      <Text style={[styles.videoChannelText, { color: theme.textMuted }]}>
+                        {item.video.channelName}
                       </Text>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 )}
               />
             ) : (
@@ -2213,42 +2262,73 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalTipRowCard: {
-    borderRadius: 20,
+  youtubeVideoCard: {
+    flexDirection: 'row',
+    borderRadius: 16,
     borderWidth: 1,
-    padding: 14,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-    gap: 10,
+    padding: 10,
+    alignItems: 'center',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
+    elevation: 1,
+    gap: 12,
   },
-  modalTipRowHeader: {
+  videoThumbnailContainer: {
+    width: 110,
+    height: 65,
+    borderRadius: 10,
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: '#ECEFF1',
+  },
+  videoThumbnail: {
+    width: '100%',
+    height: '100%',
+  },
+  videoDurationBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  videoDurationText: {
+    color: '#FFFFFF',
+    fontSize: 8.5,
+    fontWeight: 'bold',
+  },
+  videoInfoCol: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: 2,
+  },
+  videoHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
   },
-  modalTipRowName: {
-    fontSize: 14,
+  videoNameTag: {
+    fontSize: 9.5,
     fontWeight: 'bold',
-    flexShrink: 1,
-  },
-  categoryBadge: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
+    overflow: 'hidden',
   },
-  modalTipRowCategory: {
+  videoCategoryText: {
     fontSize: 9.5,
     fontWeight: '600',
   },
-  modalTipRowBody: {
-    width: '100%',
-    paddingLeft: 4,
+  videoTitleText: {
+    fontSize: 12.5,
+    fontWeight: 'bold',
+    lineHeight: 17,
   },
-  modalTipRowText: {
-    fontSize: 12,
-    lineHeight: 18,
+  videoChannelText: {
+    fontSize: 10,
     fontWeight: '500',
   },
 });
