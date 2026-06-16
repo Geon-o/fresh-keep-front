@@ -695,52 +695,30 @@ export default function RefrigeratorVisual({
   const currentMonth = new Date().getMonth() + 1;
   const seasonalIngredients = SEASONAL_INGREDIENTS.filter(item => item.months.includes(currentMonth));
 
-  // 유튜브 이동 핸들러 (인앱 브라우저를 띄워 뒤로가기/닫기 시 앱으로 즉각 복귀 가능)
+  // 유튜브 이동 핸들러 (OS 스마트 링크 기능에 위임하여 공식 유튜브 앱 또는 외부 브라우저에서 100% 확실히 재생 보장)
   const handleOpenYoutube = async (input: string) => {
-    // 11자리 유튜브 비디오 ID 형식인지 체크 (영문 대소문자, 숫자, -, _ 로 구성됨)
     const isVideoId = /^[a-zA-Z0-9_-]{11}$/.test(input);
-    let url = '';
-    
-    if (isVideoId) {
-      // 비디오 ID인 경우 다이렉트 영상 재생 페이지로 이동
-      url = `https://www.youtube.com/watch?v=${input}`;
-    } else {
-      // 일반 검색어인 경우 유튜브 검색 결과 페이지로 이동
-      url = `https://www.youtube.com/results?search_query=${encodeURIComponent(input)}`;
-    }
+    const url = isVideoId
+      ? `https://www.youtube.com/watch?v=${input}`
+      : `https://www.youtube.com/results?search_query=${encodeURIComponent(input)}`;
 
     try {
-      if (isVideoId) {
-        // 모바일 유튜브 앱 스킴 다이렉트 호출 시도
-        const appUrl = `youtube://watch?v=${input}`;
-        const canOpen = await Linking.canOpenURL(appUrl).catch(() => false);
-        if (canOpen) {
-          await Linking.openURL(appUrl);
-          return;
-        }
-        
-        // 딥링크 앱 스킴 실패 시 https 주소로 Linking.openURL 시도 (OS 차원 앱 연결)
-        try {
-          await Linking.openURL(url);
-          return;
-        } catch (linkErr) {
-          // Linking.openURL 실패 시 인앱브라우저(WebBrowser)로 폴백
-          console.warn("Linking.openURL failed, falling back to WebBrowser:", linkErr);
-        }
-      }
-
-      await WebBrowser.openBrowserAsync(url, {
-        readerMode: false,
-        dismissButtonStyle: 'close',
-        toolbarColor: '#FFFFFF',
-        enableBarCollapsing: true,
-      });
+      // Linking.openURL은 기기에 유튜브 앱이 있다면 앱으로 바로 열고, 없다면 기본 외부 브라우저(크롬/사파리)로 100% 안전하게 실행합니다.
+      // (인앱 웹브라우저에서 유튜브 동영상 재생 차단 오류를 완전히 회피할 수 있는 방식입니다.)
+      await Linking.openURL(url);
     } catch (err) {
-      console.warn("Failed to open YouTube URL, trying standard Linking:", err);
-      Linking.openURL(url).catch(fallbackErr => {
-        console.error("Failed to open YouTube URL", fallbackErr);
+      console.error("Failed to open YouTube link via Linking, trying WebBrowser fallback:", err);
+      try {
+        await WebBrowser.openBrowserAsync(url, {
+          readerMode: false,
+          dismissButtonStyle: 'close',
+          toolbarColor: '#FFFFFF',
+          enableBarCollapsing: true,
+        });
+      } catch (browserErr) {
+        console.error("Failed to open YouTube link via WebBrowser:", browserErr);
         Alert.alert("알림 ⚠️", "유튜브 링크를 열 수 없습니다.");
-      });
+      }
     }
   };
 
