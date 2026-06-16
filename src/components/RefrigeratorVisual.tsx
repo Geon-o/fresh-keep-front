@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions, TextInput, FlatList, Platform, ActivityIndicator, Linking, Alert } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions, TextInput, FlatList, Platform, ActivityIndicator, Linking, Alert, Modal, SafeAreaView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
@@ -230,7 +230,13 @@ const STORAGE_TIPS: StorageTip[] = [
   { name: '달걀', emoji: '🥚', category: '유제품', tip: '뾰족한 곳이 아래로 향하게 보관하세요. 둥근 부분에 숨구멍이 있어 신선함이 오래 유지돼요.' },
   { name: '토마토', emoji: '🍅', category: '채소', tip: '냉장 보관하면 당도가 떨어지고 껍질이 두꺼워집니다. 꼭지를 떼어 그늘진 실온에 보관하세요.' },
   { name: '감자', emoji: '🥔', category: '채소', tip: '신선한 사과 한 개를 같이 넣어두면, 사과에서 나오는 에틸렌 가스가 감자 싹의 성장을 막아줘요.' },
-  { name: '두부', emoji: '⬜', category: '기타', tip: '밀폐용기에 맑은 물과 소금 한 꼬집을 넣은 뒤 두부를 담가 보관하면 상하는 것을 늦출 수 있어요.' }
+  { name: '두부', emoji: '⬜', category: '기타', tip: '밀폐용기에 맑은 물과 소금 한 꼬집을 넣은 뒤 두부를 담가 보관하면 상하는 것을 늦출 수 있어요.' },
+  { name: '소고기', emoji: '🥩', category: '육류/수산', tip: '단기간 보관 시 올리브오일을 얇게 바르고 랩으로 감싸 신선실이나 김치냉장고에 두면 갈변을 방지할 수 있어요.' },
+  { name: '고등어', emoji: '🐟', category: '육류/수산', tip: '아가미와 내장을 제거하고 깨끗이 씻은 후 물기를 없애고 청주를 뿌려 팩에 밀봉 보관하면 비린내를 차단할 수 있어요.' },
+  { name: '슬라이스 치즈', emoji: '🧀', category: '유제품', tip: '남은 치즈는 지퍼백에 넣어 완전히 밀봉 보관하거나, 종이호일로 개별 감싸 냉장 보관하세요.' },
+  { name: '마늘', emoji: '🧄', category: '채소', tip: '통마늘은 망에 넣어 서늘한 곳에 두고, 다진 마늘은 아이스 트레이에 얼려 한 조각씩 밀폐용기에 보관하세요.' },
+  { name: '버섯', emoji: '🍄', category: '채소', tip: '신문지나 키친타월에 싸서 보관하면 습기를 빨아들여 신선하게 오래 유지됩니다.' },
+  { name: '사과', emoji: '🍎', category: '과일', tip: '사과의 에틸렌 가스는 다른 채소의 숙성을 촉진하므로 반드시 개별 밀봉 보관하세요.' }
 ];
 
 interface RefrigeratorVisualProps {
@@ -260,6 +266,19 @@ export default function RefrigeratorVisual({
   // 식재료 목록 탭용 상태
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'expired' | 'imminent' | 'safe'>('all');
+
+  // 보관 가이드 모달 상태
+  const [guideModalVisible, setGuideModalVisible] = useState(false);
+  const [guideSearchQuery, setGuideSearchQuery] = useState('');
+  const [guideSelectedCategory, setGuideSelectedCategory] = useState<string>('all');
+
+  // 가이드북용 필터링 로직
+  const filteredTips = STORAGE_TIPS.filter(tip => {
+    const matchSearch = tip.name.toLowerCase().includes(guideSearchQuery.toLowerCase()) || 
+                        tip.tip.toLowerCase().includes(guideSearchQuery.toLowerCase());
+    const matchCategory = guideSelectedCategory === 'all' || tip.category === guideSelectedCategory;
+    return matchSearch && matchCategory;
+  });
 
   // 위치 권한 및 실시간 날씨 기반 식중독 지수 상태
   const [locationPermission, setLocationPermission] = useState<'granted' | 'denied' | 'undetermined'>('undetermined');
@@ -1166,46 +1185,28 @@ export default function RefrigeratorVisual({
           </View>
 
           {/* 알아두면 유용한 식재료 보관 꿀팁! 💡 */}
-          <View style={[styles.sectionContainer, { marginBottom: 40 }]}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={[styles.sectionTitle, { paddingHorizontal: 0, marginBottom: 0, color: theme.textPrimary }]}>
-                장기 보관을 위한 식재료 꿀팁 💡
-              </Text>
+          <TouchableOpacity
+            style={[styles.guideBanner, { shadowColor: theme.shadow }]}
+            activeOpacity={0.9}
+            onPress={() => {
+              setGuideSearchQuery('');
+              setGuideSelectedCategory('all');
+              setGuideModalVisible(true);
+            }}
+          >
+            <View style={styles.guideBannerLeft}>
+              <Text style={styles.guideBannerSubTitle}>신선함을 오래오래 💡</Text>
+              <Text style={styles.guideBannerTitle}>식재료 보관 가이드북</Text>
+              <Text style={styles.guideBannerDesc}>식재료별 수명을 늘리고 영양을 지키는 최적의 보관법을 한눈에 검색해보세요.</Text>
+              <View style={[styles.guideBannerButton, { backgroundColor: theme.surface }]}>
+                <Text style={[styles.guideBannerButtonText, { color: theme.primary }]}>가이드북 열기</Text>
+                <Ionicons name="chevron-forward" size={14} color={theme.primary} />
+              </View>
             </View>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.urgentScrollContainer}
-            >
-              {STORAGE_TIPS.map((item, idx) => (
-                <View
-                  key={`tip_${idx}`}
-                  style={[
-                    styles.tipCard,
-                    {
-                      backgroundColor: theme.surface,
-                      borderColor: theme.borderLight,
-                      shadowColor: theme.shadow,
-                    }
-                  ]}
-                >
-                  <View style={styles.tipCardHeader}>
-                    <View style={[styles.urgentEmojiBadge, { backgroundColor: theme.surfaceTertiary, width: 36, height: 36, borderRadius: 11, marginBottom: 0 }]}>
-                      <Text style={{ fontSize: 18 }}>{item.emoji}</Text>
-                    </View>
-                    <View style={styles.tipCardTitleCol}>
-                      <Text style={[styles.tipCardName, { color: theme.textPrimary }]}>{item.name}</Text>
-                      <Text style={[styles.tipCardCategory, { color: theme.textMuted }]}>{item.category}</Text>
-                    </View>
-                  </View>
-                  <Text style={[styles.tipCardText, { color: theme.textSecondary }]} numberOfLines={3}>
-                    {item.tip}
-                  </Text>
-                </View>
-              ))}
-            </ScrollView>
-          </View>
+            <View style={styles.guideBannerRight}>
+              <Text style={{ fontSize: 52 }}>📖</Text>
+            </View>
+          </TouchableOpacity>
         </ScrollView>
       )}
 
@@ -1404,6 +1405,121 @@ export default function RefrigeratorVisual({
           )}
         </View>
       )}
+
+      {/* 보관 가이드북 모달 */}
+      <Modal
+        visible={guideModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setGuideModalVisible(false)}
+      >
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.background }]}>
+          {/* 모달 헤더 */}
+          <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
+            <View style={styles.modalHeaderTitleRow}>
+              <Text style={{ fontSize: 20 }}>📖</Text>
+              <Text style={[styles.modalHeaderTitle, { color: theme.textPrimary }]}>식재료 보관 가이드북</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.modalCloseButton, { backgroundColor: theme.surfaceSecondary }]}
+              onPress={() => setGuideModalVisible(false)}
+            >
+              <Ionicons name="close" size={20} color={theme.textPrimary} />
+            </TouchableOpacity>
+          </View>
+
+          {/* 모달 바디 */}
+          <View style={{ flex: 1 }}>
+            {/* 가이드북용 검색창 */}
+            <View style={[styles.searchContainer, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderLight, marginTop: 16 }]}>
+              <Ionicons name="search" size={18} color={theme.textTertiary} />
+              <TextInput
+                style={[styles.searchInput, { color: theme.textPrimary }]}
+                value={guideSearchQuery}
+                onChangeText={setGuideSearchQuery}
+                placeholder="어떤 식재료 보관법을 찾으시나요?"
+                placeholderTextColor={theme.textMuted}
+              />
+              {guideSearchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setGuideSearchQuery('')}>
+                  <Ionicons name="close-circle" size={18} color={theme.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* 가이드북용 카테고리 필터 칩 */}
+            <View style={[styles.filterContainer, { height: 38 }]}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
+                {['all', '채소', '과일', '육류/수산', '유제품', '기타'].map((cat) => {
+                  const label = cat === 'all' ? '전체' : cat;
+                  const isActive = guideSelectedCategory === cat;
+                  return (
+                    <TouchableOpacity
+                      key={cat}
+                      style={[
+                        styles.filterChip,
+                        isActive && [styles.filterChipActive, { backgroundColor: theme.primary }]
+                      ]}
+                      onPress={() => setGuideSelectedCategory(cat)}
+                    >
+                      <Text style={[styles.filterChipText, { color: theme.textSecondary }, isActive && { color: theme.primaryOnPrimary }]}>
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            {/* 가이드 리스트 */}
+            {filteredTips.length > 0 ? (
+              <ScrollView
+                style={{ flex: 1, paddingHorizontal: 20 }}
+                contentContainerStyle={{ paddingBottom: 40, gap: 12 }}
+                showsVerticalScrollIndicator={false}
+              >
+                {filteredTips.map((item, idx) => (
+                  <View
+                    key={`modal_tip_${idx}`}
+                    style={[
+                      styles.modalTipCard,
+                      {
+                        backgroundColor: theme.surface,
+                        borderColor: theme.borderLight,
+                        shadowColor: theme.shadow,
+                      }
+                    ]}
+                  >
+                    <View style={styles.modalTipHeader}>
+                      <View style={[styles.urgentEmojiBadge, { backgroundColor: theme.surfaceTertiary, width: 38, height: 38, borderRadius: 12, marginBottom: 0 }]}>
+                        <Text style={{ fontSize: 20 }}>{item.emoji}</Text>
+                      </View>
+                      <View style={styles.modalTipTitleCol}>
+                        <Text style={[styles.modalTipName, { color: theme.textPrimary }]}>{item.name}</Text>
+                        <Text style={[styles.modalTipCategory, { color: theme.textMuted }]}>{item.category}</Text>
+                      </View>
+                    </View>
+                    <View style={[styles.modalTipDivider, { backgroundColor: theme.borderLight }]} />
+                    <Text style={[styles.modalTipText, { color: theme.textSecondary }]}>
+                      {item.tip}
+                    </Text>
+                  </View>
+                ))}
+              </ScrollView>
+            ) : (
+              <View style={styles.emptyStateContainer}>
+                <Ionicons name="search-outline" size={48} color={theme.textMuted} style={{ marginBottom: 12 }} />
+                <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>
+                  일치하는 식재료 꿀팁이 없습니다.
+                </Text>
+                <Text style={{ color: theme.textMuted, fontSize: 12, marginTop: 4 }}>
+                  다른 이름이나 유사한 단어로 검색해 보세요! 🔍
+                </Text>
+              </View>
+            )}
+          </View>
+        </SafeAreaView>
+      </Modal>
     </View>
   );
 }
@@ -1998,39 +2114,125 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
-  tipCard: {
-    width: 260,
-    height: 140,
+  guideBanner: {
+    marginHorizontal: 20,
+    backgroundColor: '#3F51B5', // Indigo Accent 배경
+    borderRadius: 24,
+    padding: 22,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 40,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  guideBannerLeft: {
+    flex: 1,
+    paddingRight: 10,
+    gap: 6,
+  },
+  guideBannerSubTitle: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#C5CAE9', // 소프트 블루
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  guideBannerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  guideBannerDesc: {
+    fontSize: 12,
+    color: '#E0E0E0',
+    lineHeight: 18,
+    marginTop: 2,
+    marginBottom: 8,
+  },
+  guideBannerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    alignSelf: 'flex-start',
+  },
+  guideBannerButtonText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  guideBannerRight: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    flex: 1,
+  },
+  modalHeader: {
+    height: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+  },
+  modalHeaderTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  modalHeaderTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  modalCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalTipCard: {
     borderRadius: 20,
     borderWidth: 1,
     padding: 16,
-    justifyContent: 'space-between',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.04,
     shadowRadius: 8,
     elevation: 2,
   },
-  tipCardHeader: {
+  modalTipHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
-  tipCardTitleCol: {
+  modalTipTitleCol: {
     justifyContent: 'center',
+    gap: 2,
   },
-  tipCardName: {
-    fontSize: 14,
+  modalTipName: {
+    fontSize: 15,
     fontWeight: 'bold',
   },
-  tipCardCategory: {
-    fontSize: 10,
+  modalTipCategory: {
+    fontSize: 11,
     fontWeight: '600',
-    marginTop: 1,
   },
-  tipCardText: {
-    fontSize: 12,
-    lineHeight: 18,
+  modalTipDivider: {
+    height: 1,
+    marginVertical: 12,
+  },
+  modalTipText: {
+    fontSize: 13,
+    lineHeight: 20,
     fontWeight: '500',
-    marginTop: 8,
   },
 });
