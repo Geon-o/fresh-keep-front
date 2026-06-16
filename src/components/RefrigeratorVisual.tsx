@@ -1473,14 +1473,15 @@ export default function RefrigeratorVisual({
 
             {/* 가이드 리스트 */}
             {filteredTips.length > 0 ? (
-              <ScrollView
-                style={{ flex: 1, paddingHorizontal: 20 }}
-                contentContainerStyle={{ paddingBottom: 40, gap: 12 }}
+              <FlatList
+                data={filteredTips}
+                keyExtractor={(item) => item.name}
+                numColumns={2}
+                columnWrapperStyle={{ gap: 12, marginBottom: 12 }}
+                contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
                 showsVerticalScrollIndicator={false}
-              >
-                {filteredTips.map((item, idx) => (
+                renderItem={({ item }) => (
                   <View
-                    key={`modal_tip_${idx}`}
                     style={[
                       styles.modalTipCard,
                       {
@@ -1491,8 +1492,8 @@ export default function RefrigeratorVisual({
                     ]}
                   >
                     <View style={styles.modalTipHeader}>
-                      <View style={[styles.urgentEmojiBadge, { backgroundColor: theme.surfaceTertiary, width: 38, height: 38, borderRadius: 12, marginBottom: 0 }]}>
-                        <Text style={{ fontSize: 20 }}>{item.emoji}</Text>
+                      <View style={[styles.urgentEmojiBadge, { backgroundColor: theme.surfaceTertiary, width: 34, height: 34, borderRadius: 10, marginBottom: 0 }]}>
+                        <Text style={{ fontSize: 18 }}>{item.emoji}</Text>
                       </View>
                       <View style={styles.modalTipTitleCol}>
                         <Text style={[styles.modalTipName, { color: theme.textPrimary }]}>{item.name}</Text>
@@ -1500,12 +1501,12 @@ export default function RefrigeratorVisual({
                       </View>
                     </View>
                     <View style={[styles.modalTipDivider, { backgroundColor: theme.borderLight }]} />
-                    <Text style={[styles.modalTipText, { color: theme.textSecondary }]}>
+                    <Text style={[styles.modalTipText, { color: theme.textSecondary }]} numberOfLines={5}>
                       {item.tip}
                     </Text>
                   </View>
-                ))}
-              </ScrollView>
+                )}
+              />
             ) : (
               <View style={styles.emptyStateContainer}>
                 <Ionicons name="search-outline" size={48} color={theme.textMuted} style={{ marginBottom: 12 }} />
@@ -2201,38 +2202,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalTipCard: {
+    flex: 1,
+    width: '48%',
     borderRadius: 20,
     borderWidth: 1,
-    padding: 16,
+    padding: 14,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.04,
     shadowRadius: 8,
     elevation: 2,
+    minHeight: 160,
+    justifyContent: 'flex-start',
   },
   modalTipHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
   modalTipTitleCol: {
     justifyContent: 'center',
-    gap: 2,
+    gap: 1,
   },
   modalTipName: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: 'bold',
   },
   modalTipCategory: {
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: '600',
   },
   modalTipDivider: {
     height: 1,
-    marginVertical: 12,
+    marginVertical: 8,
   },
   modalTipText: {
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 11.5,
+    lineHeight: 16,
     fontWeight: '500',
   },
 });
