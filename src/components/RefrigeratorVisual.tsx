@@ -696,19 +696,16 @@ export default function RefrigeratorVisual({
   const currentMonth = new Date().getMonth() + 1;
   const seasonalIngredients = SEASONAL_INGREDIENTS.filter(item => item.months.includes(currentMonth));
 
-  // 유튜브 이동 핸들러 (OS 스마트 링크 기능에 위임하여 공식 유튜브 앱 또는 외부 브라우저에서 100% 확실히 재생 보장)
-  const handleOpenYoutube = async (input: string) => {
+  // 유튜브 이동 핸들러 (OS 스마트 링크 기능에 위임하여 공식 유튜브 앱 또는 외부 브라우저에서 100% 확실히 검색 결과 오픈)
+  const handleOpenYoutube = async (input: string, name: string) => {
+    // 특정 비디오 ID 다이렉트 재생 시 유튜브 앱의 지역/저작권/기기별 차단 오류가 종종 발생하므로,
+    // 해당 식재료 명칭의 최적 검색 쿼리를 바탕으로 한 검색 결과 페이지를 제공하여 에러를 100% 원천 예방하고 다양한 정보를 선택해 보게 합니다.
     const isVideoId = /^[a-zA-Z0-9_-]{11}$/.test(input);
-    const url = isVideoId
-      ? `https://www.youtube.com/watch?v=${input}`
-      : `https://www.youtube.com/results?search_query=${encodeURIComponent(input)}`;
-
-    // 임시 디버깅용 팝업: 최신 코드 실행 여부 및 URL 정합성 검증
-    Alert.alert("유튜브 디버깅 🔍", `호출 URL: ${url}\n\n[확인]을 누르면 시스템 외부 브라우저나 유튜브 앱 열기를 시도합니다.`);
+    const searchQuery = isVideoId ? `${name} 보관법` : input;
+    const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(searchQuery)}`;
 
     try {
       // Linking.openURL은 기기에 유튜브 앱이 있다면 앱으로 바로 열고, 없다면 기본 외부 브라우저(크롬/사파리)로 100% 안전하게 실행합니다.
-      // (인앱 웹브라우저에서 유튜브 동영상 재생 차단 오류를 완전히 회피할 수 있는 방식입니다.)
       await Linking.openURL(url);
     } catch (err) {
       console.error("Failed to open YouTube link via Linking, trying WebBrowser fallback:", err);
@@ -1250,7 +1247,7 @@ export default function RefrigeratorVisual({
                     }
                   ]}
                   activeOpacity={0.8}
-                  onPress={() => handleOpenYoutube(item.searchQuery)}
+                  onPress={() => handleOpenYoutube(item.searchQuery, item.name)}
                 >
                   <View style={[styles.urgentEmojiBadge, { backgroundColor: theme.surfaceTertiary, width: 44, height: 44, borderRadius: 15, marginBottom: 8 }]}>
                     <Text style={{ fontSize: 24 }}>{item.emoji}</Text>
@@ -1639,7 +1636,7 @@ export default function RefrigeratorVisual({
                             { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderLight }
                           ]}
                           activeOpacity={0.8}
-                          onPress={() => handleOpenYoutube(hasVideo ? item.video!.videoId : (item.youtubeQuery || item.name))}
+                          onPress={() => handleOpenYoutube(item.youtubeQuery || item.name, item.name)}
                         >
                           <Ionicons name="logo-youtube" size={15} color="#FF0000" />
                           <Text style={[styles.guideYoutubeText, { color: theme.textPrimary }]} numberOfLines={1}>
