@@ -703,6 +703,9 @@ export default function RefrigeratorVisual({
       ? `https://www.youtube.com/watch?v=${input}`
       : `https://www.youtube.com/results?search_query=${encodeURIComponent(input)}`;
 
+    // 임시 디버깅용 팝업: 최신 코드 실행 여부 및 URL 정합성 검증
+    Alert.alert("유튜브 디버깅 🔍", `호출 URL: ${url}\n\n[확인]을 누르면 시스템 외부 브라우저나 유튜브 앱 열기를 시도합니다.`);
+
     try {
       // Linking.openURL은 기기에 유튜브 앱이 있다면 앱으로 바로 열고, 없다면 기본 외부 브라우저(크롬/사파리)로 100% 안전하게 실행합니다.
       // (인앱 웹브라우저에서 유튜브 동영상 재생 차단 오류를 완전히 회피할 수 있는 방식입니다.)
