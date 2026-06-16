@@ -1495,8 +1495,8 @@ export default function RefrigeratorVisual({
                         <Text style={{ fontSize: 18 }}>{item.emoji}</Text>
                       </View>
                       <View style={styles.modalTipRowTitleCol}>
-                        <Text style={[styles.modalTipRowName, { color: theme.textPrimary }]}>{item.name}</Text>
-                        <Text style={[styles.modalTipRowCategory, { color: theme.textMuted }]}>{item.category}</Text>
+                        <Text style={[styles.modalTipRowName, { color: theme.textPrimary }]} numberOfLines={1}>{item.name}</Text>
+                        <Text style={[styles.modalTipRowCategory, { color: theme.textMuted }]} numberOfLines={1}>{item.category}</Text>
                       </View>
                     </View>
                     <View style={styles.modalTipRowRight}>
@@ -2223,6 +2223,7 @@ const styles = StyleSheet.create({
   modalTipRowTitleCol: {
     justifyContent: 'center',
     gap: 1,
+    flex: 1,
   },
   modalTipRowName: {
     fontSize: 13,
