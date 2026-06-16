@@ -1681,6 +1681,22 @@ export default function RefrigeratorVisual({
                             {item.tip}
                           </Text>
                         </View>
+
+                        {/* 3. 하단 유튜브 보관법 외부 앱 검색 버튼 */}
+                        <TouchableOpacity
+                          style={[
+                            styles.guideYoutubeButton,
+                            { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderLight }
+                          ]}
+                          activeOpacity={0.8}
+                          onPress={() => handleOpenYoutube(item.youtubeQuery || item.name, item.name)}
+                        >
+                          <Ionicons name="logo-youtube" size={15} color="#FF0000" />
+                          <Text style={[styles.guideYoutubeText, { color: theme.textPrimary }]} numberOfLines={1}>
+                            {`YouTube에서 "${item.name} 보관법" 검색`}
+                          </Text>
+                          <Ionicons name="chevron-forward" size={13} color={theme.textMuted} style={{ marginLeft: 'auto' }} />
+                        </TouchableOpacity>
                       </View>
                     );
                   }}
