@@ -1619,71 +1619,56 @@ export default function RefrigeratorVisual({
                   renderItem={({ item }) => {
                     const hasVideo = !!item.video;
                     return (
-                      <TouchableOpacity
+                      <View
                         style={[
-                          styles.youtubeVideoCard,
+                          styles.guideTipCard,
                           {
                             backgroundColor: theme.surface,
                             borderColor: theme.borderLight,
                           }
                         ]}
-                        activeOpacity={0.85}
-                        onPress={() => handleOpenYoutube(hasVideo ? item.video!.videoId : (item.youtubeQuery || item.name))}
                       >
-                        {hasVideo ? (
-                          <>
-                            <View style={styles.videoThumbnailContainer}>
-                              <Image
-                                style={styles.videoThumbnail}
-                                source={{ uri: `https://img.youtube.com/vi/${item.video!.videoId}/mqdefault.jpg` }}
-                              />
-                              <View style={styles.videoDurationBadge}>
-                                <Text style={styles.videoDurationText}>{item.video!.duration}</Text>
-                              </View>
-                            </View>
-
-                            <View style={styles.videoInfoCol}>
-                              <View style={styles.videoHeaderRow}>
-                                <Text style={[styles.videoNameTag, { color: theme.primary, backgroundColor: theme.primaryLight }]}>
-                                  {item.name}
-                                </Text>
-                                <Text style={[styles.videoCategoryText, { color: theme.textMuted }]}>
-                                  {item.category}
-                                </Text>
-                              </View>
-                              <Text style={[styles.videoTitleText, { color: theme.textPrimary }]} numberOfLines={2}>
-                                {item.video!.title}
-                              </Text>
-                              <Text style={[styles.videoChannelText, { color: theme.textMuted }]}>
-                                {item.video!.channelName}
-                              </Text>
-                            </View>
-                          </>
-                        ) : (
-                          <View style={{ flex: 1, gap: 8 }}>
-                            <View style={styles.videoHeaderRow}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Text style={{ fontSize: 16 }}>{item.emoji}</Text>
-                                <Text style={[styles.videoTitleText, { color: theme.textPrimary, fontSize: 14 }]}>
-                                  {item.name}
-                                </Text>
-                                <View style={{ backgroundColor: theme.surfaceTertiary, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
-                                  <Text style={[styles.videoCategoryText, { color: theme.textMuted, fontSize: 9.5 }]}>
-                                    {item.category}
-                                  </Text>
-                                </View>
-                              </View>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FF000012', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
-                                <Ionicons name="logo-youtube" size={12} color="#FF0000" />
-                                <Text style={{ color: '#FF0000', fontSize: 10, fontWeight: 'bold' }}>영상 보기</Text>
-                              </View>
-                            </View>
-                            <Text style={{ color: theme.textSecondary, fontSize: 12, lineHeight: 18 }}>
-                              {item.tip}
+                        {/* 1. 상단 정보 헤더 행 */}
+                        <View style={styles.guideCardHeader}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text style={{ fontSize: 18 }}>{item.emoji}</Text>
+                            <Text style={[styles.guideCardName, { color: theme.textPrimary }]}>
+                              {item.name}
                             </Text>
+                            <View style={[styles.categoryBadge, { backgroundColor: theme.surfaceTertiary }]}>
+                              <Text style={[styles.categoryBadgeText, { color: theme.textMuted }]}>
+                                {item.category}
+                              </Text>
+                            </View>
                           </View>
-                        )}
-                      </TouchableOpacity>
+                        </View>
+
+                        {/* 2. 중앙 보관 꿀팁 내용 본문 */}
+                        <View style={styles.guideCardBody}>
+                          <Text style={[styles.guideCardTipText, { color: theme.textSecondary }]}>
+                            {item.tip}
+                          </Text>
+                        </View>
+
+                        {/* 3. 하단 유튜브 동영상 연동 바 / 버튼 */}
+                        <TouchableOpacity
+                          style={[
+                            styles.guideYoutubeButton,
+                            { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderLight }
+                          ]}
+                          activeOpacity={0.8}
+                          onPress={() => handleOpenYoutube(hasVideo ? item.video!.videoId : (item.youtubeQuery || item.name))}
+                        >
+                          <Ionicons name="logo-youtube" size={15} color="#FF0000" />
+                          <Text style={[styles.guideYoutubeText, { color: theme.textPrimary }]} numberOfLines={1}>
+                            {hasVideo 
+                              ? `영상 가이드: ${item.video!.title} (${item.video!.duration})`
+                              : `YouTube에서 "${item.name} 보관법" 검색`
+                            }
+                          </Text>
+                          <Ionicons name="chevron-forward" size={13} color={theme.textMuted} style={{ marginLeft: 'auto' }} />
+                        </TouchableOpacity>
+                      </View>
                     );
                   }}
                 />
@@ -2382,73 +2367,55 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  youtubeVideoCard: {
-    flexDirection: 'row',
+  guideTipCard: {
     borderRadius: 16,
     borderWidth: 1,
-    padding: 10,
-    alignItems: 'center',
-    shadowOffset: { width: 0, height: 2 },
+    padding: 16,
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.02,
-    shadowRadius: 4,
+    shadowRadius: 6,
     elevation: 1,
     gap: 12,
   },
-  videoThumbnailContainer: {
-    width: 110,
-    height: 65,
-    borderRadius: 10,
-    overflow: 'hidden',
-    position: 'relative',
-    backgroundColor: '#ECEFF1',
-  },
-  videoThumbnail: {
-    width: '100%',
-    height: '100%',
-  },
-  videoDurationBadge: {
-    position: 'absolute',
-    bottom: 4,
-    right: 4,
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: 4,
-  },
-  videoDurationText: {
-    color: '#FFFFFF',
-    fontSize: 8.5,
-    fontWeight: 'bold',
-  },
-  videoInfoCol: {
-    flex: 1,
-    justifyContent: 'center',
-    gap: 2,
-  },
-  videoHeaderRow: {
+  guideCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  videoNameTag: {
-    fontSize: 9.5,
+  guideCardName: {
+    fontSize: 15,
     fontWeight: 'bold',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+  },
+  categoryBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
     overflow: 'hidden',
   },
-  videoCategoryText: {
-    fontSize: 9.5,
-    fontWeight: '600',
-  },
-  videoTitleText: {
-    fontSize: 12.5,
-    fontWeight: 'bold',
-    lineHeight: 17,
-  },
-  videoChannelText: {
+  categoryBadgeText: {
     fontSize: 10,
+    fontWeight: 'bold',
+  },
+  guideCardBody: {
+    width: '100%',
+  },
+  guideCardTipText: {
+    fontSize: 12.5,
+    lineHeight: 18.5,
     fontWeight: '500',
+  },
+  guideYoutubeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  guideYoutubeText: {
+    fontSize: 11.5,
+    fontWeight: 'bold',
+    flex: 1,
   },
 });
