@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions, TextInput, FlatList, Platform, ActivityIndicator, Linking, Alert, Modal, Image, SafeAreaView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import { searchStorageGuides } from '../api/guideService';
 import * as Location from 'expo-location';
 import * as WebBrowser from 'expo-web-browser';
 import { FridgeType, Ingredient } from '../types';
@@ -228,7 +229,8 @@ interface StorageTip {
   emoji: string;
   category: string;
   tip: string;
-  video: YoutubeVideo;
+  video?: YoutubeVideo | null;
+  youtubeQuery?: string;
 }
 
 const STORAGE_TIPS: StorageTip[] = [
@@ -290,13 +292,15 @@ export default function RefrigeratorVisual({
   const [guideSearchQuery, setGuideSearchQuery] = useState('');
   const [guideSelectedCategory, setGuideSelectedCategory] = useState<string>('all');
 
-  // 가이드북용 필터링 로직
-  const filteredTips = STORAGE_TIPS.filter(tip => {
-    const matchSearch = tip.name.toLowerCase().includes(guideSearchQuery.toLowerCase()) || 
-                        tip.tip.toLowerCase().includes(guideSearchQuery.toLowerCase());
-    const matchCategory = guideSelectedCategory === 'all' || tip.category === guideSelectedCategory;
-    return matchSearch && matchCategory;
-  });
+  // 실시간 AI 하이브리드 캐싱을 위한 추가 상태
+  const [apiGuides, setApiGuides] = useState<StorageTip[]>([]);
+  const [isGuideLoading, setIsGuideLoading] = useState(false);
+  const [guideError, setGuideError] = useState<string | null>(null);
+
+  // 가이드북용 필터링 로직 (검색어가 없으면 로컬 데이터셋, 검색어가 있으면 실시간 검색 결과 매핑)
+  const filteredTips = !guideSearchQuery.trim()
+    ? STORAGE_TIPS.filter(tip => guideSelectedCategory === 'all' || tip.category === guideSelectedCategory)
+    : apiGuides.filter(tip => guideSelectedCategory === 'all' || tip.category === guideSelectedCategory);
 
   // 위치 권한 및 실시간 날씨 기반 식중독 지수 상태
   const [locationPermission, setLocationPermission] = useState<'granted' | 'denied' | 'undetermined'>('undetermined');
@@ -737,6 +741,58 @@ export default function RefrigeratorVisual({
         console.error("Failed to open YouTube URL", fallbackErr);
         Alert.alert("알림 ⚠️", "유튜브 링크를 열 수 없습니다.");
       });
+    }
+  };
+
+  // AI 하이브리드 가이드북 실시간 검색 처리
+  const handleSearchGuide = async () => {
+    const cleanQuery = guideSearchQuery.trim();
+    if (!cleanQuery) {
+      setApiGuides([]);
+      setGuideError(null);
+      return;
+    }
+
+    setGuideError(null);
+
+    // 1단계: 로컬 23종 데이터셋에서 1차 매칭 시도
+    const queryLower = cleanQuery.toLowerCase();
+    const localMatches = STORAGE_TIPS.filter(tip => 
+      tip.name.toLowerCase().includes(queryLower) || 
+      tip.tip.toLowerCase().includes(queryLower)
+    );
+
+    if (localMatches.length > 0) {
+      setApiGuides(localMatches);
+      return;
+    }
+
+    // 2단계: 로컬 매칭 실패 시 백엔드 API 호출
+    if (!isLoggedIn) {
+      setGuideError('로그인 후 이용하시면 AI가 실시간으로 새로운 식재료 보관 꿀팁을 분석해 드립니다! 💡');
+      setApiGuides([]);
+      return;
+    }
+
+    setIsGuideLoading(true);
+    try {
+      const results = await searchStorageGuides(cleanQuery);
+      const mapped: StorageTip[] = results.map(item => ({
+        name: item.name,
+        emoji: item.emoji || '💡',
+        category: item.category,
+        tip: item.tip,
+        youtubeQuery: item.youtubeQuery,
+        video: item.video
+      }));
+      setApiGuides(mapped);
+    } catch (err: any) {
+      console.error("Failed to fetch storage guide from AI backend:", err);
+      const errMsg = err.response?.data?.message || '식재료 보관법 정보를 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.';
+      setGuideError(errMsg);
+      setApiGuides([]);
+    } finally {
+      setIsGuideLoading(false);
     }
   };
 
@@ -1484,15 +1540,30 @@ export default function RefrigeratorVisual({
               <TextInput
                 style={[styles.searchInput, { color: theme.textPrimary }]}
                 value={guideSearchQuery}
-                onChangeText={setGuideSearchQuery}
+                onChangeText={(text) => {
+                  setGuideSearchQuery(text);
+                  if (!text.trim()) {
+                    setApiGuides([]);
+                    setGuideError(null);
+                  }
+                }}
+                onSubmitEditing={handleSearchGuide}
+                returnKeyType="search"
                 placeholder="어떤 식재료 보관법을 찾으시나요?"
                 placeholderTextColor={theme.textMuted}
               />
               {guideSearchQuery.length > 0 && (
-                <TouchableOpacity onPress={() => setGuideSearchQuery('')}>
-                  <Ionicons name="close-circle" size={18} color={theme.textMuted} />
+                <TouchableOpacity onPress={() => {
+                  setGuideSearchQuery('');
+                  setApiGuides([]);
+                  setGuideError(null);
+                }}>
+                  <Ionicons name="close-circle" size={18} color={theme.textMuted} style={{ marginRight: 4 }} />
                 </TouchableOpacity>
               )}
+              <TouchableOpacity onPress={handleSearchGuide} style={{ paddingHorizontal: 8 }}>
+                <Text style={{ color: theme.primary, fontWeight: 'bold', fontSize: 13 }}>검색</Text>
+              </TouchableOpacity>
             </View>
 
             {/* 가이드북용 카테고리 필터 칩 */}
@@ -1519,65 +1590,114 @@ export default function RefrigeratorVisual({
               </ScrollView>
             </View>
 
-            {/* 가이드 리스트 */}
-            {filteredTips.length > 0 ? (
-              <FlatList
-                data={filteredTips}
-                keyExtractor={(item) => item.name}
-                numColumns={1}
-                contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40, gap: 12 }}
-                showsVerticalScrollIndicator={false}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={[
-                      styles.youtubeVideoCard,
-                      {
-                        backgroundColor: theme.surface,
-                        borderColor: theme.borderLight,
-                      }
-                    ]}
-                    activeOpacity={0.85}
-                    onPress={() => handleOpenYoutube(item.video.videoId)}
-                  >
-                    <View style={styles.videoThumbnailContainer}>
-                      <Image
-                        style={styles.videoThumbnail}
-                        source={{ uri: `https://img.youtube.com/vi/${item.video.videoId}/mqdefault.jpg` }}
-                      />
-                      <View style={styles.videoDurationBadge}>
-                        <Text style={styles.videoDurationText}>{item.video.duration}</Text>
-                      </View>
-                    </View>
+            {/* 에러 및 로딩 상태 오버레이 */}
+            {isGuideLoading && (
+              <View style={{ paddingVertical: 40, justifyContent: 'center', alignItems: 'center', gap: 10 }}>
+                <ActivityIndicator size="large" color={theme.primary} />
+                <Text style={{ color: theme.textSecondary, fontSize: 13 }}>AI가 신선 보관 꿀팁을 분석하고 있습니다... 🔍</Text>
+              </View>
+            )}
 
-                    <View style={styles.videoInfoCol}>
-                      <View style={styles.videoHeaderRow}>
-                        <Text style={[styles.videoNameTag, { color: theme.primary, backgroundColor: theme.primaryLight }]}>
-                          {item.name}
-                        </Text>
-                        <Text style={[styles.videoCategoryText, { color: theme.textMuted }]}>
-                          {item.category}
-                        </Text>
-                      </View>
-                      <Text style={[styles.videoTitleText, { color: theme.textPrimary }]} numberOfLines={2}>
-                        {item.video.title}
-                      </Text>
-                      <Text style={[styles.videoChannelText, { color: theme.textMuted }]}>
-                        {item.video.channelName}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                )}
-              />
-            ) : (
-              <View style={styles.emptyStateContainer}>
-                <Ionicons name="search-outline" size={48} color={theme.textMuted} style={{ marginBottom: 12 }} />
-                <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>
-                  일치하는 식재료 꿀팁이 없습니다.
-                </Text>
-                <Text style={{ color: theme.textMuted, fontSize: 12, marginTop: 4 }}>
-                  다른 이름이나 유사한 단어로 검색해 보세요! 🔍
+            {guideError && !isGuideLoading && (
+              <View style={{ padding: 16, marginHorizontal: 20, marginBottom: 12, backgroundColor: theme.surfaceSecondary, borderWidth: 1, borderColor: theme.borderLight, borderRadius: 16, alignItems: 'center', gap: 8 }}>
+                <Ionicons name="alert-circle-outline" size={28} color={theme.ddayImminent} />
+                <Text style={{ color: theme.textSecondary, fontSize: 12, textAlign: 'center', lineHeight: 18 }}>
+                  {guideError}
                 </Text>
               </View>
+            )}
+
+            {/* 가이드 리스트 */}
+            {!isGuideLoading && (
+              filteredTips.length > 0 ? (
+                <FlatList
+                  data={filteredTips}
+                  keyExtractor={(item) => item.name}
+                  numColumns={1}
+                  contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40, gap: 12 }}
+                  showsVerticalScrollIndicator={false}
+                  renderItem={({ item }) => {
+                    const hasVideo = !!item.video;
+                    return (
+                      <TouchableOpacity
+                        style={[
+                          styles.youtubeVideoCard,
+                          {
+                            backgroundColor: theme.surface,
+                            borderColor: theme.borderLight,
+                          }
+                        ]}
+                        activeOpacity={0.85}
+                        onPress={() => handleOpenYoutube(hasVideo ? item.video!.videoId : (item.youtubeQuery || item.name))}
+                      >
+                        {hasVideo ? (
+                          <>
+                            <View style={styles.videoThumbnailContainer}>
+                              <Image
+                                style={styles.videoThumbnail}
+                                source={{ uri: `https://img.youtube.com/vi/${item.video!.videoId}/mqdefault.jpg` }}
+                              />
+                              <View style={styles.videoDurationBadge}>
+                                <Text style={styles.videoDurationText}>{item.video!.duration}</Text>
+                              </View>
+                            </View>
+
+                            <View style={styles.videoInfoCol}>
+                              <View style={styles.videoHeaderRow}>
+                                <Text style={[styles.videoNameTag, { color: theme.primary, backgroundColor: theme.primaryLight }]}>
+                                  {item.name}
+                                </Text>
+                                <Text style={[styles.videoCategoryText, { color: theme.textMuted }]}>
+                                  {item.category}
+                                </Text>
+                              </View>
+                              <Text style={[styles.videoTitleText, { color: theme.textPrimary }]} numberOfLines={2}>
+                                {item.video!.title}
+                              </Text>
+                              <Text style={[styles.videoChannelText, { color: theme.textMuted }]}>
+                                {item.video!.channelName}
+                              </Text>
+                            </View>
+                          </>
+                        ) : (
+                          <View style={{ flex: 1, gap: 8 }}>
+                            <View style={styles.videoHeaderRow}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={{ fontSize: 16 }}>{item.emoji}</Text>
+                                <Text style={[styles.videoTitleText, { color: theme.textPrimary, fontSize: 14 }]}>
+                                  {item.name}
+                                </Text>
+                                <View style={{ backgroundColor: theme.surfaceTertiary, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                                  <Text style={[styles.videoCategoryText, { color: theme.textMuted, fontSize: 9.5 }]}>
+                                    {item.category}
+                                  </Text>
+                                </View>
+                              </View>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FF000012', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
+                                <Ionicons name="logo-youtube" size={12} color="#FF0000" />
+                                <Text style={{ color: '#FF0000', fontSize: 10, fontWeight: 'bold' }}>영상 보기</Text>
+                              </View>
+                            </View>
+                            <Text style={{ color: theme.textSecondary, fontSize: 12, lineHeight: 18 }}>
+                              {item.tip}
+                            </Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  }}
+                />
+              ) : (
+                <View style={styles.emptyStateContainer}>
+                  <Ionicons name="search-outline" size={48} color={theme.textMuted} style={{ marginBottom: 12 }} />
+                  <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>
+                    일치하는 식재료 꿀팁이 없습니다.
+                  </Text>
+                  <Text style={{ color: theme.textMuted, fontSize: 12, marginTop: 4 }}>
+                    다른 이름이나 유사한 단어로 검색해 보세요! 🔍
+                  </Text>
+                </View>
+              )
             )}
           </View>
         </SafeAreaView>
