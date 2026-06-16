@@ -1477,7 +1477,7 @@ export default function RefrigeratorVisual({
                 data={filteredTips}
                 keyExtractor={(item) => item.name}
                 numColumns={1}
-                contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40, gap: 10 }}
+                contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40, gap: 12 }}
                 showsVerticalScrollIndicator={false}
                 renderItem={({ item }) => (
                   <View
@@ -1490,17 +1490,19 @@ export default function RefrigeratorVisual({
                       }
                     ]}
                   >
-                    <View style={styles.modalTipRowLeft}>
-                      <View style={[styles.urgentEmojiBadge, { backgroundColor: theme.surfaceTertiary, width: 34, height: 34, borderRadius: 10, marginBottom: 0 }]}>
-                        <Text style={{ fontSize: 18 }}>{item.emoji}</Text>
+                    <View style={styles.modalTipRowHeader}>
+                      <View style={[styles.urgentEmojiBadge, { backgroundColor: theme.surfaceTertiary, width: 32, height: 32, borderRadius: 10, marginBottom: 0 }]}>
+                        <Text style={{ fontSize: 16 }}>{item.emoji}</Text>
                       </View>
-                      <View style={styles.modalTipRowTitleCol}>
-                        <Text style={[styles.modalTipRowName, { color: theme.textPrimary }]} numberOfLines={1}>{item.name}</Text>
-                        <Text style={[styles.modalTipRowCategory, { color: theme.textMuted }]} numberOfLines={1}>{item.category}</Text>
+                      <Text style={[styles.modalTipRowName, { color: theme.textPrimary }]} numberOfLines={1}>
+                        {item.name}
+                      </Text>
+                      <View style={[styles.categoryBadge, { backgroundColor: theme.surfaceTertiary }]}>
+                        <Text style={[styles.modalTipRowCategory, { color: theme.textMuted }]}>{item.category}</Text>
                       </View>
                     </View>
-                    <View style={styles.modalTipRowRight}>
-                      <Text style={[styles.modalTipRowText, { color: theme.textSecondary }]} numberOfLines={3}>
+                    <View style={styles.modalTipRowBody}>
+                      <Text style={[styles.modalTipRowText, { color: theme.textSecondary }]}>
                         {item.tip}
                       </Text>
                     </View>
@@ -2202,43 +2204,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalTipRowCard: {
-    flexDirection: 'row',
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
-    padding: 12,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
-    elevation: 1,
-    gap: 12,
+    padding: 14,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+    gap: 10,
   },
-  modalTipRowLeft: {
+  modalTipRowHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    width: 95,
-  },
-  modalTipRowTitleCol: {
-    justifyContent: 'center',
-    gap: 1,
-    flex: 1,
   },
   modalTipRowName: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: 'bold',
+    flexShrink: 1,
+  },
+  categoryBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
   modalTipRowCategory: {
-    fontSize: 9,
+    fontSize: 9.5,
     fontWeight: '600',
   },
-  modalTipRowRight: {
-    flex: 1,
+  modalTipRowBody: {
+    width: '100%',
+    paddingLeft: 4,
   },
   modalTipRowText: {
-    fontSize: 11.5,
-    lineHeight: 16,
+    fontSize: 12,
+    lineHeight: 18,
     fontWeight: '500',
   },
 });
