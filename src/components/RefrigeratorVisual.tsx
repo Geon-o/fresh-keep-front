@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions, TextInput, FlatList, Platform, ActivityIndicator, Linking, Alert, Modal, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import YoutubePlayer from 'react-native-youtube-iframe';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { searchStorageGuides } from '../api/guideService';
@@ -293,7 +292,6 @@ export default function RefrigeratorVisual({
   const [guideModalVisible, setGuideModalVisible] = useState(false);
   const [guideSearchQuery, setGuideSearchQuery] = useState('');
   const [guideSelectedCategory, setGuideSelectedCategory] = useState<string>('all');
-  const [playingVideoName, setPlayingVideoName] = useState<string | null>(null);
 
   // 실시간 AI 하이브리드 캐싱을 위한 추가 상태
   const [apiGuides, setApiGuides] = useState<StorageTip[]>([]);
@@ -1541,7 +1539,6 @@ export default function RefrigeratorVisual({
         presentationStyle="pageSheet"
         onRequestClose={() => {
           setGuideModalVisible(false);
-          setPlayingVideoName(null);
         }}
       >
         <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.background }]}>
@@ -1555,7 +1552,6 @@ export default function RefrigeratorVisual({
               style={[styles.modalCloseButton, { backgroundColor: theme.surfaceSecondary }]}
               onPress={() => {
                 setGuideModalVisible(false);
-                setPlayingVideoName(null);
               }}
             >
               <Ionicons name="close" size={20} color={theme.textPrimary} />
@@ -1654,7 +1650,6 @@ export default function RefrigeratorVisual({
                   contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40, gap: 12 }}
                   showsVerticalScrollIndicator={false}
                   renderItem={({ item }) => {
-                    const hasVideo = !!item.video;
                     return (
                       <View
                         style={[
@@ -1686,63 +1681,6 @@ export default function RefrigeratorVisual({
                             {item.tip}
                           </Text>
                         </View>
-
-                        {/* 3. 하단 유튜브 동영상 연동 바 또는 인앱 재생 영역 */}
-                        {hasVideo ? (
-                          playingVideoName === item.name ? (
-                            <View style={{ marginTop: 10, borderRadius: 12, overflow: 'hidden', backgroundColor: '#000' }}>
-                              <YoutubePlayer
-                                height={200}
-                                play={true}
-                                videoId={item.video!.videoId}
-                              />
-                              <TouchableOpacity
-                                style={{
-                                  padding: 10,
-                                  backgroundColor: theme.surfaceSecondary,
-                                  alignItems: 'center',
-                                  flexDirection: 'row',
-                                  justifyContent: 'center',
-                                  gap: 6
-                                }}
-                                onPress={() => setPlayingVideoName(null)}
-                              >
-                                <Ionicons name="chevron-up" size={16} color={theme.textPrimary} />
-                                <Text style={{ color: theme.textPrimary, fontSize: 13, fontWeight: 'bold' }}>영상 재생 닫기</Text>
-                              </TouchableOpacity>
-                            </View>
-                          ) : (
-                            <TouchableOpacity
-                              style={[
-                                styles.guideYoutubeButton,
-                                { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderLight }
-                              ]}
-                              activeOpacity={0.8}
-                              onPress={() => setPlayingVideoName(item.name)}
-                            >
-                              <Ionicons name="logo-youtube" size={15} color="#FF0000" />
-                              <Text style={[styles.guideYoutubeText, { color: theme.textPrimary }]} numberOfLines={1}>
-                                {`인앱 영상 가이드: ${item.video!.title}`}
-                              </Text>
-                              <Ionicons name="play-circle-outline" size={16} color={theme.primary} style={{ marginLeft: 'auto' }} />
-                            </TouchableOpacity>
-                          )
-                        ) : (
-                          <TouchableOpacity
-                            style={[
-                              styles.guideYoutubeButton,
-                              { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderLight }
-                            ]}
-                            activeOpacity={0.8}
-                            onPress={() => handleOpenYoutube(item.youtubeQuery || item.name, item.name)}
-                          >
-                            <Ionicons name="logo-youtube" size={15} color="#FF0000" />
-                            <Text style={[styles.guideYoutubeText, { color: theme.textPrimary }]} numberOfLines={1}>
-                              {`YouTube에서 "${item.name} 보관법" 검색`}
-                            </Text>
-                            <Ionicons name="chevron-forward" size={13} color={theme.textMuted} style={{ marginLeft: 'auto' }} />
-                          </TouchableOpacity>
-                        )}
                       </View>
                     );
                   }}
