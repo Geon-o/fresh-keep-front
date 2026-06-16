@@ -17,9 +17,9 @@ export interface StorageGuideDto {
 /**
  * AI 기반 하이브리드 캐싱 식재료 보관 가이드 검색 API 호출
  */
-export const searchStorageGuides = async (query: string): Promise<StorageGuideDto[]> => {
+export const searchStorageGuides = async (query: string, autoGenerate: boolean = true): Promise<StorageGuideDto[]> => {
   const response = await client.get<StorageGuideDto[]>(`/api/guide/search`, {
-    params: { query },
+    params: { query, autoGenerate },
   });
   return response.data;
 };

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions, TextInput, FlatList, Platform, ActivityIndicator, Linking, Alert, Modal, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import YoutubePlayer from 'react-native-youtube-iframe';
@@ -299,6 +299,7 @@ export default function RefrigeratorVisual({
   const [apiGuides, setApiGuides] = useState<StorageTip[]>([]);
   const [isGuideLoading, setIsGuideLoading] = useState(false);
   const [guideError, setGuideError] = useState<string | null>(null);
+  const typingTimeoutRef = useRef<any>(null);
 
   // 가이드북용 필터링 로직 (검색어가 없으면 로컬 데이터셋, 검색어가 있으면 실시간 검색 결과 매핑)
   const filteredTips = !guideSearchQuery.trim()
@@ -774,6 +775,48 @@ export default function RefrigeratorVisual({
       setApiGuides([]);
     } finally {
       setIsGuideLoading(false);
+    }
+  };
+
+  // 타이핑 중 실시간 DB 캐시 매칭 처리 (AI 호출 생략)
+  const handleTypingSearch = async (query: string) => {
+    const cleanQuery = query.trim();
+    if (!cleanQuery) {
+      setApiGuides([]);
+      setGuideError(null);
+      return;
+    }
+
+    // 1단계: 로컬 23종 데이터셋 1차 매칭
+    const queryLower = cleanQuery.toLowerCase();
+    const localMatches = STORAGE_TIPS.filter(tip => 
+      tip.name.toLowerCase().includes(queryLower) || 
+      tip.tip.toLowerCase().includes(queryLower)
+    );
+
+    if (localMatches.length > 0) {
+      setApiGuides(localMatches);
+      setGuideError(null);
+      return;
+    }
+
+    // 2단계: 백엔드 DB 캐시 검색 호출 (autoGenerate = false)
+    if (!isLoggedIn) return;
+
+    try {
+      const results = await searchStorageGuides(cleanQuery, false);
+      const mapped: StorageTip[] = results.map(item => ({
+        name: item.name,
+        emoji: item.emoji || '💡',
+        category: item.category,
+        tip: item.tip,
+        youtubeQuery: item.youtubeQuery,
+        video: item.video
+      }));
+      setApiGuides(mapped);
+      setGuideError(null);
+    } catch (err) {
+      console.error("Failed to query DB cache during typing:", err);
     }
   };
 
@@ -1529,9 +1572,16 @@ export default function RefrigeratorVisual({
                 value={guideSearchQuery}
                 onChangeText={(text) => {
                   setGuideSearchQuery(text);
+                  if (typingTimeoutRef.current) {
+                    clearTimeout(typingTimeoutRef.current);
+                  }
                   if (!text.trim()) {
                     setApiGuides([]);
                     setGuideError(null);
+                  } else {
+                    typingTimeoutRef.current = setTimeout(() => {
+                      handleTypingSearch(text);
+                    }, 300);
                   }
                 }}
                 onSubmitEditing={handleSearchGuide}
