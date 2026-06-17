@@ -1453,7 +1453,7 @@ export default function RefrigeratorVisual({
       {mode === 'fridge' && (
         <ScrollView
           style={styles.dashboardScrollView}
-          contentContainerStyle={[styles.dashboardContent, { paddingBottom: 80 }]}
+          contentContainerStyle={[styles.dashboardContent, { paddingBottom: 120 }]}
           showsVerticalScrollIndicator={false}
         >
           <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>나의 냉장고</Text>
@@ -2117,11 +2117,11 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   carouselWrapper: {
-    height: 510,
+    height: 580,
     width: '100%',
   },
   slideContainer: {
-    height: 500,
+    height: 570,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2147,7 +2147,7 @@ const styles = StyleSheet.create({
   },
   fridgeCard: {
     width: '90%',
-    height: 465,
+    height: 530,
     borderRadius: 28,
     borderWidth: 1.5,
     padding: 20,
@@ -2297,7 +2297,7 @@ const styles = StyleSheet.create({
   },
   addFridgeBox: {
     width: '90%',
-    height: 465,
+    height: 530,
     backgroundColor: '#FFFFFF',
     borderRadius: 28,
     borderWidth: 2.5,
