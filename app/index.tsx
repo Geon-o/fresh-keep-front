@@ -522,12 +522,11 @@ export default function Index() {
                 setActiveIndex={setActiveIndex}
                 onOpenAddSelector={handleOpenAddSelector}
                 onOpenRenameModal={handleOpenRenameModal}
+                onEditFridgeType={handleOpenEditSelector}
+                onDeleteFridge={handleDeleteConfirm}
               />
             ) : (
               <SettingsView
-                activeFridge={activeFridge}
-                onEditFridgeType={handleOpenEditSelector}
-                onDeleteFridge={handleDeleteConfirm}
                 isLoggedIn={isLoggedIn}
                 user={user}
                 onLogout={logout}

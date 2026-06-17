@@ -5,9 +5,6 @@ import { FridgeType } from '../types';
 import { useTheme } from '../context/ThemeContext';
 
 interface SettingsViewProps {
-  activeFridge: { id: string; name: string; type: FridgeType } | null;
-  onEditFridgeType: () => void;
-  onDeleteFridge: () => void;
   isLoggedIn: boolean;
   user: { id: number; name: string; email: string; provider: string } | null;
   onLogout: () => void;
@@ -58,9 +55,6 @@ FreshKeep은 회원의 개인정보를 소중하게 처리하며, 관련 개인�
 회원은 언제든지 앱 내 설정을 통해 탈퇴하거나 수집된 정보의 열람 및 정정을 청구할 수 있습니다.`;
 
 export default function SettingsView({
-  activeFridge,
-  onEditFridgeType,
-  onDeleteFridge,
   isLoggedIn,
   user,
   onLogout,
@@ -183,53 +177,7 @@ export default function SettingsView({
         </View>
       </View>
 
-      {/* 2. 냉장고 관리 영역 */}
-      <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>냉장고 관리</Text>
-      
-      {activeFridge ? (
-        <View style={[styles.fridgeControlCard, { backgroundColor: theme.surface, borderColor: theme.borderLight, shadowColor: theme.shadow }]}>
-          <View style={[styles.activeFridgeHeader, { backgroundColor: theme.primaryLight, borderBottomColor: theme.primaryBorder }]}>
-            <Ionicons name="business" size={20} color={theme.primary} />
-            <Text style={[styles.activeFridgeText, { color: theme.primaryText }]}>
-              선택된 냉장고: <Text style={{ fontWeight: 'bold' }}>{activeFridge.name}</Text>
-            </Text>
-          </View>
-          
-          <View style={styles.buttonGroup}>
-            <TouchableOpacity style={styles.actionRow} activeOpacity={0.7} onPress={onEditFridgeType}>
-              <View style={styles.actionLeft}>
-                <View style={[styles.iconBadge, { backgroundColor: theme.primaryLight }]}>
-                  <Ionicons name="swap-horizontal" size={18} color={theme.primary} />
-                </View>
-                <Text style={[styles.actionText, { color: theme.textSecondary }]}>현재 냉장고 타입 변경</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[styles.actionRow, styles.destructiveActionRow, { borderTopColor: theme.borderLight }]} 
-              activeOpacity={0.7} 
-              onPress={onDeleteFridge}
-            >
-              <View style={styles.actionLeft}>
-                <View style={[styles.iconBadge, { backgroundColor: theme.dangerLight }]}>
-                  <Ionicons name="trash-outline" size={18} color={theme.danger} />
-                </View>
-                <Text style={[styles.actionText, { color: theme.danger }]}>현재 냉장고 삭제</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={theme.dangerMuted} />
-            </TouchableOpacity>
-          </View>
-        </View>
-      ) : (
-        <View style={[styles.emptyFridgeCard, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
-          <Ionicons name="alert-circle-outline" size={24} color={theme.textMuted} />
-          <Text style={[styles.emptyFridgeText, { color: theme.textSecondary }]}>활성화된 냉장고가 없습니다.</Text>
-          <Text style={[styles.emptyFridgeSub, { color: theme.textMuted }]}>홈 탭에서 냉장고를 추가하거나 선택한 후 설정을 변경해 주세요.</Text>
-        </View>
-      )}
-
-      {/* 3. 약관 및 정책 영역 */}
+      {/* 2. 약관 및 정책 영역 */}
       <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>약관 및 정책</Text>
       <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.borderLight, shadowColor: theme.shadow, paddingVertical: 6 }]}>
         <TouchableOpacity style={styles.actionRow} activeOpacity={0.7} onPress={() => handleOpenTerms('service')}>
@@ -255,7 +203,7 @@ export default function SettingsView({
         </TouchableOpacity>
       </View>
 
-      {/* 4. 로그아웃 버튼 (로그인 시에만 노출) */}
+      {/* 3. 로그아웃 버튼 (로그인 시에만 노출) */}
       {isLoggedIn && (
         <TouchableOpacity 
           style={[styles.logoutButton, { backgroundColor: theme.surfaceTertiary, borderColor: theme.borderLight }]} 

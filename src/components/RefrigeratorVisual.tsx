@@ -269,6 +269,8 @@ interface RefrigeratorVisualProps {
   setActiveIndex: (index: number) => void;
   onOpenAddSelector: () => void;
   onOpenRenameModal: () => void;
+  onEditFridgeType: () => void;
+  onDeleteFridge: () => void;
 }
 
 export default function RefrigeratorVisual({
@@ -278,13 +280,16 @@ export default function RefrigeratorVisual({
   activeIndex,
   setActiveIndex,
   onOpenAddSelector,
-  onOpenRenameModal
+  onOpenRenameModal,
+  onEditFridgeType,
+  onDeleteFridge
 }: RefrigeratorVisualProps) {
   const { width: screenWidth } = useWindowDimensions();
   const { isLoggedIn } = useAuth();
   const router = useRouter();
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const { theme, isDark } = useTheme();
+  const [fridgeSettingsVisible, setFridgeSettingsVisible] = useState(false);
 
   // 식재료 목록 탭용 상태
   const [searchQuery, setSearchQuery] = useState('');
@@ -531,6 +536,9 @@ export default function RefrigeratorVisual({
   if (refrigerators.length < 3) {
     pages.push({ type: 'add' });
   }
+
+  // 현재 노출 중인 활성 냉장고
+  const activeFridge = pages[activeIndex]?.type === 'fridge' ? pages[activeIndex].data : null;
 
   // 가로 스크롤 시 활성 슬라이드 인덱스 동적 갱신
   const handleScroll = (event: any) => {
@@ -1416,7 +1424,18 @@ export default function RefrigeratorVisual({
           contentContainerStyle={[styles.dashboardContent, { paddingBottom: 140 }]}
           showsVerticalScrollIndicator={false}
         >
-          <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>나의 냉장고</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: 20, marginBottom: 20 }}>
+            <Text style={[styles.pageTitle, { color: theme.textPrimary, marginBottom: 0 }]}>나의 냉장고</Text>
+            {activeFridge && (
+              <TouchableOpacity
+                style={[styles.fridgeSettingButton, { backgroundColor: theme.surfaceTertiary, padding: 8, borderRadius: 10 }]}
+                activeOpacity={0.7}
+                onPress={() => setFridgeSettingsVisible(true)}
+              >
+                <Ionicons name="settings-outline" size={20} color={theme.textPrimary} />
+              </TouchableOpacity>
+            )}
+          </View>
           {/* 나의 냉장고 보관소 */}
           <View style={[styles.sectionContainer, { marginTop: 0 }]}>
             <View style={styles.carouselWrapper}>
@@ -1453,13 +1472,6 @@ export default function RefrigeratorVisual({
                       <View style={[styles.fridgeCard, { width: screenWidth - 40, backgroundColor: theme.surface, borderColor: theme.glassBorder }]}>
                         <View style={styles.fridgeNameContainer}>
                           <Text style={[styles.fridgeNameTitle, { color: theme.textPrimary }]}>{fridge.name}</Text>
-                          <TouchableOpacity
-                            style={[styles.pencilIconButton, { backgroundColor: theme.primaryLight }]}
-                            activeOpacity={0.7}
-                            onPress={onOpenRenameModal}
-                          >
-                            <Ionicons name="pencil-sharp" size={14} color={theme.primaryText} />
-                          </TouchableOpacity>
                         </View>
                         {fridge.type === 'four-door' && renderFourDoor(fridge.id)}
                         {fridge.type === 'side-by-side' && renderSideBySide(fridge.id)}
@@ -1935,6 +1947,104 @@ export default function RefrigeratorVisual({
             )}
           </View>
         </SafeAreaView>
+      </Modal>
+
+      {/* 냉장고 관리 설정 모달 */}
+      <Modal
+        visible={fridgeSettingsVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFridgeSettingsVisible(false)}
+      >
+        <View style={[styles.modalOverlay, { backgroundColor: theme.modalOverlay }]}>
+          <View style={[styles.settingsModalContent, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="settings-outline" size={20} color={theme.textPrimary} />
+                <Text style={[styles.modalTitleText, { color: theme.textPrimary }]}>냉장고 설정</Text>
+              </View>
+              <TouchableOpacity onPress={() => setFridgeSettingsVisible(false)} style={styles.modalCloseButton}>
+                <Ionicons name="close" size={24} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.settingsModalBody}>
+              {activeFridge ? (
+                <>
+                  <View style={[styles.settingsActiveFridgeInfo, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderLight }]}>
+                    <Text style={[styles.settingsActiveFridgeLabel, { color: theme.textSecondary }]}>현재 선택된 냉장고</Text>
+                    <Text style={[styles.settingsActiveFridgeName, { color: theme.textPrimary }]}>{activeFridge.name}</Text>
+                    <View style={[styles.settingsActiveFridgeTypeBadge, { backgroundColor: theme.primaryLight }]}>
+                      <Text style={[styles.settingsActiveFridgeTypeText, { color: theme.primaryText }]}>
+                        {activeFridge.type === 'four-door' ? '4도어 냉장고' : activeFridge.type === 'side-by-side' ? '양문형 냉장고' : '일반 2도어 냉장고'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.settingsActionsContainer}>
+                    {/* 이름 변경 */}
+                    <TouchableOpacity
+                      style={[styles.settingsActionRow, { borderBottomWidth: 1, borderBottomColor: theme.borderLight }]}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        setFridgeSettingsVisible(false);
+                        onOpenRenameModal();
+                      }}
+                    >
+                      <View style={styles.settingsActionLeft}>
+                        <View style={[styles.settingsIconBadge, { backgroundColor: theme.primaryLight }]}>
+                          <Ionicons name="pencil-outline" size={18} color={theme.primary} />
+                        </View>
+                        <Text style={[styles.settingsActionText, { color: theme.textSecondary }]}>냉장고 이름 변경</Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+                    </TouchableOpacity>
+
+                    {/* 타입 변경 */}
+                    <TouchableOpacity
+                      style={[styles.settingsActionRow, { borderBottomWidth: 1, borderBottomColor: theme.borderLight }]}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        setFridgeSettingsVisible(false);
+                        onEditFridgeType();
+                      }}
+                    >
+                      <View style={styles.settingsActionLeft}>
+                        <View style={[styles.settingsIconBadge, { backgroundColor: theme.primaryLight }]}>
+                          <Ionicons name="swap-horizontal-outline" size={18} color={theme.primary} />
+                        </View>
+                        <Text style={[styles.settingsActionText, { color: theme.textSecondary }]}>냉장고 타입 변경</Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+                    </TouchableOpacity>
+
+                    {/* 냉장고 삭제 */}
+                    <TouchableOpacity
+                      style={styles.settingsActionRow}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        setFridgeSettingsVisible(false);
+                        onDeleteFridge();
+                      }}
+                    >
+                      <View style={styles.settingsActionLeft}>
+                        <View style={[styles.settingsIconBadge, { backgroundColor: theme.dangerLight }]}>
+                          <Ionicons name="trash-outline" size={18} color={theme.danger} />
+                        </View>
+                        <Text style={[styles.settingsActionText, { color: theme.danger }]}>현재 냉장고 삭제</Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={16} color={theme.dangerMuted} />
+                    </TouchableOpacity>
+                  </View>
+                </>
+              ) : (
+                <Text style={{ color: theme.textMuted, textAlign: 'center', marginVertical: 20 }}>
+                  선택된 냉장고가 없습니다.
+                </Text>
+              )}
+            </View>
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -2902,6 +3012,86 @@ const styles = StyleSheet.create({
   googleButtonText: {
     color: '#1F2937',
     fontSize: 14,
+    fontWeight: 'bold',
+  },
+  settingsModalContent: {
+    width: '90%',
+    maxHeight: '80%',
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 20,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 5,
+  },
+  settingsModalBody: {
+    marginTop: 16,
+    gap: 16,
+  },
+  settingsActiveFridgeInfo: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    alignItems: 'center',
+    gap: 6,
+  },
+  settingsActiveFridgeLabel: {
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  settingsActiveFridgeName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  settingsActiveFridgeTypeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginTop: 4,
+  },
+  settingsActiveFridgeTypeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  settingsActionsContainer: {
+    borderRadius: 18,
+    overflow: 'hidden',
+  },
+  settingsActionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+  },
+  settingsActionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  settingsIconBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  settingsActionText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  fridgeSettingButton: {
+    padding: 8,
+    borderRadius: 10,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalTitleText: {
+    fontSize: 16,
     fontWeight: 'bold',
   },
 });
