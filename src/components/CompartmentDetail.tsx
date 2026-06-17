@@ -353,16 +353,16 @@ export default function CompartmentDetail({
 
   // 부모의 비동기 리렌더링 props 딜레이를 우회하기 위한 로컬 compartmentId 동기 레퍼런스
   const currentCompartmentIdRef = useRef(compartmentId);
-  const [prevPropId, setPrevPropId] = useState(compartmentId);
-  if (compartmentId !== prevPropId) {
-    setPrevPropId(compartmentId);
-    currentCompartmentIdRef.current = compartmentId;
-  }
 
   // 드래그 앤 드롭 제스처 관련 상태
   const [draggingItem, setDraggingItem] = useState<Ingredient | null>(null);
   const dragPosition = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const [dragCurrentCoords, setDragCurrentCoords] = useState<{ x: number, y: number }>({ x: 0, y: 0 });
+  
+  // 드래그 중이 아닐 때만 프로퍼티의 변경을 레퍼런스에 반영 (드래그 전환 도중 이전 프로퍼티 덮어쓰기 완전 차단)
+  if (draggingItem === null) {
+    currentCompartmentIdRef.current = compartmentId;
+  }
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const [activeHoverShelfId, setActiveHoverShelfId] = useState<string | null>(null);
   
