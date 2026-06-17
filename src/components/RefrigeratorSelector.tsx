@@ -6,13 +6,17 @@ import { useTheme } from '../context/ThemeContext';
 
 interface RefrigeratorSelectorProps {
   onSelect: (type: FridgeType) => void;
+  currentType?: FridgeType;
 }
 
-export default function RefrigeratorSelector({ onSelect }: RefrigeratorSelectorProps) {
-  const [selected, setSelected] = useState<FridgeType>('four-door');
+export default function RefrigeratorSelector({ onSelect, currentType }: RefrigeratorSelectorProps) {
+  const [selected, setSelected] = useState<FridgeType>(currentType || 'four-door');
   const { theme } = useTheme();
 
+  const isDisabled = currentType !== undefined && selected === currentType;
+
   const handleStart = () => {
+    if (isDisabled) return;
     onSelect(selected);
   };
 
@@ -94,11 +98,24 @@ export default function RefrigeratorSelector({ onSelect }: RefrigeratorSelectorP
       </View>
 
       <TouchableOpacity 
-        style={[styles.button, { backgroundColor: theme.primary, shadowColor: theme.primary }]} 
-        activeOpacity={0.9} 
+        style={[
+          styles.button, 
+          { 
+            backgroundColor: isDisabled ? theme.borderLight : theme.primary, 
+            shadowColor: isDisabled ? 'transparent' : theme.primary 
+          }
+        ]} 
+        activeOpacity={isDisabled ? 1 : 0.9} 
         onPress={handleStart}
+        disabled={isDisabled}
       >
-        <Text style={[styles.buttonText, { color: theme.primaryOnPrimary }]}>이 냉장고로 시작하기</Text>
+        <Text style={[styles.buttonText, { color: isDisabled ? theme.textMuted : theme.primaryOnPrimary }]}>
+          {currentType !== undefined
+            ? isDisabled
+              ? '현재와 다른 타입을 선택해 주세요'
+              : '이 타입으로 변경하기'
+            : '이 냉장고로 시작하기'}
+        </Text>
       </TouchableOpacity>
     </ScrollView>
   );

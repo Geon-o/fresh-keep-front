@@ -654,6 +654,7 @@ export default function Index() {
               </TouchableOpacity>
             </View>
             <RefrigeratorSelector
+              currentType={selectorMode === 'edit' && activeFridge ? activeFridge.type : undefined}
               onSelect={(selectedType) => {
                 if (selectorMode === 'add') {
                   handleAddFridge(selectedType);
