@@ -1225,16 +1225,17 @@ export default function RefrigeratorVisual({
                 style={[
                   styles.statsMiniCard, 
                   { 
-                    backgroundColor: theme.surface, 
-                    borderColor: theme.borderLight,
-                    shadowColor: theme.shadow 
-                  }
+                    backgroundColor: totalSafe > 0 ? theme.ddaySafe + '06' : theme.surface, 
+                    borderColor: totalSafe > 0 ? theme.ddaySafe + '25' : theme.borderLight,
+                    shadowColor: totalSafe > 0 ? 'transparent' : theme.shadow 
+                  },
+                  totalSafe > 0 && { shadowOpacity: 0, elevation: 0 }
                 ]}
               >
-                <View style={[styles.statsIconBadge, { backgroundColor: theme.ddaySafe + '10' }]}>
-                  <Ionicons name="leaf-outline" size={18} color={theme.ddaySafe} />
+                <View style={[styles.statsIconBadge, { backgroundColor: totalSafe > 0 ? theme.ddaySafe + '15' : theme.surfaceSecondary }]}>
+                  <Ionicons name="leaf-outline" size={18} color={totalSafe > 0 ? theme.ddaySafe : theme.textMuted} />
                 </View>
-                <Text style={[styles.statsCountText, { color: theme.ddaySafe }]}>
+                <Text style={[styles.statsCountText, { color: totalSafe > 0 ? theme.ddaySafe : theme.textPrimary }]}>
                   {totalSafe}
                 </Text>
                 <Text style={[styles.statsMiniLabel, { color: theme.textSecondary }]}>
