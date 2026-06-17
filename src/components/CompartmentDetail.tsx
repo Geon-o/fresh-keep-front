@@ -124,6 +124,9 @@ export default function CompartmentDetail({
   const [draggingItem, setDraggingItem] = useState<Ingredient | null>(null);
   const dragPosition = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const [dragCurrentCoords, setDragCurrentCoords] = useState<{ x: number, y: number }>({ x: 0, y: 0 });
+  const [scrollEnabled, setScrollEnabled] = useState(true);
+  const [activeHoverShelfId, setActiveHoverShelfId] = useState<string | null>(null);
+  
   const shelfRefs = useRef<Record<string, View | null>>({});
   const shelfLayouts = useRef<Record<string, { x: number; y: number; width: number; height: number }>>({});
   const lastSwappedTime = useRef<number>(0);
@@ -148,23 +151,6 @@ export default function CompartmentDetail({
         });
       }
     });
-  };
-
-  // 드래그 햅틱 및 시작
-  const startDrag = async (item: Ingredient, startX: number, startY: number) => {
-    try {
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch (e) {
-      // 햅틱 실패 시 조용히 무시
-    }
-    setDraggingItem(item);
-    // 손가락 위치에 맞게 Animated Value 초기화 (드래그 요소를 손가락 위치보다 약간 위로 오프셋 -30)
-    dragPosition.setValue({ x: startX - 50, y: startY - 70 });
-    setDragCurrentCoords({ x: startX, y: startY });
-    // 선반들 위치 측정
-    setTimeout(() => {
-      measureShelves();
-    }, 100);
   };
 
   // 드래그 완료 처리 (드롭)
@@ -214,55 +200,143 @@ export default function CompartmentDetail({
     setDraggingItem(null);
   };
 
-  // PanResponder 생성
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderMove: (evt, gestureState) => {
-        // 실시간 플로팅 요소 좌표 업데이트
-        dragPosition.setValue({ 
-          x: gestureState.moveX - 50, 
-          y: gestureState.moveY - 70 
-        });
-        setDragCurrentCoords({ x: gestureState.moveX, y: gestureState.moveY });
+  // 개별 식재료용 드래그 앤 드롭 전용 컴포넌트 (롱프레스 감지 타이머 내장 및 손가락 홀딩 드래그 지원)
+  const DraggableBadge = ({ item, shelfId, shelfLabel }: { item: Ingredient, shelfId: string, shelfLabel: string }) => {
+    const dDay = getDDayInfo(item.expiryDate);
+    const emoji = CATEGORY_EMOJI[item.category] || '';
+    const isDraggingThis = draggingItem !== null && draggingItem.id === item.id;
+    
+    const longPressTimer = useRef<any>(null);
+    const isDraggingActive = useRef(false);
+    const touchStartPos = useRef({ x: 0, y: 0 });
 
-        // 4문형 냉장고 경계선 탈출(Swipe Edge) 체크
-        const switchTarget = getFourDoorSwitchTarget(compartmentId);
-        if (switchTarget && onNavigateCompartment) {
-          const now = Date.now();
-          // 쿨타임 1.5초
-          if (now - lastSwappedTime.current > 1500) {
-            const isRightSide = compartmentId.includes('right');
-            const isLeftSide = compartmentId.includes('left');
+    const badgePanResponder = useRef(
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (evt, gestureState) => {
+          const startX = evt.nativeEvent.pageX;
+          const startY = evt.nativeEvent.pageY;
+          touchStartPos.current = { x: startX, y: startY };
+          isDraggingActive.current = false;
 
-            if (isRightSide && gestureState.moveX < 35) {
-              lastSwappedTime.current = now;
-              onNavigateCompartment(switchTarget.id, switchTarget.label);
-              setTimeout(() => {
-                measureShelves();
-              }, 100);
+          // 0.7초 롱프레스 타이머 가동
+          longPressTimer.current = setTimeout(async () => {
+            isDraggingActive.current = true;
+            try {
+              await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            } catch (e) {}
+            
+            setScrollEnabled(false); // 스크롤 차단
+            setDraggingItem(item);
+            dragPosition.setValue({ x: startX - 70, y: startY - 20 });
+            setDragCurrentCoords({ x: startX, y: startY });
+            measureShelves(); // 선반 좌표 수집
+          }, 700);
+        },
+        onPanResponderMove: (evt, gestureState) => {
+          const currentX = gestureState.moveX;
+          const currentY = gestureState.moveY;
+
+          if (!isDraggingActive.current) {
+            // 움직임 거리가 클 경우 단순 스크롤로 간주하고 타이머 취소
+            const dx = Math.abs(currentX - touchStartPos.current.x);
+            const dy = Math.abs(currentY - touchStartPos.current.y);
+            if (dx > 8 || dy > 8) {
+              if (longPressTimer.current) {
+                clearTimeout(longPressTimer.current);
+              }
             }
-            else if (isLeftSide && gestureState.moveX > screenWidth - 35) {
-              lastSwappedTime.current = now;
-              onNavigateCompartment(switchTarget.id, switchTarget.label);
-              setTimeout(() => {
-                measureShelves();
-              }, 100);
+          } else {
+            // 드래그 중인 경우
+            dragPosition.setValue({ x: currentX - 70, y: currentY - 20 });
+            setDragCurrentCoords({ x: currentX, y: currentY });
+
+            // 호버 선반 추적
+            let hoverShelfId: string | null = null;
+            Object.keys(shelfLayouts.current).forEach(sId => {
+              const layout = shelfLayouts.current[sId];
+              if (layout) {
+                const inX = currentX >= layout.x && currentX <= layout.x + layout.width;
+                const inY = currentY >= layout.y && currentY <= layout.y + layout.height;
+                if (inX && inY) {
+                  hoverShelfId = sId;
+                }
+              }
+            });
+            setActiveHoverShelfId(hoverShelfId);
+
+            // 4문형 경계선 전환 검사
+            const switchTarget = getFourDoorSwitchTarget(compartmentId);
+            if (switchTarget && onNavigateCompartment) {
+              const now = Date.now();
+              if (now - lastSwappedTime.current > 1500) {
+                const isRightSide = compartmentId.includes('right');
+                const isLeftSide = compartmentId.includes('left');
+
+                if (isRightSide && currentX < 35) {
+                  lastSwappedTime.current = now;
+                  onNavigateCompartment(switchTarget.id, switchTarget.label);
+                  setTimeout(() => {
+                    measureShelves();
+                  }, 150);
+                }
+                else if (isLeftSide && currentX > screenWidth - 35) {
+                  lastSwappedTime.current = now;
+                  onNavigateCompartment(switchTarget.id, switchTarget.label);
+                  setTimeout(() => {
+                    measureShelves();
+                  }, 150);
+                }
+              }
             }
           }
+        },
+        onPanResponderRelease: (evt, gestureState) => {
+          if (longPressTimer.current) {
+            clearTimeout(longPressTimer.current);
+          }
+          setScrollEnabled(true);
+
+          if (isDraggingActive.current) {
+            handleDropIngredient(item, gestureState.moveX, gestureState.moveY);
+            setActiveHoverShelfId(null);
+          } else {
+            // 타이머 만료 전 손 뗌 -> 단순 탭
+            handleOpenShelfDetailModal(shelfId, shelfLabel);
+          }
+          isDraggingActive.current = false;
+        },
+        onPanResponderTerminate: () => {
+          if (longPressTimer.current) {
+            clearTimeout(longPressTimer.current);
+          }
+          setScrollEnabled(true);
+          setDraggingItem(null);
+          setActiveHoverShelfId(null);
+          isDraggingActive.current = false;
         }
-      },
-      onPanResponderRelease: (evt, gestureState) => {
-        if (draggingItem) {
-          handleDropIngredient(draggingItem, gestureState.moveX, gestureState.moveY);
-        }
-      },
-      onPanResponderTerminate: () => {
-        setDraggingItem(null);
-      }
-    })
-  ).current;
+      })
+    ).current;
+
+    return (
+      <View
+        {...badgePanResponder.panHandlers}
+        style={[
+          styles.itemBadge,
+          { borderLeftWidth: 3.5, borderLeftColor: dDay.color, paddingLeft: 8 },
+          isDraggingThis && { opacity: 0.15 }
+        ]}
+      >
+        <Text style={styles.itemText} numberOfLines={1}>
+          {emoji ? `${emoji} ` : ''}{item.name}
+        </Text>
+        <Text style={[styles.itemDDay, { color: dDay.color }]}>
+          {dDay.text}
+        </Text>
+      </View>
+    );
+  };
 
   // 선반 동적 배열 상태 관리 (초기값은 비워두고 useEffect에서 로드)
   const [insideShelves, setInsideShelves] = useState<{ id: string; label: string }[]>([]);
@@ -915,34 +989,7 @@ export default function CompartmentDetail({
     );
   };
 
-  // 개별 식재료 뱃지 프리뷰 렌더러 (선반 프리뷰용 - 단순 뷰)
-  const renderItemBadgePreview = (item: Ingredient, shelfId: string, shelfLabel: string) => {
-    const dDay = getDDayInfo(item.expiryDate);
-    const emoji = CATEGORY_EMOJI[item.category] || '';
-    const isDraggingThis = draggingItem !== null && draggingItem.id === item.id;
-    
-    return (
-      <TouchableOpacity
-        key={item.id}
-        style={[
-          styles.itemBadge, 
-          { borderLeftWidth: 3.5, borderLeftColor: dDay.color, paddingLeft: 8 },
-          isDraggingThis && { opacity: 0.15 } // 들려 올라간 느낌을 주기 위해 원래 위치 배지는 투명화
-        ]}
-        activeOpacity={0.7}
-        onPress={() => handleOpenShelfDetailModal(shelfId, shelfLabel)}
-        delayLongPress={1000}
-        onLongPress={(e) => startDrag(item, e.nativeEvent.pageX, e.nativeEvent.pageY)}
-      >
-        <Text style={styles.itemText} numberOfLines={1}>
-          {emoji ? `${emoji} ` : ''}{item.name}
-        </Text>
-        <Text style={[styles.itemDDay, { color: dDay.color }]}>
-          {dDay.text}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
+
 
   return (
     <View style={styles.container}>
@@ -997,7 +1044,7 @@ export default function CompartmentDetail({
                     <View 
                       key={shelf.id} 
                       ref={el => { shelfRefs.current[shelf.id] = el; }} 
-                      style={styles.shelf}
+                      style={[styles.shelf, activeHoverShelfId === shelf.id && styles.shelfHovered]}
                     >
                       <View style={styles.shelfHeaderRow}>
                         <TouchableOpacity
@@ -1018,9 +1065,11 @@ export default function CompartmentDetail({
                         <ScrollView
                           showsVerticalScrollIndicator={true}
                           contentContainerStyle={styles.shelfItemsScroll}
-                          scrollEnabled={true}
+                          scrollEnabled={scrollEnabled}
                         >
-                          {getItemsBySubLocation(shelf.id).map(item => renderItemBadgePreview(item, shelf.id, shelf.label))}
+                          {getItemsBySubLocation(shelf.id).map(item => (
+                            <DraggableBadge key={item.id} item={item} shelfId={shelf.id} shelfLabel={shelf.label} />
+                          ))}
                           {getItemsBySubLocation(shelf.id).length === 0 && (
                             <TouchableOpacity onPress={() => handleOpenShelfDetailModal(shelf.id, shelf.label)}>
                               <Text style={styles.emptyText}>비어 있음</Text>
@@ -1056,7 +1105,7 @@ export default function CompartmentDetail({
                       <View 
                         key={shelf.id} 
                         ref={el => { shelfRefs.current[shelf.id] = el; }} 
-                        style={styles.pocket}
+                        style={[styles.pocket, activeHoverShelfId === shelf.id && styles.shelfHovered]}
                       >
                         <View style={styles.shelfHeaderRow}>
                           <TouchableOpacity
@@ -1077,9 +1126,11 @@ export default function CompartmentDetail({
                           <ScrollView
                             showsVerticalScrollIndicator={true}
                             contentContainerStyle={styles.shelfItemsScroll}
-                            scrollEnabled={true}
+                            scrollEnabled={scrollEnabled}
                           >
-                            {getItemsBySubLocation(shelf.id).map(item => renderItemBadgePreview(item, shelf.id, shelf.label))}
+                            {getItemsBySubLocation(shelf.id).map(item => (
+                              <DraggableBadge key={item.id} item={item} shelfId={shelf.id} shelfLabel={shelf.label} />
+                            ))}
                             {getItemsBySubLocation(shelf.id).length === 0 && (
                               <TouchableOpacity onPress={() => handleOpenShelfDetailModal(shelf.id, shelf.label)}>
                                 <Text style={styles.emptyText}>비어 있음</Text>
@@ -1418,7 +1469,7 @@ export default function CompartmentDetail({
       {draggingItem !== null && (
         <View 
           style={StyleSheet.absoluteFillObject} 
-          {...panResponder.panHandlers}
+          pointerEvents="none"
         >
           <Animated.View
             style={[
@@ -2115,6 +2166,16 @@ function createStyles(theme: ThemeColors) {
     floatingDragDDay: {
       fontSize: 11,
       fontWeight: 'bold',
+    },
+    shelfHovered: {
+      borderColor: theme.primary,
+      borderWidth: 1.5,
+      backgroundColor: theme.surfaceSecondary,
+      shadowColor: theme.primary,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 6,
+      elevation: 3,
     },
   });
 }
