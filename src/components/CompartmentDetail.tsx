@@ -296,13 +296,10 @@ const DraggableBadge = ({
           clearTimeout(longPressTimer.current);
         }
         const props = latestProps.current;
-        props.setScrollEnabled(true);
-
-        if (isDraggingActive.current) {
-          props.handleDropIngredient(props.item, evt.nativeEvent.pageX, evt.nativeEvent.pageY);
-          props.setActiveHoverShelfId(null);
-        } else {
+        
+        if (!isDraggingActive.current) {
           // 타이머 만료 전 손 뗌 -> 단순 탭
+          props.setScrollEnabled(true);
           props.handleOpenShelfDetailModal(props.shelfId, props.shelfLabel);
         }
         isDraggingActive.current = false;
@@ -312,9 +309,11 @@ const DraggableBadge = ({
           clearTimeout(longPressTimer.current);
         }
         const props = latestProps.current;
-        props.setScrollEnabled(true);
-        props.setDraggingItem(null);
-        props.setActiveHoverShelfId(null);
+        if (!isDraggingActive.current) {
+          props.setScrollEnabled(true);
+          props.setDraggingItem(null);
+          props.setActiveHoverShelfId(null);
+        }
         isDraggingActive.current = false;
       }
     })
@@ -363,6 +362,89 @@ export default function CompartmentDetail({
   const shelfLayouts = useRef<Record<string, { x: number; y: number; width: number; height: number }>>({});
   const lastSwappedTime = useRef<number>(0);
   const screenWidth = Dimensions.get('window').width;
+
+  const latestParentProps = useRef({
+    draggingItem,
+    compartmentId,
+  });
+
+  useEffect(() => {
+    latestParentProps.current = {
+      draggingItem,
+      compartmentId,
+    };
+  }, [draggingItem, compartmentId]);
+
+  // 부모 루트용 PanResponder (드래그 활성화 시 제스처 캡처 및 좌표 갱신 담당)
+  const parentPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponder: () => latestParentProps.current.draggingItem !== null,
+      onMoveShouldSetPanResponderCapture: () => latestParentProps.current.draggingItem !== null,
+      onPanResponderMove: (evt, gestureState) => {
+        const props = latestParentProps.current;
+        if (!props.draggingItem) return;
+        const currentX = evt.nativeEvent.pageX;
+        const currentY = evt.nativeEvent.pageY;
+
+        // 드래그 위치 업데이트
+        dragPosition.setValue({ x: currentX - 70, y: currentY - 20 });
+        setDragCurrentCoords({ x: currentX, y: currentY });
+
+        // 호버 선반 추적
+        let hoverShelfId: string | null = null;
+        Object.keys(shelfLayouts.current).forEach(sId => {
+          const layout = shelfLayouts.current[sId];
+          if (layout) {
+            const inX = currentX >= layout.x && currentX <= layout.x + layout.width;
+            const inY = currentY >= layout.y && currentY <= layout.y + layout.height;
+            if (inX && inY) {
+              hoverShelfId = sId;
+            }
+          }
+        });
+        setActiveHoverShelfId(hoverShelfId);
+
+        // 4문형 경계선 전환 검사
+        const switchTarget = getFourDoorSwitchTarget(props.compartmentId);
+        if (switchTarget && onNavigateCompartment) {
+          const now = Date.now();
+          if (now - lastSwappedTime.current > 1500) {
+            const isRightSide = props.compartmentId.includes('right');
+            const isLeftSide = props.compartmentId.includes('left');
+
+            if (isRightSide && currentX < 35) {
+              lastSwappedTime.current = now;
+              onNavigateCompartment(switchTarget.id, switchTarget.label);
+              setTimeout(() => {
+                measureShelves();
+              }, 150);
+            }
+            else if (isLeftSide && currentX > screenWidth - 35) {
+              lastSwappedTime.current = now;
+              onNavigateCompartment(switchTarget.id, switchTarget.label);
+              setTimeout(() => {
+                measureShelves();
+              }, 150);
+            }
+          }
+        }
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        const props = latestParentProps.current;
+        if (!props.draggingItem) return;
+        setScrollEnabled(true);
+        handleDropIngredient(props.draggingItem, evt.nativeEvent.pageX, evt.nativeEvent.pageY);
+        setActiveHoverShelfId(null);
+      },
+      onPanResponderTerminate: () => {
+        setScrollEnabled(true);
+        setDraggingItem(null);
+        setActiveHoverShelfId(null);
+      }
+    })
+  ).current;
 
   // 4문형 냉장고의 좌/우 칸 전환 매핑 헬퍼
   const getFourDoorSwitchTarget = (compId: string): { id: string; label: string } | null => {
@@ -1086,7 +1168,10 @@ export default function CompartmentDetail({
 
 
   return (
-    <View style={styles.container}>
+    <View 
+      style={styles.container}
+      {...parentPanResponder.panHandlers}
+    >
       {/* 상단 헤더 바 */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} activeOpacity={0.7} onPress={onBack}>
