@@ -235,8 +235,8 @@ export default function CompartmentDetail({
           }, 700);
         },
         onPanResponderMove: (evt, gestureState) => {
-          const currentX = gestureState.moveX;
-          const currentY = gestureState.moveY;
+          const currentX = evt.nativeEvent.pageX;
+          const currentY = evt.nativeEvent.pageY;
 
           if (!isDraggingActive.current) {
             // 움직임 거리가 클 경우 단순 스크롤로 간주하고 타이머 취소
@@ -299,7 +299,7 @@ export default function CompartmentDetail({
           setScrollEnabled(true);
 
           if (isDraggingActive.current) {
-            handleDropIngredient(item, gestureState.moveX, gestureState.moveY);
+            handleDropIngredient(item, evt.nativeEvent.pageX, evt.nativeEvent.pageY);
             setActiveHoverShelfId(null);
           } else {
             // 타이머 만료 전 손 뗌 -> 단순 탭
@@ -1474,9 +1474,8 @@ export default function CompartmentDetail({
           <Animated.View
             style={[
               styles.floatingDragBadge,
+              dragPosition.getLayout(),
               {
-                left: dragPosition.x,
-                top: dragPosition.y,
                 backgroundColor: theme.surface,
                 borderColor: theme.borderLight,
                 borderLeftWidth: 3.5,
