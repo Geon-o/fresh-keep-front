@@ -520,7 +520,7 @@ export default function Index() {
 
           {/* 하단 탭 바 (Bottom Navigation Bar) */}
           <View style={[styles.tabBar, { 
-            backgroundColor: isDark ? '#0F172A' : '#FFFFFF',
+            backgroundColor: isDark ? '#000000' : '#FFFFFF',
             borderTopColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.06)',
             borderTopWidth: 1,
             paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
