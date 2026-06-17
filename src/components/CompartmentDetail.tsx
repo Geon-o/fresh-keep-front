@@ -919,11 +919,16 @@ export default function CompartmentDetail({
   const renderItemBadgePreview = (item: Ingredient, shelfId: string, shelfLabel: string) => {
     const dDay = getDDayInfo(item.expiryDate);
     const emoji = CATEGORY_EMOJI[item.category] || '';
+    const isDraggingThis = draggingItem !== null && draggingItem.id === item.id;
     
     return (
       <TouchableOpacity
         key={item.id}
-        style={[styles.itemBadge, { borderLeftWidth: 3.5, borderLeftColor: dDay.color, paddingLeft: 8 }]}
+        style={[
+          styles.itemBadge, 
+          { borderLeftWidth: 3.5, borderLeftColor: dDay.color, paddingLeft: 8 },
+          isDraggingThis && { opacity: 0.15 } // 들려 올라간 느낌을 주기 위해 원래 위치 배지는 투명화
+        ]}
         activeOpacity={0.7}
         onPress={() => handleOpenShelfDetailModal(shelfId, shelfLabel)}
         delayLongPress={1500}
@@ -1421,13 +1426,19 @@ export default function CompartmentDetail({
               {
                 left: dragPosition.x,
                 top: dragPosition.y,
-                backgroundColor: theme.surfaceSecondary || '#F3F4F6',
-                borderColor: theme.primary || '#4F46E5',
+                backgroundColor: theme.surface,
+                borderColor: theme.borderLight,
+                borderLeftWidth: 3.5,
+                borderLeftColor: getDDayInfo(draggingItem.expiryDate).color,
               }
             ]}
           >
-            <Text style={[styles.floatingDragText, { color: theme.textPrimary }]}>
+            <Text style={[styles.floatingDragText, { color: theme.textPrimary }]} numberOfLines={1}>
+              {CATEGORY_EMOJI[draggingItem.category] ? `${CATEGORY_EMOJI[draggingItem.category]} ` : ''}
               {draggingItem.name}
+            </Text>
+            <Text style={[styles.floatingDragDDay, { color: getDDayInfo(draggingItem.expiryDate).color }]}>
+              {getDDayInfo(draggingItem.expiryDate).text}
             </Text>
           </Animated.View>
         </View>
@@ -2077,21 +2088,32 @@ function createStyles(theme: ThemeColors) {
     },
     floatingDragBadge: {
       position: 'absolute',
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      borderRadius: 12,
-      borderWidth: 1.5,
-      justifyContent: 'center',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
       alignItems: 'center',
+      borderRadius: 10,
+      borderWidth: 1,
+      paddingVertical: 8,
+      paddingHorizontal: 10,
+      paddingLeft: 8,
+      width: 140,
+      height: 40,
       zIndex: 99999,
+      opacity: 0.85,
       shadowColor: '#000000',
-      shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: 0.15,
-      shadowRadius: 8,
-      elevation: 5,
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.2,
+      shadowRadius: 10,
+      elevation: 8,
+      transform: [{ scale: 1.08 }],
     },
     floatingDragText: {
-      fontSize: 14,
+      fontSize: 12,
+      fontWeight: 'bold',
+      maxWidth: '65%',
+    },
+    floatingDragDDay: {
+      fontSize: 11,
       fontWeight: 'bold',
     },
   });
