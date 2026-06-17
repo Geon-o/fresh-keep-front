@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, TouchableOpacity, View, ScrollView, Modal, Text, ActivityIndicator } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, ScrollView, Modal, Text } from 'react-native';
 import { FridgeType } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
@@ -10,15 +10,14 @@ interface RefrigeratorSelectorProps {
 }
 
 export default function RefrigeratorSelector({ onSelect, currentType }: RefrigeratorSelectorProps) {
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
 
   // 경고 모달 관련 상태
   const [warningModalVisible, setWarningModalVisible] = useState(false);
   const [tempSelectedType, setTempSelectedType] = useState<FridgeType | null>(null);
   const [isAgreed, setIsAgreed] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSelectType = async (type: FridgeType) => {
+  const handleSelectType = (type: FridgeType) => {
     if (currentType !== undefined && type === currentType) {
       return;
     }
@@ -29,14 +28,7 @@ export default function RefrigeratorSelector({ onSelect, currentType }: Refriger
       setWarningModalVisible(true);
     } else {
       // 신규 추가 모드: 터치 시 바로 추가 완료
-      try {
-        setIsSubmitting(true);
-        await onSelect(type);
-      } catch (error) {
-        console.error('Failed to add refrigerator:', error);
-      } finally {
-        setIsSubmitting(false);
-      }
+      onSelect(type);
     }
   };
 
@@ -122,9 +114,7 @@ export default function RefrigeratorSelector({ onSelect, currentType }: Refriger
         visible={warningModalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => {
-          if (!isSubmitting) setWarningModalVisible(false);
-        }}
+        onRequestClose={() => setWarningModalVisible(false)}
       >
         <View style={styles.warningModalOverlay}>
           <View style={[styles.warningModalContent, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
@@ -144,18 +134,15 @@ export default function RefrigeratorSelector({ onSelect, currentType }: Refriger
               {/* 동의 체크박스 */}
               <TouchableOpacity
                 style={styles.checkboxContainer}
-                activeOpacity={isSubmitting ? 1.0 : 0.8}
-                onPress={() => {
-                  if (!isSubmitting) setIsAgreed(!isAgreed);
-                }}
-                disabled={isSubmitting}
+                activeOpacity={0.8}
+                onPress={() => setIsAgreed(!isAgreed)}
               >
                 <Ionicons
                   name={isAgreed ? 'checkbox' : 'square-outline'}
                   size={22}
-                  color={isAgreed ? (isSubmitting ? theme.textMuted : theme.primary) : theme.textMuted}
+                  color={isAgreed ? theme.primary : theme.textMuted}
                 />
-                <Text style={[styles.checkboxLabel, { color: isSubmitting ? theme.textSecondary : theme.textPrimary }]}>
+                <Text style={[styles.checkboxLabel, { color: theme.textPrimary }]}>
                   위 주의사항을 확인하였으며, 이에 동의합니다.
                 </Text>
               </TouchableOpacity>
@@ -163,16 +150,9 @@ export default function RefrigeratorSelector({ onSelect, currentType }: Refriger
 
             <View style={styles.warningButtonRow}>
               <TouchableOpacity
-                style={[
-                  styles.warningButton, 
-                  styles.warningCancelButton, 
-                  { backgroundColor: theme.surfaceSecondary, opacity: isSubmitting ? 0.5 : 1.0 }
-                ]}
-                activeOpacity={isSubmitting ? 1.0 : 0.7}
-                onPress={() => {
-                  if (!isSubmitting) setWarningModalVisible(false);
-                }}
-                disabled={isSubmitting}
+                style={[styles.warningButton, styles.warningCancelButton, { backgroundColor: theme.surfaceSecondary }]}
+                activeOpacity={0.7}
+                onPress={() => setWarningModalVisible(false)}
               >
                 <Text style={[styles.warningCancelText, { color: theme.textSecondary }]}>취소</Text>
               </TouchableOpacity>
@@ -182,68 +162,26 @@ export default function RefrigeratorSelector({ onSelect, currentType }: Refriger
                   styles.warningButton,
                   styles.warningConfirmButton,
                   { 
-                    backgroundColor: isAgreed ? (isSubmitting ? theme.primary + '80' : theme.primary) : theme.borderLight,
+                    backgroundColor: isAgreed ? theme.primary : theme.borderLight,
                   }
                 ]}
-                activeOpacity={isAgreed && !isSubmitting ? 0.8 : 1}
-                disabled={!isAgreed || isSubmitting}
-                onPress={async () => {
+                activeOpacity={isAgreed ? 0.8 : 1}
+                disabled={!isAgreed}
+                onPress={() => {
                   if (isAgreed && tempSelectedType) {
-                    try {
-                      setIsSubmitting(true);
-                      await onSelect(tempSelectedType);
-                      setWarningModalVisible(false);
-                    } catch (error) {
-                      console.error('Failed to change refrigerator type:', error);
-                    } finally {
-                      setIsSubmitting(false);
-                    }
+                    setWarningModalVisible(false);
+                    onSelect(tempSelectedType);
                   }
                 }}
               >
-                {isSubmitting ? (
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <ActivityIndicator size="small" color={theme.primaryOnPrimary} />
-                    <Text style={[styles.warningConfirmText, { color: theme.primaryOnPrimary, marginLeft: 6 }]}>
-                      변경 중...
-                    </Text>
-                  </View>
-                ) : (
-                  <Text style={[styles.warningConfirmText, { color: isAgreed ? theme.primaryOnPrimary : theme.textMuted }]}>
-                    변경하기
-                  </Text>
-                )}
+                <Text style={[styles.warningConfirmText, { color: isAgreed ? theme.primaryOnPrimary : theme.textMuted }]}>
+                  변경하기
+                </Text>
               </TouchableOpacity>
             </View>
-
-            {/* 모달 내부 로딩 오버레이 추가 */}
-            {isSubmitting && (
-              <View 
-                style={[
-                  styles.modalLoadingOverlay, 
-                  { backgroundColor: isDark ? 'rgba(30, 30, 30, 0.7)' : 'rgba(255, 255, 255, 0.7)' }
-                ]}
-              >
-                <ActivityIndicator size="large" color={theme.primary} />
-                <Text style={[styles.modalLoadingText, { color: theme.textPrimary }]}>변경 중...</Text>
-              </View>
-            )}
           </View>
         </View>
       </Modal>
-
-      {/* 신규 추가 모드에서의 로딩 오버레이 */}
-      {isSubmitting && currentType === undefined && (
-        <View 
-          style={[
-            styles.globalLoadingOverlay,
-            { backgroundColor: isDark ? 'rgba(30, 30, 30, 0.7)' : 'rgba(255, 255, 255, 0.7)' }
-          ]}
-        >
-          <ActivityIndicator size="large" color={theme.primary} />
-          <Text style={[styles.globalLoadingText, { color: theme.textPrimary }]}>등록 중...</Text>
-        </View>
-      )}
     </ScrollView>
   );
 }
@@ -425,36 +363,5 @@ const styles = StyleSheet.create({
   warningConfirmText: {
     fontSize: 14,
     fontWeight: 'bold',
-  },
-  modalLoadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  modalLoadingText: {
-    marginTop: 10,
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  globalLoadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 9999,
-  },
-  globalLoadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    fontWeight: '600',
   },
 });

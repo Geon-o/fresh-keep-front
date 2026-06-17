@@ -21,6 +21,7 @@ export default function Index() {
   const router = useRouter();
   const { theme, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  const [isGlobalLoading, setIsGlobalLoading] = useState(false);
 
   const splashTheme = {
     background: theme.splashBg,
@@ -347,7 +348,7 @@ export default function Index() {
     if (isLoggedIn) {
       try {
         await createFridge(`냉장고 ${refrigerators.length + 1}`, type);
-        queryClient.invalidateQueries({ queryKey: ['fridges'] });
+        await queryClient.invalidateQueries({ queryKey: ['fridges'] });
       } catch (e) {
         console.error('Failed to add refrigerator on server', e);
       }
@@ -374,7 +375,7 @@ export default function Index() {
         const target = refrigerators.find(f => f.id === fridgeId);
         if (target) {
           await updateFridge(Number(fridgeId), target.name, newType);
-          queryClient.invalidateQueries({ queryKey: ['fridges'] });
+          await queryClient.invalidateQueries({ queryKey: ['fridges'] });
         }
       } catch (e) {
         console.error('Failed to change refrigerator type on server', e);
@@ -656,12 +657,22 @@ export default function Index() {
             <RefrigeratorSelector
               currentType={selectorMode === 'edit' && activeFridge ? activeFridge.type : undefined}
               onSelect={async (selectedType) => {
-                if (selectorMode === 'add') {
-                  await handleAddFridge(selectedType);
-                } else if (activeFridge) {
-                  await handleChangeFridgeType(activeFridge.id, selectedType);
-                }
+                // 1. 모달 팝업 즉시 닫기
                 setSelectorVisible(false);
+                // 2. 전역 로딩 켜기
+                setIsGlobalLoading(true);
+                try {
+                  if (selectorMode === 'add') {
+                    await handleAddFridge(selectedType);
+                  } else if (activeFridge) {
+                    await handleChangeFridgeType(activeFridge.id, selectedType);
+                  }
+                } catch (error) {
+                  console.error('Failed to change/add fridge:', error);
+                } finally {
+                  // 3. 전역 로딩 끄기
+                  setIsGlobalLoading(false);
+                }
               }}
             />
           </View>
@@ -765,6 +776,15 @@ export default function Index() {
             <Text style={[styles.toastText, { color: theme.background }]}>{toastText}</Text>
           </View>
         </Animated.View>
+      )}
+      {/* 냉장고 변경/추가 진행 중 전역 로딩 오버레이 */}
+      {isGlobalLoading && (
+        <View style={[styles.globalLoadingOverlay, { backgroundColor: isDark ? 'rgba(0, 0, 0, 0.7)' : 'rgba(255, 255, 255, 0.7)' }]}>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.globalLoadingText, { color: theme.textPrimary }]}>
+            냉장고 변경 중...
+          </Text>
+        </View>
       )}
     </SafeAreaView>
   );
@@ -1020,5 +1040,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  globalLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 99999,
+  },
+  globalLoadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
