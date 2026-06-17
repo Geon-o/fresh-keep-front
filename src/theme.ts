@@ -104,52 +104,52 @@ export const darkColors: typeof lightColors = {
   // 프라이머리 (하늘색 계열 - Material Blue #BBDEFB)
   primary: '#BBDEFB',        // Blue-100: 다크모드에서 대비 효과가 좋은 밝은 하늘색
   primaryDark: '#90CAF9',    // Blue-200: 프레스 상태
-  primaryLight: '#0D47A1',   // Blue-900: 연한 배경 (다크에서는 어두운 블루 톤)
-  primaryBorder: '#1565C0',  // Blue-800: 연한 보더
+  primaryLight: '#111827',   // 어두운 톤 (네이비 대신 neutral 어두운 색상 - grey-900)
+  primaryBorder: '#374151',  // neutral 보더 - grey-700
   primaryText: '#BBDEFB',    // Blue-100: 다크모드 텍스트 강조용
-  primaryOnPrimary: '#0F172A', // 다크모드 프라이머리 버튼 위 다크 텍스트
+  primaryOnPrimary: '#000000', // 다크모드 프라이머리 버튼 위 블랙 텍스트
 
   // 프리미엄 UI 확장 토큰
-  glassBg: 'rgba(30, 41, 59, 0.72)',
+  glassBg: 'rgba(10, 10, 10, 0.72)',
   glassBorder: 'rgba(255, 255, 255, 0.08)',
-  cardGradientStart: '#0F172A', // dark blue
-  cardGradientEnd: '#1E293B',   // dark slate
+  cardGradientStart: '#000000', // pure black
+  cardGradientEnd: '#1A1A1A',   // neutral dark grey
   glowDanger: 'rgba(248, 113, 113, 0.55)',
   glowWarning: 'rgba(251, 191, 36, 0.55)',
-  metallicTrim: '#475569',
+  metallicTrim: '#404040',
 
   // 배경
-  background: '#0F172A',
-  surface: '#1E293B',
-  surfaceSecondary: '#1E293B',
-  surfaceTertiary: '#334155',
+  background: '#000000',      // pure black
+  surface: '#1A1A1A',         // neutral dark grey
+  surfaceSecondary: '#1A1A1A',
+  surfaceTertiary: '#262626',
 
   // 텍스트
-  textPrimary: '#F1F5F9',
-  textSecondary: '#CBD5E1',
-  textTertiary: '#94A3B8',
-  textMuted: '#64748B',
-  textOnPrimary: '#0C4A6E',
+  textPrimary: '#F5F5F5',     // neutral light
+  textSecondary: '#E5E5E5',   // neutral mid-light
+  textTertiary: '#A3A3A3',    // neutral grey
+  textMuted: '#737373',
+  textOnPrimary: '#000000',
 
   // 보더 & 디바이더
-  border: '#334155',
-  borderLight: '#475569',
-  divider: '#334155',
+  border: '#262626',
+  borderLight: '#404040',
+  divider: '#262626',
 
-  // 냉장고 비주얼
-  fridgeDoor: '#1E3A5F',
-  fridgeDoorBorder: '#FFFFFF',
-  freezerDoor: '#164E63',
-  freezerDoorBorder: '#FFFFFF',
+  // 냉장고 비주얼 (올 블랙/다크 그레이 냉장고로 프리미엄화)
+  fridgeDoor: '#1A1A1A',
+  fridgeDoorBorder: '#404040',
+  freezerDoor: '#262626',
+  freezerDoorBorder: '#404040',
   fridgeFrame: '#FFFFFF',
-  fridgeHandle: '#94A3B8',
-  fridgeLabel: '#E2E8F0',
-  fridgeCountText: '#94A3B8',
-  fridgeCountBg: 'rgba(30, 41, 59, 0.7)',
+  fridgeHandle: '#A3A3A3',
+  fridgeLabel: '#E5E5E5',
+  fridgeCountText: '#A3A3A3',
+  fridgeCountBg: 'rgba(26, 26, 26, 0.7)',
 
   // 시맨틱
   success: '#34D399',
-  successLight: '#064E3B',
+  successLight: '#022C22',   // deep green
   warning: '#FBBF24',
   danger: '#F87171',
   dangerDark: '#EF4444',
@@ -163,30 +163,30 @@ export const darkColors: typeof lightColors = {
   ddaySafe: '#34D399',
 
   // 오버레이 & 그림자
-  overlay: 'rgba(0, 0, 0, 0.6)',
+  overlay: 'rgba(0, 0, 0, 0.7)',
   shadow: '#000000',
 
   // 모달
-  modalOverlay: 'rgba(0, 0, 0, 0.7)',
+  modalOverlay: 'rgba(0, 0, 0, 0.75)',
 
   // 스플래시
   splashBg: '#000000',
   splashIcon: '#BBDEFB',
-  splashText: '#F1F5F9',
-  splashSubText: '#94A3B8',
+  splashText: '#F5F5F5',
+  splashSubText: '#A3A3A3',
   splashSpinner: '#BBDEFB',
 
   // 탭바 전용
-  tabBarBg: 'rgba(30, 41, 59, 0.92)',
-  tabBarBorder: 'rgba(51, 65, 85, 0.8)',
-  tabIconInactive: '#94A3B8',
+  tabBarBg: 'rgba(10, 10, 10, 0.95)',
+  tabBarBorder: 'rgba(255, 255, 255, 0.08)',
+  tabIconInactive: '#A3A3A3',
 
   // 플레이스홀더
-  placeholder: '#64748B',
+  placeholder: '#737373',
 
   // 토글
-  toggleBg: '#334155',
-  toggleInactiveText: '#64748B',
+  toggleBg: '#262626',
+  toggleInactiveText: '#737373',
 
   // 카카오 / 네이버 (브랜드 필수 - 유지)
   kakao: '#FEE500',
