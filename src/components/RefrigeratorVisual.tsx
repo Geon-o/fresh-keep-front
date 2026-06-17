@@ -2153,8 +2153,8 @@ const styles = StyleSheet.create({
     width: '100%',
     backgroundColor: '#37474F', // 진회색 외곽 프레임
     borderRadius: 20,
-    padding: 8,
-    gap: 6,
+    padding: 4,
+    gap: 3,
   },
   horizontalRow: {
     flex: 1,
@@ -2167,12 +2167,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
     padding: 16,
-    borderWidth: 1.5,
+    borderWidth: 0.5,
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
   },
   fridgeColor: {
     backgroundColor: '#E3F2FD', // 연파랑
@@ -2193,7 +2193,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 14,
   },
   dividerLine: {
-    height: 6,
+    height: 3,
     backgroundColor: '#37474F',
   },
   doorLabel: {
