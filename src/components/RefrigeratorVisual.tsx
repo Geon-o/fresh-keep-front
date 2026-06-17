@@ -1,9 +1,9 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions, TextInput, FlatList, Platform, ActivityIndicator, Linking, Alert, Modal, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { searchStorageGuides } from '../api/guideService';
+import { searchStorageGuides, getAllStorageGuides } from '../api/guideService';
 import * as Location from 'expo-location';
 import * as WebBrowser from 'expo-web-browser';
 import { FridgeType, Ingredient } from '../types';
@@ -293,15 +293,52 @@ export default function RefrigeratorVisual({
   const [guideSearchQuery, setGuideSearchQuery] = useState('');
   const [guideSelectedCategory, setGuideSelectedCategory] = useState<string>('all');
 
+  // DB에서 저장된 전체 가이드 리스트 가져오기
+  const [dbGuides, setDbGuides] = useState<StorageTip[]>([]);
+
   // 실시간 AI 하이브리드 캐싱을 위한 추가 상태
   const [apiGuides, setApiGuides] = useState<StorageTip[]>([]);
   const [isGuideLoading, setIsGuideLoading] = useState(false);
   const [guideError, setGuideError] = useState<string | null>(null);
   const typingTimeoutRef = useRef<any>(null);
 
-  // 보관 팁용 필터링 로직 (검색어가 없으면 로컬 데이터셋, 검색어가 있으면 실시간 검색 결과 매핑)
+  useEffect(() => {
+    if (guideModalVisible && isLoggedIn) {
+      const fetchDbGuides = async () => {
+        try {
+          const results = await getAllStorageGuides();
+          const mapped: StorageTip[] = results.map(item => ({
+            name: item.name,
+            emoji: item.emoji || '💡',
+            category: item.category,
+            tip: item.tip,
+            youtubeQuery: item.youtubeQuery,
+            video: item.video
+          }));
+          setDbGuides(mapped);
+        } catch (err) {
+          console.error("Failed to load all DB guides:", err);
+        }
+      };
+      fetchDbGuides();
+    }
+  }, [guideModalVisible, isLoggedIn]);
+
+  // 로컬 가이드 데이터와 DB 가이드 데이터 병합 (이름 중복 제거)
+  const mergedDefaultTips = useMemo(() => {
+    const merged = [...STORAGE_TIPS];
+    dbGuides.forEach(dbTip => {
+      const exists = merged.some(localTip => localTip.name.toLowerCase() === dbTip.name.toLowerCase());
+      if (!exists) {
+        merged.push(dbTip);
+      }
+    });
+    return merged;
+  }, [dbGuides]);
+
+  // 보관 팁용 필터링 로직 (검색어가 없으면 로컬 및 DB 병합 데이터셋, 검색어가 있으면 실시간 검색 결과 매핑)
   const filteredTips = !guideSearchQuery.trim()
-    ? STORAGE_TIPS.filter(tip => guideSelectedCategory === 'all' || tip.category === guideSelectedCategory)
+    ? mergedDefaultTips.filter(tip => guideSelectedCategory === 'all' || tip.category === guideSelectedCategory)
     : apiGuides.filter(tip => guideSelectedCategory === 'all' || tip.category === guideSelectedCategory);
 
   // 위치 권한 및 실시간 날씨 기반 식중독 지수 상태
@@ -766,6 +803,18 @@ export default function RefrigeratorVisual({
         video: item.video
       }));
       setApiGuides(mapped);
+
+      // 새로 로드/생성된 가이드를 dbGuides 캐시 목록에도 추가하여 실시간 동기화
+      setDbGuides(prev => {
+        const updated = [...prev];
+        mapped.forEach(newTip => {
+          const exists = updated.some(tip => tip.name.toLowerCase() === newTip.name.toLowerCase());
+          if (!exists) {
+            updated.push(newTip);
+          }
+        });
+        return updated;
+      });
     } catch (err: any) {
       console.error("Failed to fetch storage guide from AI backend:", err);
       const errMsg = err.response?.data?.message || '식재료 보관법 정보를 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.';
@@ -813,6 +862,18 @@ export default function RefrigeratorVisual({
       }));
       setApiGuides(mapped);
       setGuideError(null);
+
+      // 타이핑 결과로 나온 가이드를 dbGuides 캐시 목록에도 추가하여 실시간 동기화
+      setDbGuides(prev => {
+        const updated = [...prev];
+        mapped.forEach(newTip => {
+          const exists = updated.some(tip => tip.name.toLowerCase() === newTip.name.toLowerCase());
+          if (!exists) {
+            updated.push(newTip);
+          }
+        });
+        return updated;
+      });
     } catch (err) {
       console.error("Failed to query DB cache during typing:", err);
     }

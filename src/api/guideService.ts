@@ -23,3 +23,11 @@ export const searchStorageGuides = async (query: string, autoGenerate: boolean =
   });
   return response.data;
 };
+
+/**
+ * 모든 저장된 보관 가이드 목록 조회 API 호출
+ */
+export const getAllStorageGuides = async (): Promise<StorageGuideDto[]> => {
+  const response = await client.get<StorageGuideDto[]>(`/api/guide/all`);
+  return response.data;
+};
