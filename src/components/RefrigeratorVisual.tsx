@@ -3,6 +3,7 @@ import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensio
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { searchStorageGuides, getAllStorageGuides } from '../api/guideService';
 import * as Location from 'expo-location';
 import * as WebBrowser from 'expo-web-browser';
@@ -281,6 +282,7 @@ export default function RefrigeratorVisual({
 }: RefrigeratorVisualProps) {
   const { width: screenWidth } = useWindowDimensions();
   const { isLoggedIn } = useAuth();
+  const router = useRouter();
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const { theme, isDark } = useTheme();
 
@@ -405,9 +407,8 @@ export default function RefrigeratorVisual({
           if (ingredientsStr) {
             setIngredients(JSON.parse(ingredientsStr));
           } else {
-            // 샘플 데이터 초기화
-            const allSamples = Object.values(SAMPLE_INGREDIENTS).flat();
-            setIngredients(allSamples);
+            // 로컬 저장소에 데이터 없음 → 빈 상태로 시작
+            setIngredients([]);
           }
         }
       } catch (e) {
@@ -1522,160 +1523,223 @@ export default function RefrigeratorVisual({
               <Ionicons name="chevron-forward" size={12} color={theme.primaryOnPrimary} />
             </View>
           </TouchableOpacity>
-          {/* 검색 바 */}
-          <View style={[styles.searchContainer, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderLight }]}>
-            <Ionicons name="search" size={18} color={theme.textTertiary} />
-            <TextInput
-              style={[styles.searchInput, { color: theme.textPrimary }]}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="식재료 검색..."
-              placeholderTextColor={theme.textMuted}
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <Ionicons name="close-circle" size={18} color={theme.textMuted} />
-              </TouchableOpacity>
-            )}
-          </View>
+          {isLoggedIn ? (
+            <>
+              {/* 검색 바 */}
+              <View style={[styles.searchContainer, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderLight }]}>
+                <Ionicons name="search" size={18} color={theme.textTertiary} />
+                <TextInput
+                  style={[styles.searchInput, { color: theme.textPrimary }]}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder="식재료 검색..."
+                  placeholderTextColor={theme.textMuted}
+                />
+                {searchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => setSearchQuery('')}>
+                    <Ionicons name="close-circle" size={18} color={theme.textMuted} />
+                  </TouchableOpacity>
+                )}
+              </View>
 
-          {/* 필터 칩 바 */}
-          <View style={styles.filterContainer}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
-              <TouchableOpacity
-                style={[
-                  styles.filterChip, 
-                  { 
-                    backgroundColor: theme.surfaceTertiary,
-                    borderWidth: 1,
-                    borderColor: theme.borderLight
-                  },
-                  selectedFilter === 'all' && [
-                    styles.filterChipActive, 
-                    { backgroundColor: theme.primary, borderColor: theme.primary }
-                  ]
-                ]}
-                onPress={() => setSelectedFilter('all')}
-              >
-                <Text style={[styles.filterChipText, { color: theme.textSecondary }, selectedFilter === 'all' && { color: theme.primaryOnPrimary }]}>
-                  전체 {ingredients.length}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.filterChip, 
-                  { 
-                    backgroundColor: theme.surfaceTertiary,
-                    borderWidth: 1,
-                    borderColor: theme.borderLight
-                  },
-                  selectedFilter === 'expired' && [
-                    styles.filterChipActive, 
-                    { backgroundColor: theme.ddayExpired, borderColor: theme.ddayExpired }
-                  ]
-                ]}
-                onPress={() => setSelectedFilter('expired')}
-              >
-                <Text style={[styles.filterChipText, { color: theme.textSecondary }, selectedFilter === 'expired' && { color: '#FFFFFF' }]}>
-                  만료 {totalExpired}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.filterChip, 
-                  { 
-                    backgroundColor: theme.surfaceTertiary,
-                    borderWidth: 1,
-                    borderColor: theme.borderLight
-                  },
-                  selectedFilter === 'imminent' && [
-                    styles.filterChipActive, 
-                    { backgroundColor: theme.ddayImminent, borderColor: theme.ddayImminent }
-                  ]
-                ]}
-                onPress={() => setSelectedFilter('imminent')}
-              >
-                <Text style={[styles.filterChipText, { color: theme.textSecondary }, selectedFilter === 'imminent' && { color: '#FFFFFF' }]}>
-                  임박 {totalImminent}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.filterChip, 
-                  { 
-                    backgroundColor: theme.surfaceTertiary,
-                    borderWidth: 1,
-                    borderColor: theme.borderLight
-                  },
-                  selectedFilter === 'safe' && [
-                    styles.filterChipActive, 
-                    { backgroundColor: theme.ddaySafe, borderColor: theme.ddaySafe }
-                  ]
-                ]}
-                onPress={() => setSelectedFilter('safe')}
-              >
-                <Text style={[styles.filterChipText, { color: theme.textSecondary }, selectedFilter === 'safe' && { color: '#FFFFFF' }]}>
-                  안전 {totalSafe}
-                </Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
+              {/* 필터 칩 바 */}
+              <View style={styles.filterContainer}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
+                  <TouchableOpacity
+                    style={[
+                      styles.filterChip, 
+                      { 
+                        backgroundColor: theme.surfaceTertiary,
+                        borderWidth: 1,
+                        borderColor: theme.borderLight
+                      },
+                      selectedFilter === 'all' && [
+                        styles.filterChipActive, 
+                        { backgroundColor: theme.primary, borderColor: theme.primary }
+                      ]
+                    ]}
+                    onPress={() => setSelectedFilter('all')}
+                  >
+                    <Text style={[styles.filterChipText, { color: theme.textSecondary }, selectedFilter === 'all' && { color: theme.primaryOnPrimary }]}>
+                      전체 {ingredients.length}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.filterChip, 
+                      { 
+                        backgroundColor: theme.surfaceTertiary,
+                        borderWidth: 1,
+                        borderColor: theme.borderLight
+                      },
+                      selectedFilter === 'expired' && [
+                        styles.filterChipActive, 
+                        { backgroundColor: theme.ddayExpired, borderColor: theme.ddayExpired }
+                      ]
+                    ]}
+                    onPress={() => setSelectedFilter('expired')}
+                  >
+                    <Text style={[styles.filterChipText, { color: theme.textSecondary }, selectedFilter === 'expired' && { color: '#FFFFFF' }]}>
+                      만료 {totalExpired}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.filterChip, 
+                      { 
+                        backgroundColor: theme.surfaceTertiary,
+                        borderWidth: 1,
+                        borderColor: theme.borderLight
+                      },
+                      selectedFilter === 'imminent' && [
+                        styles.filterChipActive, 
+                        { backgroundColor: theme.ddayImminent, borderColor: theme.ddayImminent }
+                      ]
+                    ]}
+                    onPress={() => setSelectedFilter('imminent')}
+                  >
+                    <Text style={[styles.filterChipText, { color: theme.textSecondary }, selectedFilter === 'imminent' && { color: '#FFFFFF' }]}>
+                      임박 {totalImminent}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.filterChip, 
+                      { 
+                        backgroundColor: theme.surfaceTertiary,
+                        borderWidth: 1,
+                        borderColor: theme.borderLight
+                      },
+                      selectedFilter === 'safe' && [
+                        styles.filterChipActive, 
+                        { backgroundColor: theme.ddaySafe, borderColor: theme.ddaySafe }
+                      ]
+                    ]}
+                    onPress={() => setSelectedFilter('safe')}
+                  >
+                    <Text style={[styles.filterChipText, { color: theme.textSecondary }, selectedFilter === 'safe' && { color: '#FFFFFF' }]}>
+                      안전 {totalSafe}
+                    </Text>
+                  </TouchableOpacity>
+                </ScrollView>
+              </View>
 
-          {/* 식재료 리스트 */}
-          {filteredIngredients.length > 0 ? (
+              {/* 식재료 리스트 */}
+              {filteredIngredients.length > 0 ? (
+                <ScrollView
+                  style={styles.ingListContainer}
+                  contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100, gap: 12 }}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {filteredIngredients.map(item => {
+                    const dday = getDDayInfo(item.expiryDate);
+                    const emoji = CATEGORY_EMOJI[item.category] || '📦';
+                    const fridge = refrigerators.find(r => r.id === item.fridgeId);
+                    const locationLabel = getCompartmentLabel(item.location);
+
+                    return (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={[styles.ingCard, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}
+                        activeOpacity={0.8}
+                        onPress={() => onPressCompartment(item.location, locationLabel, item.fridgeId || '')}
+                      >
+                        <View style={styles.ingCardLeft}>
+                          <View style={[styles.ingCardEmojiBg, { backgroundColor: theme.surfaceTertiary }]}>
+                            <Text style={{ fontSize: 22 }}>{emoji}</Text>
+                          </View>
+                          <View style={styles.ingCardInfo}>
+                            <Text style={[styles.ingCardName, { color: theme.textPrimary }]} numberOfLines={1}>
+                              {item.name}
+                            </Text>
+                            <Text style={[styles.ingCardLoc, { color: theme.textMuted }]}>
+                              {`${fridge ? fridge.name : '냉장고'} > ${locationLabel}`}
+                            </Text>
+                            <Text style={[styles.ingCardQty, { color: theme.textSecondary }]}>
+                              수량: {item.quantity} {item.unit}
+                            </Text>
+                          </View>
+                        </View>
+                        <View style={styles.ingCardRight}>
+                          <View style={[styles.urgentDDayBadge, { backgroundColor: dday.color + '12', borderColor: dday.color }]}>
+                            <Text style={[styles.urgentDDayText, { color: dday.color }]}>{dday.text}</Text>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              ) : (
+                <View style={styles.emptyStateContainer}>
+                  <Ionicons name="restaurant-outline" size={48} color={theme.textMuted} style={{ marginBottom: 12 }} />
+                  <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>
+                    {searchQuery.trim() ? '검색 결과와 일치하는 식재료가 없습니다.' : '등록된 식재료가 없습니다.'}
+                  </Text>
+                  <Text style={{ color: theme.textMuted, fontSize: 12, marginTop: 4 }}>
+                    {searchQuery.trim() ? '다른 키워드로 검색해 보세요!' : '보관소에서 식재료를 추가해 보세요! 📦'}
+                  </Text>
+                </View>
+              )}
+            </>
+          ) : (
             <ScrollView
-              style={styles.ingListContainer}
-              contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100, gap: 12 }}
+              style={{ flex: 1, marginTop: 4 }}
+              contentContainerStyle={{ paddingBottom: 100, gap: 16 }}
               showsVerticalScrollIndicator={false}
             >
-              {filteredIngredients.map(item => {
-                const dday = getDDayInfo(item.expiryDate);
-                const emoji = CATEGORY_EMOJI[item.category] || '📦';
-                const fridge = refrigerators.find(r => r.id === item.fridgeId);
-                const locationLabel = getCompartmentLabel(item.location);
+              <View style={[styles.loginPromptCard, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
+                <View style={styles.loginPromptHeader}>
+                  <Text style={{ fontSize: 32, marginBottom: 12 }}>🔒</Text>
+                  <Text style={[styles.loginPromptTitle, { color: theme.textPrimary }]}>로그인 후 이용 가능</Text>
+                  <Text style={[styles.loginPromptSubtitle, { color: theme.textSecondary }]}>나의 식재료를 스마트하게 관리해 보세요</Text>
+                </View>
 
-                return (
+                <View style={[styles.loginBenefitContainer, { backgroundColor: theme.surfaceSecondary }]}>
+                  <View style={styles.loginBenefitItem}>
+                    <Ionicons name="notifications-outline" size={16} color={theme.primary} />
+                    <Text style={[styles.loginBenefitText, { color: theme.textPrimary }]}>유통기한 자동 알림</Text>
+                  </View>
+                  <View style={styles.loginBenefitItem}>
+                    <Ionicons name="apps-outline" size={16} color={theme.primary} />
+                    <Text style={[styles.loginBenefitText, { color: theme.textPrimary }]}>냉장고 칸별 식재료 관리</Text>
+                  </View>
+                  <View style={styles.loginBenefitItem}>
+                    <Ionicons name="sync-outline" size={16} color={theme.primary} />
+                    <Text style={[styles.loginBenefitText, { color: theme.textPrimary }]}>여러 기기에서 동시 사용</Text>
+                  </View>
+                </View>
+
+                <View style={styles.loginPromptFooter}>
+                  <Text style={[styles.loginPromptFooterText, { color: theme.textTertiary }]}>⚡ 간편로그인으로 30초 만에 시작</Text>
+                </View>
+
+                <View style={styles.socialLoginButtonsContainer}>
                   <TouchableOpacity
-                    key={item.id}
-                    style={[styles.ingCard, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}
+                    style={[styles.socialButton, styles.kakaoButton]}
                     activeOpacity={0.8}
-                    onPress={() => onPressCompartment(item.location, locationLabel, item.fridgeId || '')}
+                    onPress={() => router.push('/login')}
                   >
-                    <View style={styles.ingCardLeft}>
-                      <View style={[styles.ingCardEmojiBg, { backgroundColor: theme.surfaceTertiary }]}>
-                        <Text style={{ fontSize: 22 }}>{emoji}</Text>
-                      </View>
-                      <View style={styles.ingCardInfo}>
-                        <Text style={[styles.ingCardName, { color: theme.textPrimary }]} numberOfLines={1}>
-                          {item.name}
-                        </Text>
-                        <Text style={[styles.ingCardLoc, { color: theme.textMuted }]}>
-                          {`${fridge ? fridge.name : '냉장고'} > ${locationLabel}`}
-                        </Text>
-                        <Text style={[styles.ingCardQty, { color: theme.textSecondary }]}>
-                          수량: {item.quantity} {item.unit}
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={styles.ingCardRight}>
-                      <View style={[styles.urgentDDayBadge, { backgroundColor: dday.color + '12', borderColor: dday.color }]}>
-                        <Text style={[styles.urgentDDayText, { color: dday.color }]}>{dday.text}</Text>
-                      </View>
-                    </View>
+                    <Text style={styles.kakaoButtonText}>카카오 로그인</Text>
                   </TouchableOpacity>
-                );
-              })}
+
+                  <TouchableOpacity
+                    style={[styles.socialButton, styles.naverButton]}
+                    activeOpacity={0.8}
+                    onPress={() => router.push('/login')}
+                  >
+                    <Text style={styles.naverButtonText}>네이버 로그인</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.socialButton, styles.googleButton, { borderColor: theme.borderLight }]}
+                    activeOpacity={0.8}
+                    onPress={() => router.push('/login')}
+                  >
+                    <Text style={[styles.googleButtonText, { color: theme.textPrimary }]}>Google 로그인</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </ScrollView>
-          ) : (
-            <View style={styles.emptyStateContainer}>
-              <Ionicons name="restaurant-outline" size={48} color={theme.textMuted} style={{ marginBottom: 12 }} />
-              <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>
-                {searchQuery.trim() ? '검색 결과와 일치하는 식재료가 없습니다.' : '등록된 식재료가 없습니다.'}
-              </Text>
-              <Text style={{ color: theme.textMuted, fontSize: 12, marginTop: 4 }}>
-                {searchQuery.trim() ? '다른 키워드로 검색해 보세요!' : '보관소에서 식재료를 추가해 보세요! 📦'}
-              </Text>
-            </View>
           )}
         </View>
       )}
@@ -2752,5 +2816,92 @@ const styles = StyleSheet.create({
   statDivider: {
     width: 1.5,
     height: 16,
+  },
+  loginPromptCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 24,
+    alignItems: 'stretch',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 3,
+    marginHorizontal: 20,
+    marginTop: 8,
+  },
+  loginPromptHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  loginPromptTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 6,
+  },
+  loginPromptSubtitle: {
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  loginBenefitContainer: {
+    borderRadius: 16,
+    padding: 16,
+    gap: 12,
+    marginBottom: 24,
+  },
+  loginBenefitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  loginBenefitText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  loginPromptFooter: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  loginPromptFooterText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  socialLoginButtonsContainer: {
+    gap: 10,
+  },
+  socialButton: {
+    height: 48,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  kakaoButton: {
+    backgroundColor: '#FEE500',
+  },
+  kakaoButtonText: {
+    color: '#191919',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  naverButton: {
+    backgroundColor: '#03C75A',
+  },
+  naverButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  googleButton: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+  },
+  googleButtonText: {
+    color: '#1F2937',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });

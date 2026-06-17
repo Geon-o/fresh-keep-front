@@ -241,9 +241,8 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
             const filtered = allIngredients.filter(item => item.fridgeId === fridgeId && item.location === compartmentId);
             setIngredients(filtered);
           } else {
-            const allSamples = Object.values(SAMPLE_INGREDIENTS).flat().map(item => ({ ...item, fridgeId }));
-            await AsyncStorage.setItem('@ingredients', JSON.stringify(allSamples));
-            setIngredients(SAMPLE_INGREDIENTS[compartmentId]?.map(item => ({ ...item, fridgeId })) || []);
+            // 로컬 저장소에 데이터 없음 → 빈 상태로 시작
+            setIngredients([]);
           }
         }
       } catch (e) {
@@ -280,9 +279,6 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
       let allIngredients: Ingredient[] = [];
       if (ingredientsStr) {
         allIngredients = JSON.parse(ingredientsStr);
-      } else {
-        const allSamples = Object.values(SAMPLE_INGREDIENTS).flat().map(item => ({ ...item, fridgeId }));
-        allIngredients = allSamples;
       }
       
       // 현재 compartmentId 및 fridgeId의 식재료만 필터링하여 제거 후 업데이트
