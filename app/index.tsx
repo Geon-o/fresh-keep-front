@@ -29,9 +29,9 @@ export default function Index() {
     spinner: theme.splashSpinner,
   };
 
-  // 탭바 테마별 색상 설정 (라이트: 검정배경+하늘색아이콘, 다크: 화이트배경+다크아이콘)
-  const activeTabColor = isDark ? '#0F172A' : '#BBDEFB';
-  const inactiveTabColor = isDark ? 'rgba(15, 23, 42, 0.4)' : 'rgba(255, 255, 255, 0.45)';
+  // 탭바 테마별 색상 설정 (라이트: 화이트배경+다크아이콘, 다크: 검정배경+하늘색아이콘)
+  const activeTabColor = isDark ? '#BBDEFB' : '#0F172A';
+  const inactiveTabColor = isDark ? 'rgba(255, 255, 255, 0.45)' : 'rgba(15, 23, 42, 0.4)';
 
   // 1. 네비게이션 및 활성 인덱스 상태
   const [activeTab, setActiveTab] = useState<'home' | 'ingredients' | 'fridge' | 'settings'>('home');
@@ -517,8 +517,8 @@ export default function Index() {
 
           {/* 하단 탭 바 (Bottom Navigation Bar) */}
           <View style={[styles.tabBar, { 
-            backgroundColor: isDark ? '#FFFFFF' : '#0F172A',
-            borderTopColor: isDark ? 'rgba(15, 23, 42, 0.06)' : 'rgba(255, 255, 255, 0.08)',
+            backgroundColor: isDark ? '#0F172A' : '#FFFFFF',
+            borderTopColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.06)',
             borderTopWidth: 1,
           }]}>
             {/* 홈 */}
