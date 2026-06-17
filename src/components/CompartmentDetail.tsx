@@ -469,6 +469,7 @@ export default function CompartmentDetail({
             if (isRightSide && currentX < 35) {
               lastSwappedTime.current = now;
               currentCompartmentIdRef.current = switchTarget.id; // 즉시 로컬 Ref 갱신하여 딜레이 제거
+              latestParentProps.current.compartmentId = switchTarget.id; // 리렌더링 전 제스처 이벤트용 Ref 동기식 즉시 변경!
               onNavigateCompartment(switchTarget.id, switchTarget.label);
               setTimeout(() => {
                 measureShelves();
@@ -477,6 +478,7 @@ export default function CompartmentDetail({
             else if (isLeftSide && currentX > screenWidth - 35) {
               lastSwappedTime.current = now;
               currentCompartmentIdRef.current = switchTarget.id; // 즉시 로컬 Ref 갱신하여 딜레이 제거
+              latestParentProps.current.compartmentId = switchTarget.id; // 리렌더링 전 제스처 이벤트용 Ref 동기식 즉시 변경!
               onNavigateCompartment(switchTarget.id, switchTarget.label);
               setTimeout(() => {
                 measureShelves();
