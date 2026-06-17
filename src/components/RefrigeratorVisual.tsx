@@ -1173,6 +1173,62 @@ export default function RefrigeratorVisual({
           contentContainerStyle={styles.dashboardContent}
           showsVerticalScrollIndicator={false}
         >
+          {/* 오늘의 식중독 지수 */}
+          <View style={styles.sectionContainer}>
+            {weatherInfo.loading ? (
+              <View style={[styles.foodSafetyCard, { backgroundColor: theme.surface, borderColor: theme.borderLight, justifyContent: 'center', alignItems: 'center', paddingVertical: 24 }]}>
+                <ActivityIndicator size="small" color={theme.primary} />
+              </View>
+            ) : locationPermission === 'denied' ? (
+              <View style={[styles.foodSafetyCard, { backgroundColor: theme.dangerLight, borderColor: theme.danger + '25' }]}>
+                <View style={styles.foodSafetyHeader}>
+                  <View style={styles.foodSafetyTitleRow}>
+                    <Ionicons name="location-outline" size={16} color={theme.danger} />
+                    <Text style={[styles.foodSafetyTitle, { color: theme.textPrimary }]}>식중독 지수 조회 불가</Text>
+                  </View>
+                  <View style={[styles.foodSafetyBadge, { backgroundColor: theme.danger }]}>
+                    <Text style={styles.foodSafetyBadgeText}>권한 필요</Text>
+                  </View>
+                </View>
+                <Text style={[styles.foodSafetyDesc, { color: theme.textSecondary, lineHeight: 18 }]}>
+                  실시간 위치 기준 식중독 지수를 조회하려면 위치 권한 허용이 필요합니다. 아래 버튼을 눌러 권한을 허용해 주세요.
+                </Text>
+                <TouchableOpacity 
+                  style={[styles.permissionButton, { backgroundColor: theme.danger }]}
+                  activeOpacity={0.8}
+                  onPress={requestLocationAndFetchWeather}
+                >
+                  <Text style={[styles.permissionButtonText, { color: '#FFFFFF' }]}>위치 권한 허용하기</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={[styles.foodSafetyCard, { backgroundColor: weatherInfo.bgColor, borderColor: weatherInfo.color + '25' }]}>
+                <View style={styles.foodSafetyHeader}>
+                  <View style={styles.foodSafetyTitleRow}>
+                    <Ionicons name="shield-checkmark" size={16} color={weatherInfo.color} />
+                    <Text style={[styles.foodSafetyTitle, { color: theme.textPrimary }]}>
+                      오늘의 식중독 지수{weatherInfo.city ? ` (${weatherInfo.city})` : ''}
+                    </Text>
+                  </View>
+                  <View style={[styles.foodSafetyBadge, { backgroundColor: weatherInfo.color }]}>
+                    <Text style={styles.foodSafetyBadgeText}>{weatherInfo.level} {weatherInfo.index}</Text>
+                  </View>
+                </View>
+                <Text style={[styles.foodSafetyDesc, { color: theme.textSecondary }]}>
+                  {weatherInfo.description}
+                </Text>
+                {weatherInfo.temp !== null && weatherInfo.humidity !== null && (
+                  <Text style={[styles.weatherConditionText, { color: theme.textTertiary }]}>
+                    현재 기온: {weatherInfo.temp}°C{weatherInfo.isFallback ? ' (평균)' : ''} | 습도: {weatherInfo.humidity}%{weatherInfo.isFallback ? ' (평균)' : ''}
+                  </Text>
+                )}
+                <View style={[styles.progressBarBg, { backgroundColor: theme.borderLight }]}>
+                  <View style={[styles.progressBarFill, { width: `${weatherInfo.index}%`, backgroundColor: weatherInfo.color }]} />
+                </View>
+              </View>
+            )}
+          </View>
+
           {/* 식재료 신선도 요약 대시보드 */}
           {(() => {
             const totalCount = totalExpired + totalImminent + totalSafe;
@@ -1306,92 +1362,6 @@ export default function RefrigeratorVisual({
             )}
           </View>
 
-          {/* 오늘의 식중독 지수 */}
-          <View style={styles.sectionContainer}>
-            {weatherInfo.loading ? (
-              <View style={[styles.foodSafetyCard, { backgroundColor: theme.surface, borderColor: theme.borderLight, justifyContent: 'center', alignItems: 'center', paddingVertical: 24 }]}>
-                <ActivityIndicator size="small" color={theme.primary} />
-              </View>
-            ) : locationPermission === 'denied' ? (
-              <View style={[styles.foodSafetyCard, { backgroundColor: theme.dangerLight, borderColor: theme.danger + '25' }]}>
-                <View style={styles.foodSafetyHeader}>
-                  <View style={styles.foodSafetyTitleRow}>
-                    <Ionicons name="location-outline" size={16} color={theme.danger} />
-                    <Text style={[styles.foodSafetyTitle, { color: theme.textPrimary }]}>식중독 지수 조회 불가</Text>
-                  </View>
-                  <View style={[styles.foodSafetyBadge, { backgroundColor: theme.danger }]}>
-                    <Text style={styles.foodSafetyBadgeText}>권한 필요</Text>
-                  </View>
-                </View>
-                <Text style={[styles.foodSafetyDesc, { color: theme.textSecondary, lineHeight: 18 }]}>
-                  실시간 위치 기준 식중독 지수를 조회하려면 위치 권한 허용이 필요합니다. 아래 버튼을 눌러 권한을 허용해 주세요.
-                </Text>
-                <TouchableOpacity 
-                  style={[styles.permissionButton, { backgroundColor: theme.danger }]}
-                  activeOpacity={0.8}
-                  onPress={requestLocationAndFetchWeather}
-                >
-                  <Text style={[styles.permissionButtonText, { color: '#FFFFFF' }]}>위치 권한 허용하기</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={[styles.foodSafetyCard, { backgroundColor: weatherInfo.bgColor, borderColor: weatherInfo.color + '25' }]}>
-                <View style={styles.foodSafetyHeader}>
-                  <View style={styles.foodSafetyTitleRow}>
-                    <Ionicons name="shield-checkmark" size={16} color={weatherInfo.color} />
-                    <Text style={[styles.foodSafetyTitle, { color: theme.textPrimary }]}>
-                      오늘의 식중독 지수{weatherInfo.city ? ` (${weatherInfo.city})` : ''}
-                    </Text>
-                  </View>
-                  <View style={[styles.foodSafetyBadge, { backgroundColor: weatherInfo.color }]}>
-                    <Text style={styles.foodSafetyBadgeText}>{weatherInfo.level} {weatherInfo.index}</Text>
-                  </View>
-                </View>
-                <Text style={[styles.foodSafetyDesc, { color: theme.textSecondary }]}>
-                  {weatherInfo.description}
-                </Text>
-                {weatherInfo.temp !== null && weatherInfo.humidity !== null && (
-                  <Text style={[styles.weatherConditionText, { color: theme.textTertiary }]}>
-                    현재 기온: {weatherInfo.temp}°C{weatherInfo.isFallback ? ' (평균)' : ''} | 습도: {weatherInfo.humidity}%{weatherInfo.isFallback ? ' (평균)' : ''}
-                  </Text>
-                )}
-                <View style={[styles.progressBarBg, { backgroundColor: theme.borderLight }]}>
-                  <View style={[styles.progressBarFill, { width: `${weatherInfo.index}%`, backgroundColor: weatherInfo.color }]} />
-                </View>
-              </View>
-            )}
-          </View>
-
-          {/* 보관 팁 퀵 배너 (컴팩트 버전) */}
-          <TouchableOpacity
-            style={[
-              styles.guideBannerCompact, 
-              { 
-                backgroundColor: theme.surfaceSecondary, 
-                borderColor: theme.borderLight,
-                shadowColor: theme.shadow 
-              }
-            ]}
-            activeOpacity={0.8}
-            onPress={() => {
-              setGuideSearchQuery('');
-              setGuideSelectedCategory('all');
-              setGuideModalVisible(true);
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <Text style={{ fontSize: 24 }}>💡</Text>
-              <View>
-                <Text style={[styles.guideBannerTitleCompact, { color: theme.textPrimary }]}>식재료 보관 팁</Text>
-                <Text style={{ fontSize: 11, color: theme.textTertiary, marginTop: 1 }}>최적의 보관법을 검색해 보세요!</Text>
-              </View>
-            </View>
-            <View style={[styles.guideBannerButtonCompact, { backgroundColor: theme.primary }]}>
-              <Text style={{ color: theme.primaryOnPrimary, fontSize: 11, fontWeight: 'bold' }}>보관 팁 보기</Text>
-              <Ionicons name="chevron-forward" size={12} color={theme.primaryOnPrimary} />
-            </View>
-          </TouchableOpacity>
-
           {/* 제철 식재료 추천 */}
           <View style={styles.sectionContainer}>
             <View style={styles.sectionHeaderRow}>
@@ -1522,6 +1492,36 @@ export default function RefrigeratorVisual({
       {mode === 'ingredients' && (
         <View style={{ flex: 1 }}>
           <Text style={[styles.pageTitle, { color: theme.textPrimary, paddingTop: 16 }]}>식재료 목록</Text>
+          {/* 보관 팁 퀵 배너 */}
+          <TouchableOpacity
+            style={[
+              styles.guideBannerCompact, 
+              { 
+                backgroundColor: theme.surfaceSecondary, 
+                borderColor: theme.borderLight,
+                shadowColor: theme.shadow,
+                marginBottom: 12,
+              }
+            ]}
+            activeOpacity={0.8}
+            onPress={() => {
+              setGuideSearchQuery('');
+              setGuideSelectedCategory('all');
+              setGuideModalVisible(true);
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Text style={{ fontSize: 24 }}>💡</Text>
+              <View>
+                <Text style={[styles.guideBannerTitleCompact, { color: theme.textPrimary }]}>식재료 보관 팁</Text>
+                <Text style={{ fontSize: 11, color: theme.textTertiary, marginTop: 1 }}>최적의 보관법을 검색해 보세요!</Text>
+              </View>
+            </View>
+            <View style={[styles.guideBannerButtonCompact, { backgroundColor: theme.primary }]}>
+              <Text style={{ color: theme.primaryOnPrimary, fontSize: 11, fontWeight: 'bold' }}>보관 팁 보기</Text>
+              <Ionicons name="chevron-forward" size={12} color={theme.primaryOnPrimary} />
+            </View>
+          </TouchableOpacity>
           {/* 검색 바 */}
           <View style={[styles.searchContainer, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderLight }]}>
             <Ionicons name="search" size={18} color={theme.textTertiary} />
