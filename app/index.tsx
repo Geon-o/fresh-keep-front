@@ -12,7 +12,9 @@ import CompartmentDetail from '../src/components/CompartmentDetail';
 import SettingsView from '../src/components/SettingsView';
 import RefrigeratorSelector from '../src/components/RefrigeratorSelector';
 import { useAuth } from '../src/context/AuthContext';
-import { getFridges, createFridge, deleteFridge, updateFridge, convertTypeToFrontend } from '../src/api/fridgeService';
+import { serializeMemo } from '../src/utils/memoSerializer';
+import { getFridges, createFridge, deleteFridge, updateFridge, convertTypeToFrontend, getFridgeLayout } from '../src/api/fridgeService';
+import { updateIngredient } from '../src/api/ingredientService';
 import { useTheme } from '../src/context/ThemeContext';
 
 export default function Index() {
@@ -499,6 +501,82 @@ export default function Index() {
     setActiveCompartment({ id, label, fridgeId });
   };
 
+  // 식재료 보관실/선반 간 드래그 앤 드롭 이동 API 연동 및 상태 동기화
+  const handleMoveIngredient = async (
+    ingredientId: string,
+    targetCompartmentId: string,
+    targetShelfId: string,
+    category: string,
+    currentMemo: string,
+    name: string,
+    quantity: number,
+    unit: string,
+    expiryDate: string
+  ) => {
+    if (isLoggedIn) {
+      try {
+        if (!activeCompartment) return;
+        const layout = await getFridgeLayout(Number(activeCompartment.fridgeId));
+        
+        // targetCompartmentId에 대응하는 서버 구획 찾기
+        const serverComp = layout.compartments.find((comp: any) => {
+          const isLeft = targetCompartmentId.includes('left');
+          const isRight = targetCompartmentId.includes('right');
+          if (targetCompartmentId.startsWith('freezer')) {
+            if (comp.storageType !== 'FROZEN') return false;
+          } else {
+            if (comp.storageType !== 'REFRIGERATED') return false;
+          }
+          if (isLeft && !comp.name.includes('좌')) return false;
+          if (isRight && !comp.name.includes('우')) return false;
+          return true;
+        });
+
+        if (!serverComp) {
+          throw new Error('이동 대상 서버 구획을 찾을 수 없습니다.');
+        }
+
+        const memoContent = serializeMemo(category as any, targetShelfId, currentMemo);
+
+        await updateIngredient(Number(ingredientId), {
+          compartmentId: serverComp.id,
+          name: name.trim(),
+          quantity: Number(quantity),
+          unit,
+          expirationDate: expiryDate,
+          memo: memoContent,
+        });
+
+        await queryClient.invalidateQueries({ queryKey: ['fridges'] });
+      } catch (e) {
+        console.error('Failed to move ingredient on server', e);
+        throw e;
+      }
+    } else {
+      // 로컬 스토리지 데이터 업데이트
+      try {
+        const ingredientsStr = await AsyncStorage.getItem('@ingredients');
+        if (ingredientsStr) {
+          const allIngredients: Ingredient[] = JSON.parse(ingredientsStr);
+          const updated = allIngredients.map(item => {
+            if (item.id === ingredientId) {
+              return {
+                ...item,
+                location: targetCompartmentId,
+                subLocation: targetShelfId as any,
+              };
+            }
+            return item;
+          });
+          await AsyncStorage.setItem('@ingredients', JSON.stringify(updated));
+        }
+      } catch (e) {
+        console.error('Failed to move local ingredient', e);
+        throw e;
+      }
+    }
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top', 'left', 'right']}>
       {activeCompartment !== null ? (
@@ -508,6 +586,14 @@ export default function Index() {
             compartmentLabel={activeCompartment.label}
             onBack={() => setActiveCompartment(null)}
             fridgeId={activeCompartment.fridgeId}
+            onNavigateCompartment={(newId, newLabel) => {
+              setActiveCompartment({
+                id: newId,
+                label: newLabel,
+                fridgeId: activeCompartment.fridgeId
+              });
+            }}
+            onMoveIngredient={handleMoveIngredient}
           />
         </SafeAreaView>
       ) : (

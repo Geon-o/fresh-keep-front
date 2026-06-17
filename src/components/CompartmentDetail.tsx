@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, ScrollView, Platform, Alert, TextInput, Modal, ActivityIndicator } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, Text, ScrollView, Platform, Alert, TextInput, Modal, ActivityIndicator, PanResponder, Dimensions, Animated } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
 import { Ingredient, IngredientCategory } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { getFridgeLayout, updateCompartmentShelves } from '../api/fridgeService';
@@ -14,6 +15,18 @@ interface CompartmentDetailProps {
   compartmentLabel: string;
   onBack: () => void;
   fridgeId: string;
+  onNavigateCompartment?: (newId: string, newLabel: string) => void;
+  onMoveIngredient?: (
+    ingredientId: string,
+    targetCompartmentId: string,
+    targetShelfId: string,
+    category: string,
+    currentMemo: string,
+    name: string,
+    quantity: number,
+    unit: string,
+    expiryDate: string
+  ) => Promise<void>;
 }
 
 // 특정 칸별 샘플 식재료 데이터 (디자인 테스트용 모의 데이터)
@@ -94,11 +107,162 @@ const DEFAULT_DOOR_SHELVES = [
   { id: 'pocket_2', label: '선반 2단' },
 ];
 
-export default function CompartmentDetail({ compartmentId, compartmentLabel, onBack, fridgeId }: CompartmentDetailProps) {
+export default function CompartmentDetail({ 
+  compartmentId, 
+  compartmentLabel, 
+  onBack, 
+  fridgeId,
+  onNavigateCompartment,
+  onMoveIngredient
+}: CompartmentDetailProps) {
   const { isLoggedIn } = useAuth();
   const [serverCompartmentId, setServerCompartmentId] = useState<number | null>(null);
   const { theme } = useTheme();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
+
+  // 드래그 앤 드롭 제스처 관련 상태
+  const [draggingItem, setDraggingItem] = useState<Ingredient | null>(null);
+  const dragPosition = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const [dragCurrentCoords, setDragCurrentCoords] = useState<{ x: number, y: number }>({ x: 0, y: 0 });
+  const shelfRefs = useRef<Record<string, View | null>>({});
+  const shelfLayouts = useRef<Record<string, { x: number; y: number; width: number; height: number }>>({});
+  const lastSwappedTime = useRef<number>(0);
+  const screenWidth = Dimensions.get('window').width;
+
+  // 4문형 냉장고의 좌/우 칸 전환 매핑 헬퍼
+  const getFourDoorSwitchTarget = (compId: string): { id: string; label: string } | null => {
+    if (compId === 'fridge_left') return { id: 'fridge_right', label: '냉장실 (우)' };
+    if (compId === 'fridge_right') return { id: 'fridge_left', label: '냉장실 (좌)' };
+    if (compId === 'freezer_left') return { id: 'freezer_right', label: '냉동실 (좌)' };
+    if (compId === 'freezer_right') return { id: 'freezer_left', label: '냉동실 (우)' };
+    return null;
+  };
+
+  // 선반 절대 좌표 측정
+  const measureShelves = () => {
+    Object.keys(shelfRefs.current).forEach(shelfId => {
+      const ref = shelfRefs.current[shelfId];
+      if (ref) {
+        ref.measureInWindow((x, y, width, height) => {
+          shelfLayouts.current[shelfId] = { x, y, width, height };
+        });
+      }
+    });
+  };
+
+  // 드래그 햅틱 및 시작
+  const startDrag = async (item: Ingredient, startX: number, startY: number) => {
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch (e) {
+      // 햅틱 실패 시 조용히 무시
+    }
+    setDraggingItem(item);
+    // 손가락 위치에 맞게 Animated Value 초기화 (드래그 요소를 손가락 위치보다 약간 위로 오프셋 -30)
+    dragPosition.setValue({ x: startX - 50, y: startY - 70 });
+    setDragCurrentCoords({ x: startX, y: startY });
+    // 선반들 위치 측정
+    setTimeout(() => {
+      measureShelves();
+    }, 100);
+  };
+
+  // 드래그 완료 처리 (드롭)
+  const handleDropIngredient = async (item: Ingredient, dropX: number, dropY: number) => {
+    let droppedShelfId: string | null = null;
+    
+    // 선반 좌표 매칭 루프
+    Object.keys(shelfLayouts.current).forEach(shelfId => {
+      const layout = shelfLayouts.current[shelfId];
+      if (layout) {
+        const inX = dropX >= layout.x && dropX <= layout.x + layout.width;
+        const inY = dropY >= layout.y && dropY <= layout.y + layout.height;
+        if (inX && inY) {
+          droppedShelfId = shelfId;
+        }
+      }
+    });
+
+    if (droppedShelfId && onMoveIngredient) {
+      const targetShelf = droppedShelfId;
+      // 1. 화면 즉시 반영 (낙관적 업데이트)
+      setIngredients(prev => prev.map(ing => 
+        ing.id === item.id 
+          ? { ...ing, location: compartmentId, subLocation: targetShelf as any } 
+          : ing
+      ));
+      
+      // 2. 부모 콜백 호출 (서버/로컬 저장소 저장)
+      try {
+        await onMoveIngredient(
+          item.id,
+          compartmentId,
+          targetShelf,
+          item.category,
+          item.memo || '',
+          item.name,
+          item.quantity,
+          item.unit,
+          item.expiryDate
+        );
+      } catch (error) {
+        console.error('Failed to move ingredient:', error);
+        Alert.alert('이동 실패 ⚠️', '식재료 위치를 변경하는 중 오류가 발생했습니다.');
+      }
+    }
+    
+    setDraggingItem(null);
+  };
+
+  // PanResponder 생성
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderMove: (evt, gestureState) => {
+        // 실시간 플로팅 요소 좌표 업데이트
+        dragPosition.setValue({ 
+          x: gestureState.moveX - 50, 
+          y: gestureState.moveY - 70 
+        });
+        setDragCurrentCoords({ x: gestureState.moveX, y: gestureState.moveY });
+
+        // 4문형 냉장고 경계선 탈출(Swipe Edge) 체크
+        const switchTarget = getFourDoorSwitchTarget(compartmentId);
+        if (switchTarget && onNavigateCompartment) {
+          const now = Date.now();
+          // 쿨타임 1.5초
+          if (now - lastSwappedTime.current > 1500) {
+            const isRightSide = compartmentId.includes('right');
+            const isLeftSide = compartmentId.includes('left');
+
+            if (isRightSide && gestureState.moveX < 35) {
+              lastSwappedTime.current = now;
+              onNavigateCompartment(switchTarget.id, switchTarget.label);
+              setTimeout(() => {
+                measureShelves();
+              }, 100);
+            }
+            else if (isLeftSide && gestureState.moveX > screenWidth - 35) {
+              lastSwappedTime.current = now;
+              onNavigateCompartment(switchTarget.id, switchTarget.label);
+              setTimeout(() => {
+                measureShelves();
+              }, 100);
+            }
+          }
+        }
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        if (draggingItem) {
+          handleDropIngredient(draggingItem, gestureState.moveX, gestureState.moveY);
+        }
+      },
+      onPanResponderTerminate: () => {
+        setDraggingItem(null);
+      }
+    })
+  ).current;
 
   // 선반 동적 배열 상태 관리 (초기값은 비워두고 useEffect에서 로드)
   const [insideShelves, setInsideShelves] = useState<{ id: string; label: string }[]>([]);
@@ -762,6 +926,8 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
         style={[styles.itemBadge, { borderLeftWidth: 3.5, borderLeftColor: dDay.color, paddingLeft: 8 }]}
         activeOpacity={0.7}
         onPress={() => handleOpenShelfDetailModal(shelfId, shelfLabel)}
+        delayLongPress={1500}
+        onLongPress={(e) => startDrag(item, e.nativeEvent.pageX, e.nativeEvent.pageY)}
       >
         <Text style={styles.itemText} numberOfLines={1}>
           {emoji ? `${emoji} ` : ''}{item.name}
@@ -823,7 +989,11 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
               <View style={styles.shelfContainer}>
                 <View style={styles.shelfScrollContent}>
                   {insideShelves.map((shelf) => (
-                    <View key={shelf.id} style={styles.shelf}>
+                    <View 
+                      key={shelf.id} 
+                      ref={el => { shelfRefs.current[shelf.id] = el; }} 
+                      style={styles.shelf}
+                    >
                       <View style={styles.shelfHeaderRow}>
                         <TouchableOpacity
                           onPress={() => handleOpenShelfDetailModal(shelf.id, shelf.label)}
@@ -878,7 +1048,11 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
                 <View style={styles.pocketContainer}>
                   <View style={styles.pocketScrollContent}>
                     {doorShelves.map((shelf) => (
-                      <View key={shelf.id} style={styles.pocket}>
+                      <View 
+                        key={shelf.id} 
+                        ref={el => { shelfRefs.current[shelf.id] = el; }} 
+                        style={styles.pocket}
+                      >
                         <View style={styles.shelfHeaderRow}>
                           <TouchableOpacity
                             onPress={() => handleOpenShelfDetailModal(shelf.id, shelf.label)}
@@ -1234,6 +1408,30 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
           </View>
         </View>
       </Modal>
+
+      {/* 식재료 드래그 오버레이 */}
+      {draggingItem !== null && (
+        <View 
+          style={StyleSheet.absoluteFillObject} 
+          {...panResponder.panHandlers}
+        >
+          <Animated.View
+            style={[
+              styles.floatingDragBadge,
+              {
+                left: dragPosition.x,
+                top: dragPosition.y,
+                backgroundColor: theme.surfaceSecondary || '#F3F4F6',
+                borderColor: theme.primary || '#4F46E5',
+              }
+            ]}
+          >
+            <Text style={[styles.floatingDragText, { color: theme.textPrimary }]}>
+              {draggingItem.name}
+            </Text>
+          </Animated.View>
+        </View>
+      )}
     </View>
   );
 }
@@ -1876,6 +2074,25 @@ function createStyles(theme: ThemeColors) {
       fontSize: 12,
       fontWeight: 'bold',
       color: theme.danger,
+    },
+    floatingDragBadge: {
+      position: 'absolute',
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderRadius: 12,
+      borderWidth: 1.5,
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 99999,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      elevation: 5,
+    },
+    floatingDragText: {
+      fontSize: 14,
+      fontWeight: 'bold',
     },
   });
 }
