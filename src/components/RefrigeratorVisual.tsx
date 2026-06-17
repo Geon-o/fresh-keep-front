@@ -1181,8 +1181,9 @@ export default function RefrigeratorVisual({
                   { 
                     backgroundColor: totalExpired > 0 ? theme.ddayExpired + '06' : theme.surface, 
                     borderColor: totalExpired > 0 ? theme.ddayExpired + '25' : theme.borderLight,
-                    shadowColor: theme.shadow 
-                  }
+                    shadowColor: totalExpired > 0 ? 'transparent' : theme.shadow 
+                  },
+                  totalExpired > 0 && { shadowOpacity: 0, elevation: 0 }
                 ]}
               >
                 <View style={[styles.statsIconBadge, { backgroundColor: totalExpired > 0 ? theme.ddayExpired + '15' : theme.surfaceSecondary }]}>
@@ -1203,8 +1204,9 @@ export default function RefrigeratorVisual({
                   { 
                     backgroundColor: totalImminent > 0 ? theme.ddayImminent + '06' : theme.surface, 
                     borderColor: totalImminent > 0 ? theme.ddayImminent + '25' : theme.borderLight,
-                    shadowColor: theme.shadow 
-                  }
+                    shadowColor: totalImminent > 0 ? 'transparent' : theme.shadow 
+                  },
+                  totalImminent > 0 && { shadowOpacity: 0, elevation: 0 }
                 ]}
               >
                 <View style={[styles.statsIconBadge, { backgroundColor: totalImminent > 0 ? theme.ddayImminent + '15' : theme.surfaceSecondary }]}>
