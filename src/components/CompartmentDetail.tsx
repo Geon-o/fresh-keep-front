@@ -107,6 +107,238 @@ const DEFAULT_DOOR_SHELVES = [
   { id: 'pocket_2', label: '선반 2단' },
 ];
 
+interface DraggableBadgeProps {
+  item: Ingredient;
+  shelfId: string;
+  shelfLabel: string;
+  draggingItem: Ingredient | null;
+  setDraggingItem: (item: Ingredient | null) => void;
+  dragPosition: Animated.ValueXY;
+  setDragCurrentCoords: (coords: { x: number; y: number }) => void;
+  setScrollEnabled: (enabled: boolean) => void;
+  setActiveHoverShelfId: (id: string | null) => void;
+  compartmentId: string;
+  onNavigateCompartment?: (newId: string, newLabel: string) => void;
+  handleOpenShelfDetailModal: (shelfId: string, label: string) => void;
+  measureShelves: () => void;
+  shelfLayouts: React.MutableRefObject<Record<string, { x: number; y: number; width: number; height: number }>>;
+  lastSwappedTime: React.MutableRefObject<number>;
+  screenWidth: number;
+  theme: ThemeColors;
+  styles: any;
+  handleDropIngredient: (item: Ingredient, dropX: number, dropY: number) => Promise<void>;
+  getFourDoorSwitchTarget: (compId: string) => { id: string; label: string } | null;
+  getDDayInfo: (expiryDate: string) => { text: string; color: string };
+}
+
+const DraggableBadge = ({
+  item,
+  shelfId,
+  shelfLabel,
+  draggingItem,
+  setDraggingItem,
+  dragPosition,
+  setDragCurrentCoords,
+  setScrollEnabled,
+  setActiveHoverShelfId,
+  compartmentId,
+  onNavigateCompartment,
+  handleOpenShelfDetailModal,
+  measureShelves,
+  shelfLayouts,
+  lastSwappedTime,
+  screenWidth,
+  theme,
+  styles,
+  handleDropIngredient,
+  getFourDoorSwitchTarget,
+  getDDayInfo,
+}: DraggableBadgeProps) => {
+  const dDay = getDDayInfo(item.expiryDate);
+  const emoji = CATEGORY_EMOJI[item.category] || '';
+  const isDraggingThis = draggingItem !== null && draggingItem.id === item.id;
+
+  const longPressTimer = useRef<any>(null);
+  const isDraggingActive = useRef(false);
+  const touchStartPos = useRef({ x: 0, y: 0 });
+
+  // Stale Closure 방지를 위해 최신 Props를 Ref에 항시 동기화
+  const latestProps = useRef({
+    item,
+    shelfId,
+    shelfLabel,
+    draggingItem,
+    setDraggingItem,
+    dragPosition,
+    setDragCurrentCoords,
+    setScrollEnabled,
+    setActiveHoverShelfId,
+    compartmentId,
+    onNavigateCompartment,
+    handleOpenShelfDetailModal,
+    measureShelves,
+    shelfLayouts,
+    lastSwappedTime,
+    screenWidth,
+    handleDropIngredient,
+    getFourDoorSwitchTarget,
+  });
+
+  useEffect(() => {
+    latestProps.current = {
+      item,
+      shelfId,
+      shelfLabel,
+      draggingItem,
+      setDraggingItem,
+      dragPosition,
+      setDragCurrentCoords,
+      setScrollEnabled,
+      setActiveHoverShelfId,
+      compartmentId,
+      onNavigateCompartment,
+      handleOpenShelfDetailModal,
+      measureShelves,
+      shelfLayouts,
+      lastSwappedTime,
+      screenWidth,
+      handleDropIngredient,
+      getFourDoorSwitchTarget,
+    };
+  }); // 매 렌더링마다 최신 값 동기화
+
+  const badgePanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt, gestureState) => {
+        const startX = evt.nativeEvent.pageX;
+        const startY = evt.nativeEvent.pageY;
+        touchStartPos.current = { x: startX, y: startY };
+        isDraggingActive.current = false;
+
+        // 0.7초 롱프레스 타이머 가동
+        longPressTimer.current = setTimeout(async () => {
+          isDraggingActive.current = true;
+          try {
+            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          } catch (e) {}
+          
+          const props = latestProps.current;
+          props.setScrollEnabled(false); // 스크롤 차단
+          props.setDraggingItem(props.item);
+          props.dragPosition.setValue({ x: startX - 70, y: startY - 20 });
+          props.setDragCurrentCoords({ x: startX, y: startY });
+          props.measureShelves(); // 선반 좌표 수집
+        }, 700);
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        const currentX = evt.nativeEvent.pageX;
+        const currentY = evt.nativeEvent.pageY;
+        const props = latestProps.current;
+
+        if (!isDraggingActive.current) {
+          // 움직임 거리가 클 경우 단순 스크롤로 간주하고 타이머 취소
+          const dx = Math.abs(currentX - touchStartPos.current.x);
+          const dy = Math.abs(currentY - touchStartPos.current.y);
+          if (dx > 8 || dy > 8) {
+            if (longPressTimer.current) {
+              clearTimeout(longPressTimer.current);
+            }
+          }
+        } else {
+          // 드래그 중인 경우
+          props.dragPosition.setValue({ x: currentX - 70, y: currentY - 20 });
+          props.setDragCurrentCoords({ x: currentX, y: currentY });
+
+          // 호버 선반 추적
+          let hoverShelfId: string | null = null;
+          Object.keys(props.shelfLayouts.current).forEach(sId => {
+            const layout = props.shelfLayouts.current[sId];
+            if (layout) {
+              const inX = currentX >= layout.x && currentX <= layout.x + layout.width;
+              const inY = currentY >= layout.y && currentY <= layout.y + layout.height;
+              if (inX && inY) {
+                hoverShelfId = sId;
+              }
+            }
+          });
+          props.setActiveHoverShelfId(hoverShelfId);
+
+          // 4문형 경계선 전환 검사
+          const switchTarget = props.getFourDoorSwitchTarget(props.compartmentId);
+          if (switchTarget && props.onNavigateCompartment) {
+            const now = Date.now();
+            if (now - props.lastSwappedTime.current > 1500) {
+              const isRightSide = props.compartmentId.includes('right');
+              const isLeftSide = props.compartmentId.includes('left');
+
+              if (isRightSide && currentX < 35) {
+                props.lastSwappedTime.current = now;
+                props.onNavigateCompartment(switchTarget.id, switchTarget.label);
+                setTimeout(() => {
+                  props.measureShelves();
+                }, 150);
+              }
+              else if (isLeftSide && currentX > props.screenWidth - 35) {
+                props.lastSwappedTime.current = now;
+                props.onNavigateCompartment(switchTarget.id, switchTarget.label);
+                setTimeout(() => {
+                  props.measureShelves();
+                }, 150);
+              }
+            }
+          }
+        }
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        if (longPressTimer.current) {
+          clearTimeout(longPressTimer.current);
+        }
+        const props = latestProps.current;
+        props.setScrollEnabled(true);
+
+        if (isDraggingActive.current) {
+          props.handleDropIngredient(props.item, evt.nativeEvent.pageX, evt.nativeEvent.pageY);
+          props.setActiveHoverShelfId(null);
+        } else {
+          // 타이머 만료 전 손 뗌 -> 단순 탭
+          props.handleOpenShelfDetailModal(props.shelfId, props.shelfLabel);
+        }
+        isDraggingActive.current = false;
+      },
+      onPanResponderTerminate: () => {
+        if (longPressTimer.current) {
+          clearTimeout(longPressTimer.current);
+        }
+        const props = latestProps.current;
+        props.setScrollEnabled(true);
+        props.setDraggingItem(null);
+        props.setActiveHoverShelfId(null);
+        isDraggingActive.current = false;
+      }
+    })
+  ).current;
+
+  return (
+    <View
+      {...badgePanResponder.panHandlers}
+      style={[
+        styles.itemBadge,
+        { borderLeftWidth: 3.5, borderLeftColor: dDay.color, paddingLeft: 8 },
+        isDraggingThis && { opacity: 0.15 }
+      ]}
+    >
+      <Text style={styles.itemText} numberOfLines={1}>
+        {emoji ? `${emoji} ` : ''}{item.name}
+      </Text>
+      <Text style={[styles.itemDDay, { color: dDay.color }]}>
+        {dDay.text}
+      </Text>
+    </View>
+  );
+};
+
 export default function CompartmentDetail({ 
   compartmentId, 
   compartmentLabel, 
@@ -198,144 +430,6 @@ export default function CompartmentDetail({
     }
     
     setDraggingItem(null);
-  };
-
-  // 개별 식재료용 드래그 앤 드롭 전용 컴포넌트 (롱프레스 감지 타이머 내장 및 손가락 홀딩 드래그 지원)
-  const DraggableBadge = ({ item, shelfId, shelfLabel }: { item: Ingredient, shelfId: string, shelfLabel: string }) => {
-    const dDay = getDDayInfo(item.expiryDate);
-    const emoji = CATEGORY_EMOJI[item.category] || '';
-    const isDraggingThis = draggingItem !== null && draggingItem.id === item.id;
-    
-    const longPressTimer = useRef<any>(null);
-    const isDraggingActive = useRef(false);
-    const touchStartPos = useRef({ x: 0, y: 0 });
-
-    const badgePanResponder = useRef(
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        onPanResponderGrant: (evt, gestureState) => {
-          const startX = evt.nativeEvent.pageX;
-          const startY = evt.nativeEvent.pageY;
-          touchStartPos.current = { x: startX, y: startY };
-          isDraggingActive.current = false;
-
-          // 0.7초 롱프레스 타이머 가동
-          longPressTimer.current = setTimeout(async () => {
-            isDraggingActive.current = true;
-            try {
-              await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            } catch (e) {}
-            
-            setScrollEnabled(false); // 스크롤 차단
-            setDraggingItem(item);
-            dragPosition.setValue({ x: startX - 70, y: startY - 20 });
-            setDragCurrentCoords({ x: startX, y: startY });
-            measureShelves(); // 선반 좌표 수집
-          }, 700);
-        },
-        onPanResponderMove: (evt, gestureState) => {
-          const currentX = evt.nativeEvent.pageX;
-          const currentY = evt.nativeEvent.pageY;
-
-          if (!isDraggingActive.current) {
-            // 움직임 거리가 클 경우 단순 스크롤로 간주하고 타이머 취소
-            const dx = Math.abs(currentX - touchStartPos.current.x);
-            const dy = Math.abs(currentY - touchStartPos.current.y);
-            if (dx > 8 || dy > 8) {
-              if (longPressTimer.current) {
-                clearTimeout(longPressTimer.current);
-              }
-            }
-          } else {
-            // 드래그 중인 경우
-            dragPosition.setValue({ x: currentX - 70, y: currentY - 20 });
-            setDragCurrentCoords({ x: currentX, y: currentY });
-
-            // 호버 선반 추적
-            let hoverShelfId: string | null = null;
-            Object.keys(shelfLayouts.current).forEach(sId => {
-              const layout = shelfLayouts.current[sId];
-              if (layout) {
-                const inX = currentX >= layout.x && currentX <= layout.x + layout.width;
-                const inY = currentY >= layout.y && currentY <= layout.y + layout.height;
-                if (inX && inY) {
-                  hoverShelfId = sId;
-                }
-              }
-            });
-            setActiveHoverShelfId(hoverShelfId);
-
-            // 4문형 경계선 전환 검사
-            const switchTarget = getFourDoorSwitchTarget(compartmentId);
-            if (switchTarget && onNavigateCompartment) {
-              const now = Date.now();
-              if (now - lastSwappedTime.current > 1500) {
-                const isRightSide = compartmentId.includes('right');
-                const isLeftSide = compartmentId.includes('left');
-
-                if (isRightSide && currentX < 35) {
-                  lastSwappedTime.current = now;
-                  onNavigateCompartment(switchTarget.id, switchTarget.label);
-                  setTimeout(() => {
-                    measureShelves();
-                  }, 150);
-                }
-                else if (isLeftSide && currentX > screenWidth - 35) {
-                  lastSwappedTime.current = now;
-                  onNavigateCompartment(switchTarget.id, switchTarget.label);
-                  setTimeout(() => {
-                    measureShelves();
-                  }, 150);
-                }
-              }
-            }
-          }
-        },
-        onPanResponderRelease: (evt, gestureState) => {
-          if (longPressTimer.current) {
-            clearTimeout(longPressTimer.current);
-          }
-          setScrollEnabled(true);
-
-          if (isDraggingActive.current) {
-            handleDropIngredient(item, evt.nativeEvent.pageX, evt.nativeEvent.pageY);
-            setActiveHoverShelfId(null);
-          } else {
-            // 타이머 만료 전 손 뗌 -> 단순 탭
-            handleOpenShelfDetailModal(shelfId, shelfLabel);
-          }
-          isDraggingActive.current = false;
-        },
-        onPanResponderTerminate: () => {
-          if (longPressTimer.current) {
-            clearTimeout(longPressTimer.current);
-          }
-          setScrollEnabled(true);
-          setDraggingItem(null);
-          setActiveHoverShelfId(null);
-          isDraggingActive.current = false;
-        }
-      })
-    ).current;
-
-    return (
-      <View
-        {...badgePanResponder.panHandlers}
-        style={[
-          styles.itemBadge,
-          { borderLeftWidth: 3.5, borderLeftColor: dDay.color, paddingLeft: 8 },
-          isDraggingThis && { opacity: 0.15 }
-        ]}
-      >
-        <Text style={styles.itemText} numberOfLines={1}>
-          {emoji ? `${emoji} ` : ''}{item.name}
-        </Text>
-        <Text style={[styles.itemDDay, { color: dDay.color }]}>
-          {dDay.text}
-        </Text>
-      </View>
-    );
   };
 
   // 선반 동적 배열 상태 관리 (초기값은 비워두고 useEffect에서 로드)
@@ -1068,7 +1162,30 @@ export default function CompartmentDetail({
                           scrollEnabled={scrollEnabled}
                         >
                           {getItemsBySubLocation(shelf.id).map(item => (
-                            <DraggableBadge key={item.id} item={item} shelfId={shelf.id} shelfLabel={shelf.label} />
+                            <DraggableBadge
+                              key={item.id}
+                              item={item}
+                              shelfId={shelf.id}
+                              shelfLabel={shelf.label}
+                              draggingItem={draggingItem}
+                              setDraggingItem={setDraggingItem}
+                              dragPosition={dragPosition}
+                              setDragCurrentCoords={setDragCurrentCoords}
+                              setScrollEnabled={setScrollEnabled}
+                              setActiveHoverShelfId={setActiveHoverShelfId}
+                              compartmentId={compartmentId}
+                              onNavigateCompartment={onNavigateCompartment}
+                              handleOpenShelfDetailModal={handleOpenShelfDetailModal}
+                              measureShelves={measureShelves}
+                              shelfLayouts={shelfLayouts}
+                              lastSwappedTime={lastSwappedTime}
+                              screenWidth={screenWidth}
+                              theme={theme}
+                              styles={styles}
+                              handleDropIngredient={handleDropIngredient}
+                              getFourDoorSwitchTarget={getFourDoorSwitchTarget}
+                              getDDayInfo={getDDayInfo}
+                            />
                           ))}
                           {getItemsBySubLocation(shelf.id).length === 0 && (
                             <TouchableOpacity onPress={() => handleOpenShelfDetailModal(shelf.id, shelf.label)}>
@@ -1129,7 +1246,30 @@ export default function CompartmentDetail({
                             scrollEnabled={scrollEnabled}
                           >
                             {getItemsBySubLocation(shelf.id).map(item => (
-                              <DraggableBadge key={item.id} item={item} shelfId={shelf.id} shelfLabel={shelf.label} />
+                              <DraggableBadge
+                                key={item.id}
+                                item={item}
+                                shelfId={shelf.id}
+                                shelfLabel={shelf.label}
+                                draggingItem={draggingItem}
+                                setDraggingItem={setDraggingItem}
+                                dragPosition={dragPosition}
+                                setDragCurrentCoords={setDragCurrentCoords}
+                                setScrollEnabled={setScrollEnabled}
+                                setActiveHoverShelfId={setActiveHoverShelfId}
+                                compartmentId={compartmentId}
+                                onNavigateCompartment={onNavigateCompartment}
+                                handleOpenShelfDetailModal={handleOpenShelfDetailModal}
+                                measureShelves={measureShelves}
+                                shelfLayouts={shelfLayouts}
+                                lastSwappedTime={lastSwappedTime}
+                                screenWidth={screenWidth}
+                                theme={theme}
+                                styles={styles}
+                                handleDropIngredient={handleDropIngredient}
+                                getFourDoorSwitchTarget={getFourDoorSwitchTarget}
+                                getDDayInfo={getDDayInfo}
+                              />
                             ))}
                             {getItemsBySubLocation(shelf.id).length === 0 && (
                               <TouchableOpacity onPress={() => handleOpenShelfDetailModal(shelf.id, shelf.label)}>
