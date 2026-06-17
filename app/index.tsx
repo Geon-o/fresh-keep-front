@@ -655,11 +655,11 @@ export default function Index() {
             </View>
             <RefrigeratorSelector
               currentType={selectorMode === 'edit' && activeFridge ? activeFridge.type : undefined}
-              onSelect={(selectedType) => {
+              onSelect={async (selectedType) => {
                 if (selectorMode === 'add') {
-                  handleAddFridge(selectedType);
+                  await handleAddFridge(selectedType);
                 } else if (activeFridge) {
-                  handleChangeFridgeType(activeFridge.id, selectedType);
+                  await handleChangeFridgeType(activeFridge.id, selectedType);
                 }
                 setSelectorVisible(false);
               }}
