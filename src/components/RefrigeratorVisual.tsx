@@ -1149,21 +1149,23 @@ export default function RefrigeratorVisual({
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* 1. 상단 얇고 구분선 없는 브랜드 헤더바 */}
-      <View style={[styles.slimHeader, { backgroundColor: theme.background }]}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.headerLogoText}>
-            <Text style={{ color: theme.textPrimary }}>Fresh</Text>
-            <Text style={{ color: theme.primaryText }}>Keep</Text>
-          </Text>
+      {mode === 'home' && (
+        <View style={[styles.slimHeader, { backgroundColor: theme.background }]}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.headerLogoText}>
+              <Text style={{ color: theme.textPrimary }}>Fresh</Text>
+              <Text style={{ color: theme.primaryText }}>Keep</Text>
+            </Text>
+          </View>
+          <View style={styles.headerRight}>
+            {totalExpired > 0 && (
+              <View style={[styles.headerBadge, { backgroundColor: theme.ddayExpired }]}>
+                <Text style={styles.headerBadgeText}>🚨 {totalExpired}</Text>
+              </View>
+            )}
+          </View>
         </View>
-        <View style={styles.headerRight}>
-          {totalExpired > 0 && (
-            <View style={[styles.headerBadge, { backgroundColor: theme.ddayExpired }]}>
-              <Text style={styles.headerBadgeText}>🚨 {totalExpired}</Text>
-            </View>
-          )}
-        </View>
-      </View>
+      )}
 
       {mode === 'home' && (
         <ScrollView
@@ -1454,9 +1456,9 @@ export default function RefrigeratorVisual({
           contentContainerStyle={[styles.dashboardContent, { paddingBottom: 80 }]}
           showsVerticalScrollIndicator={false}
         >
+          <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>나의 냉장고 🧊</Text>
           {/* 나의 냉장고 보관소 */}
-          <View style={[styles.sectionContainer, { marginTop: 10 }]}>
-            <Text style={[styles.sectionTitle, { color: theme.textPrimary, marginBottom: 12 }]}>나의 냉장고 보관소 🧊</Text>
+          <View style={[styles.sectionContainer, { marginTop: 0 }]}>
             <View style={styles.carouselWrapper}>
               <ScrollView
                 horizontal
@@ -1530,6 +1532,7 @@ export default function RefrigeratorVisual({
 
       {mode === 'ingredients' && (
         <View style={{ flex: 1 }}>
+          <Text style={[styles.pageTitle, { color: theme.textPrimary, paddingTop: 16 }]}>식재료 보관 팁 💡</Text>
           {/* 검색 바 */}
           <View style={[styles.searchContainer, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderLight }]}>
             <Ionicons name="search" size={18} color={theme.textTertiary} />
@@ -2638,5 +2641,12 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: 'bold',
     flex: 1,
+  },
+  pageTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    paddingHorizontal: 20,
+    marginBottom: 20,
+    letterSpacing: -0.5,
   },
 });
