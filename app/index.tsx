@@ -29,8 +29,9 @@ export default function Index() {
     spinner: theme.splashSpinner,
   };
 
-  // 탭바 배경 색상 반전에 따른 비활성화 아이콘 색상 설정
-  const inactiveIconColor = isDark ? 'rgba(15, 23, 42, 0.4)' : 'rgba(255, 255, 255, 0.45)';
+  // 탭바 테마별 색상 설정 (라이트: 검정배경+하늘색아이콘, 다크: 화이트배경+다크아이콘)
+  const activeTabColor = isDark ? '#0F172A' : '#BBDEFB';
+  const inactiveTabColor = isDark ? 'rgba(15, 23, 42, 0.4)' : 'rgba(255, 255, 255, 0.45)';
 
   // 1. 네비게이션 및 활성 인덱스 상태
   const [activeTab, setActiveTab] = useState<'home' | 'ingredients' | 'fridge' | 'settings'>('home');
@@ -244,33 +245,33 @@ export default function Index() {
   });
 
   // 탭바 스프링 애니메이션 (햅틱 반응형 피드백)
-  const homeTabScale = React.useRef(new Animated.Value(1.12)).current;
-  const ingredientsTabScale = React.useRef(new Animated.Value(0.95)).current;
-  const fridgeTabScale = React.useRef(new Animated.Value(0.95)).current;
-  const settingsTabScale = React.useRef(new Animated.Value(0.95)).current;
+  const homeTabScale = React.useRef(new Animated.Value(1.05)).current;
+  const ingredientsTabScale = React.useRef(new Animated.Value(1.0)).current;
+  const fridgeTabScale = React.useRef(new Animated.Value(1.0)).current;
+  const settingsTabScale = React.useRef(new Animated.Value(1.0)).current;
 
   useEffect(() => {
     Animated.parallel([
       Animated.spring(homeTabScale, {
-        toValue: activeTab === 'home' ? 1.12 : 0.95,
+        toValue: activeTab === 'home' ? 1.05 : 1.0,
         friction: 6,
         tension: 80,
         useNativeDriver: true,
       }),
       Animated.spring(ingredientsTabScale, {
-        toValue: activeTab === 'ingredients' ? 1.12 : 0.95,
+        toValue: activeTab === 'ingredients' ? 1.05 : 1.0,
         friction: 6,
         tension: 80,
         useNativeDriver: true,
       }),
       Animated.spring(fridgeTabScale, {
-        toValue: activeTab === 'fridge' ? 1.12 : 0.95,
+        toValue: activeTab === 'fridge' ? 1.05 : 1.0,
         friction: 6,
         tension: 80,
         useNativeDriver: true,
       }),
       Animated.spring(settingsTabScale, {
-        toValue: activeTab === 'settings' ? 1.12 : 0.95,
+        toValue: activeTab === 'settings' ? 1.05 : 1.0,
         friction: 6,
         tension: 80,
         useNativeDriver: true,
@@ -515,84 +516,94 @@ export default function Index() {
           </View>
 
           {/* 하단 탭 바 (Bottom Navigation Bar) */}
-          <View style={styles.tabBarContainer}>
-            <View style={[styles.tabBar, { 
-              backgroundColor: isDark ? '#FFFFFF' : '#0F172A',
-              borderColor: isDark ? 'rgba(15, 23, 42, 0.08)' : 'rgba(255, 255, 255, 0.08)',
-              shadowColor: theme.shadow
-            }]}>
-              {/* 홈 */}
-              <Animated.View style={{ transform: [{ scale: homeTabScale }] }}>
-                <TouchableOpacity
-                  style={[
-                    styles.tabItem, 
-                    activeTab === 'home' && [styles.tabItemActive, { backgroundColor: theme.primary }]
-                  ]}
-                  activeOpacity={0.7}
-                  onPress={() => setActiveTab('home')}
-                >
-                  <Ionicons
-                    name={activeTab === 'home' ? 'home' : 'home-outline'}
-                    size={24}
-                    color={activeTab === 'home' ? theme.primaryOnPrimary : inactiveIconColor}
-                  />
-                </TouchableOpacity>
-              </Animated.View>
+          <View style={[styles.tabBar, { 
+            backgroundColor: isDark ? '#FFFFFF' : '#0F172A',
+            borderTopColor: isDark ? 'rgba(15, 23, 42, 0.06)' : 'rgba(255, 255, 255, 0.08)',
+            borderTopWidth: 1,
+          }]}>
+            {/* 홈 */}
+            <Animated.View style={{ transform: [{ scale: homeTabScale }], flex: 1 }}>
+              <TouchableOpacity
+                style={styles.tabItem}
+                activeOpacity={0.7}
+                onPress={() => setActiveTab('home')}
+              >
+                <Ionicons
+                  name={activeTab === 'home' ? 'home' : 'home-outline'}
+                  size={20}
+                  color={activeTab === 'home' ? activeTabColor : inactiveTabColor}
+                />
+                <Text style={[
+                  styles.tabLabel,
+                  { color: activeTab === 'home' ? activeTabColor : inactiveTabColor }
+                ]}>
+                  홈
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
 
-              {/* 식재료 목록 */}
-              <Animated.View style={{ transform: [{ scale: ingredientsTabScale }] }}>
-                <TouchableOpacity
-                  style={[
-                    styles.tabItem, 
-                    activeTab === 'ingredients' && [styles.tabItemActive, { backgroundColor: theme.primary }]
-                  ]}
-                  activeOpacity={0.7}
-                  onPress={() => setActiveTab('ingredients')}
-                >
-                  <Ionicons
-                    name={activeTab === 'ingredients' ? 'restaurant' : 'restaurant-outline'}
-                    size={24}
-                    color={activeTab === 'ingredients' ? theme.primaryOnPrimary : inactiveIconColor}
-                  />
-                </TouchableOpacity>
-              </Animated.View>
+            {/* 식재료 목록 */}
+            <Animated.View style={{ transform: [{ scale: ingredientsTabScale }], flex: 1 }}>
+              <TouchableOpacity
+                style={styles.tabItem}
+                activeOpacity={0.7}
+                onPress={() => setActiveTab('ingredients')}
+              >
+                <Ionicons
+                  name={activeTab === 'ingredients' ? 'restaurant' : 'restaurant-outline'}
+                  size={20}
+                  color={activeTab === 'ingredients' ? activeTabColor : inactiveTabColor}
+                />
+                <Text style={[
+                  styles.tabLabel,
+                  { color: activeTab === 'ingredients' ? activeTabColor : inactiveTabColor }
+                ]}>
+                  식재료
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
 
-              {/* 냉장고 보관소 */}
-              <Animated.View style={{ transform: [{ scale: fridgeTabScale }] }}>
-                <TouchableOpacity
-                  style={[
-                    styles.tabItem, 
-                    activeTab === 'fridge' && [styles.tabItemActive, { backgroundColor: theme.primary }]
-                  ]}
-                  activeOpacity={0.7}
-                  onPress={() => setActiveTab('fridge')}
-                >
-                  <Ionicons
-                    name={activeTab === 'fridge' ? 'cube' : 'cube-outline'}
-                    size={24}
-                    color={activeTab === 'fridge' ? theme.primaryOnPrimary : inactiveIconColor}
-                  />
-                </TouchableOpacity>
-              </Animated.View>
+            {/* 냉장고 보관소 */}
+            <Animated.View style={{ transform: [{ scale: fridgeTabScale }], flex: 1 }}>
+              <TouchableOpacity
+                style={styles.tabItem}
+                activeOpacity={0.7}
+                onPress={() => setActiveTab('fridge')}
+              >
+                <Ionicons
+                  name={activeTab === 'fridge' ? 'cube' : 'cube-outline'}
+                  size={20}
+                  color={activeTab === 'fridge' ? activeTabColor : inactiveTabColor}
+                />
+                <Text style={[
+                  styles.tabLabel,
+                  { color: activeTab === 'fridge' ? activeTabColor : inactiveTabColor }
+                ]}>
+                  냉장고
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
 
-              {/* 설정 */}
-              <Animated.View style={{ transform: [{ scale: settingsTabScale }] }}>
-                <TouchableOpacity
-                  style={[
-                    styles.tabItem, 
-                    activeTab === 'settings' && [styles.tabItemActive, { backgroundColor: theme.primary }]
-                  ]}
-                  activeOpacity={0.7}
-                  onPress={() => setActiveTab('settings')}
-                >
-                  <Ionicons
-                    name={activeTab === 'settings' ? 'settings' : 'settings-outline'}
-                    size={24}
-                    color={activeTab === 'settings' ? theme.primaryOnPrimary : inactiveIconColor}
-                  />
-                </TouchableOpacity>
-              </Animated.View>
-            </View>
+            {/* 설정 */}
+            <Animated.View style={{ transform: [{ scale: settingsTabScale }], flex: 1 }}>
+              <TouchableOpacity
+                style={styles.tabItem}
+                activeOpacity={0.7}
+                onPress={() => setActiveTab('settings')}
+              >
+                <Ionicons
+                  name={activeTab === 'settings' ? 'settings' : 'settings-outline'}
+                  size={20}
+                  color={activeTab === 'settings' ? activeTabColor : inactiveTabColor}
+                />
+                <Text style={[
+                  styles.tabLabel,
+                  { color: activeTab === 'settings' ? activeTabColor : inactiveTabColor }
+                ]}>
+                  설정
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
           </View>
         </View>
       )}
@@ -788,39 +799,27 @@ const styles = StyleSheet.create({
   contentWrapper: {
     flex: 1,
   },
-  tabBarContainer: {
-    position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 32 : 24,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
-  },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
-    borderRadius: 30,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(226, 232, 240, 0.8)',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 8,
+    width: '100%',
+    height: Platform.OS === 'ios' ? 78 : 66,
+    borderTopWidth: 1,
+    paddingBottom: Platform.OS === 'ios' ? 18 : 6,
+    paddingTop: 8,
+    justifyContent: 'space-around',
     alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 10,
   },
   tabItem: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    flex: 1,
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 4,
     backgroundColor: 'transparent',
-    overflow: 'hidden',
     ...Platform.select({
       web: {
         outlineStyle: 'none',
@@ -828,8 +827,11 @@ const styles = StyleSheet.create({
       } as any,
     }),
   },
-  tabItemActive: {
-    backgroundColor: '#4F46E5',
+  tabLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 4,
+    letterSpacing: -0.3,
   },
   selectorModalOverlay: {
     flex: 1,
