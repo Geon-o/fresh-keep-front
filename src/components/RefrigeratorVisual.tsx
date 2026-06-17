@@ -288,7 +288,7 @@ export default function RefrigeratorVisual({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'expired' | 'imminent' | 'safe'>('all');
 
-  // 보관 가이드 모달 상태
+  // 보관 팁 모달 상태
   const [guideModalVisible, setGuideModalVisible] = useState(false);
   const [guideSearchQuery, setGuideSearchQuery] = useState('');
   const [guideSelectedCategory, setGuideSelectedCategory] = useState<string>('all');
@@ -299,7 +299,7 @@ export default function RefrigeratorVisual({
   const [guideError, setGuideError] = useState<string | null>(null);
   const typingTimeoutRef = useRef<any>(null);
 
-  // 가이드북용 필터링 로직 (검색어가 없으면 로컬 데이터셋, 검색어가 있으면 실시간 검색 결과 매핑)
+  // 보관 팁용 필터링 로직 (검색어가 없으면 로컬 데이터셋, 검색어가 있으면 실시간 검색 결과 매핑)
   const filteredTips = !guideSearchQuery.trim()
     ? STORAGE_TIPS.filter(tip => guideSelectedCategory === 'all' || tip.category === guideSelectedCategory)
     : apiGuides.filter(tip => guideSelectedCategory === 'all' || tip.category === guideSelectedCategory);
@@ -724,7 +724,7 @@ export default function RefrigeratorVisual({
     }
   };
 
-  // AI 하이브리드 가이드북 실시간 검색 처리
+  // AI 하이브리드 보관 팁 실시간 검색 처리
   const handleSearchGuide = async () => {
     const cleanQuery = guideSearchQuery.trim();
     if (!cleanQuery) {
@@ -1166,7 +1166,7 @@ export default function RefrigeratorVisual({
             )}
           </View>
 
-          {/* 가이드북 퀵 배너 (컴팩트 버전) */}
+          {/* 보관 팁 퀵 배너 (컴팩트 버전) */}
           <TouchableOpacity
             style={[
               styles.guideBannerCompact, 
@@ -1184,14 +1184,14 @@ export default function RefrigeratorVisual({
             }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <Text style={{ fontSize: 24 }}>📖</Text>
+              <Text style={{ fontSize: 24 }}>💡</Text>
               <View>
-                <Text style={[styles.guideBannerTitleCompact, { color: theme.textPrimary }]}>식재료 보관 가이드북</Text>
+                <Text style={[styles.guideBannerTitleCompact, { color: theme.textPrimary }]}>식재료 보관 팁</Text>
                 <Text style={{ fontSize: 11, color: theme.textTertiary, marginTop: 1 }}>최적의 보관법을 검색해 보세요!</Text>
               </View>
             </View>
             <View style={[styles.guideBannerButtonCompact, { backgroundColor: theme.primary }]}>
-              <Text style={{ color: theme.primaryOnPrimary, fontSize: 11, fontWeight: 'bold' }}>가이드북 열기</Text>
+              <Text style={{ color: theme.primaryOnPrimary, fontSize: 11, fontWeight: 'bold' }}>보관 팁 보기</Text>
               <Ionicons name="chevron-forward" size={12} color={theme.primaryOnPrimary} />
             </View>
           </TouchableOpacity>
@@ -1539,7 +1539,7 @@ export default function RefrigeratorVisual({
         </View>
       )}
 
-      {/* 보관 가이드북 모달 */}
+      {/* 보관 팁 모달 */}
       <Modal
         visible={guideModalVisible}
         animationType="slide"
@@ -1552,8 +1552,8 @@ export default function RefrigeratorVisual({
           {/* 모달 헤더 */}
           <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
             <View style={styles.modalHeaderTitleRow}>
-              <Text style={{ fontSize: 20 }}>📖</Text>
-              <Text style={[styles.modalHeaderTitle, { color: theme.textPrimary }]}>식재료 보관 가이드북</Text>
+              <Text style={{ fontSize: 20 }}>💡</Text>
+              <Text style={[styles.modalHeaderTitle, { color: theme.textPrimary }]}>식재료 보관 팁</Text>
             </View>
             <TouchableOpacity
               style={[styles.modalCloseButton, { backgroundColor: theme.surfaceSecondary }]}
@@ -1567,7 +1567,7 @@ export default function RefrigeratorVisual({
 
           {/* 모달 바디 */}
           <View style={{ flex: 1 }}>
-            {/* 가이드북용 검색창 */}
+            {/* 보관 팁용 검색창 */}
             <View style={[styles.searchContainer, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderLight, marginTop: 16 }]}>
               <Ionicons name="search" size={18} color={theme.textTertiary} />
               <TextInput
@@ -1606,7 +1606,7 @@ export default function RefrigeratorVisual({
               </TouchableOpacity>
             </View>
 
-            {/* 가이드북용 카테고리 필터 칩 */}
+            {/* 보관 팁용 카테고리 필터 칩 */}
             <View style={[styles.filterContainer, { height: 38 }]}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
                 {['all', '채소', '과일', '육류/수산', '유제품', '기타'].map((cat) => {
@@ -1647,7 +1647,7 @@ export default function RefrigeratorVisual({
               </View>
             )}
 
-            {/* 가이드 리스트 */}
+            {/* 보관 팁 리스트 */}
             {!isGuideLoading && (
               filteredTips.length > 0 ? (
                 <FlatList
