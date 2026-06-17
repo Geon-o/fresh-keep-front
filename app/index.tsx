@@ -19,7 +19,7 @@ export default function Index() {
   const { isLoggedIn, user, logout } = useAuth();
   const queryClient = useQueryClient();
   const router = useRouter();
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
 
   const splashTheme = {
     background: theme.splashBg,
@@ -28,6 +28,9 @@ export default function Index() {
     icon: theme.splashIcon,
     spinner: theme.splashSpinner,
   };
+
+  // 탭바 배경 색상 반전에 따른 비활성화 아이콘 색상 설정
+  const inactiveIconColor = isDark ? 'rgba(15, 23, 42, 0.4)' : 'rgba(255, 255, 255, 0.45)';
 
   // 1. 네비게이션 및 활성 인덱스 상태
   const [activeTab, setActiveTab] = useState<'home' | 'ingredients' | 'fridge' | 'settings'>('home');
@@ -514,8 +517,8 @@ export default function Index() {
           {/* 하단 탭 바 (Bottom Navigation Bar) */}
           <View style={styles.tabBarContainer}>
             <View style={[styles.tabBar, { 
-              backgroundColor: theme.glassBg,
-              borderColor: theme.glassBorder,
+              backgroundColor: isDark ? '#FFFFFF' : '#0F172A',
+              borderColor: isDark ? 'rgba(15, 23, 42, 0.08)' : 'rgba(255, 255, 255, 0.08)',
               shadowColor: theme.shadow
             }]}>
               {/* 홈 */}
@@ -531,7 +534,7 @@ export default function Index() {
                   <Ionicons
                     name={activeTab === 'home' ? 'home' : 'home-outline'}
                     size={24}
-                    color={activeTab === 'home' ? theme.primaryOnPrimary : theme.tabIconInactive}
+                    color={activeTab === 'home' ? theme.primaryOnPrimary : inactiveIconColor}
                   />
                 </TouchableOpacity>
               </Animated.View>
@@ -549,7 +552,7 @@ export default function Index() {
                   <Ionicons
                     name={activeTab === 'ingredients' ? 'restaurant' : 'restaurant-outline'}
                     size={24}
-                    color={activeTab === 'ingredients' ? theme.primaryOnPrimary : theme.tabIconInactive}
+                    color={activeTab === 'ingredients' ? theme.primaryOnPrimary : inactiveIconColor}
                   />
                 </TouchableOpacity>
               </Animated.View>
@@ -567,7 +570,7 @@ export default function Index() {
                   <Ionicons
                     name={activeTab === 'fridge' ? 'cube' : 'cube-outline'}
                     size={24}
-                    color={activeTab === 'fridge' ? theme.primaryOnPrimary : theme.tabIconInactive}
+                    color={activeTab === 'fridge' ? theme.primaryOnPrimary : inactiveIconColor}
                   />
                 </TouchableOpacity>
               </Animated.View>
@@ -585,7 +588,7 @@ export default function Index() {
                   <Ionicons
                     name={activeTab === 'settings' ? 'settings' : 'settings-outline'}
                     size={24}
-                    color={activeTab === 'settings' ? theme.primaryOnPrimary : theme.tabIconInactive}
+                    color={activeTab === 'settings' ? theme.primaryOnPrimary : inactiveIconColor}
                   />
                 </TouchableOpacity>
               </Animated.View>
