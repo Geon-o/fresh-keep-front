@@ -931,7 +931,7 @@ export default function CompartmentDetail({
         ]}
         activeOpacity={0.7}
         onPress={() => handleOpenShelfDetailModal(shelfId, shelfLabel)}
-        delayLongPress={1500}
+        delayLongPress={1000}
         onLongPress={(e) => startDrag(item, e.nativeEvent.pageX, e.nativeEvent.pageY)}
       >
         <Text style={styles.itemText} numberOfLines={1}>
