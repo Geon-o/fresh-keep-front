@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Modal, TouchableOpacity, Text, Alert, Platform, TextInput, KeyboardAvoidingView, ActivityIndicator, Animated, Easing } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { StyleSheet, View, Modal, TouchableOpacity, Text, Alert, Platform, TextInput, KeyboardAvoidingView, ActivityIndicator, Animated, Easing, BackHandler, ToastAndroid } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
@@ -45,6 +45,55 @@ export default function Index() {
   const [localRefrigerators, setLocalRefrigerators] = useState<{ id: string; type: FridgeType; name: string }[]>([]);
   const [isLocalLoading, setIsLocalLoading] = useState(true);
   const [activeCompartment, setActiveCompartment] = useState<{ id: string; label: string; fridgeId: string } | null>(null);
+
+  // 하드웨어 뒤로가기(BackHandler) 처리
+  const activeTabRef = useRef(activeTab);
+  const activeCompartmentRef = useRef(activeCompartment);
+  const backPressedTimeRef = useRef(0);
+
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
+
+  useEffect(() => {
+    activeCompartmentRef.current = activeCompartment;
+  }, [activeCompartment]);
+
+  useEffect(() => {
+    const handleBackButton = () => {
+      // 1. 구획 상세(CompartmentDetail)가 열려있다면 구획 닫기
+      if (activeCompartmentRef.current !== null) {
+        setActiveCompartment(null);
+        return true;
+      }
+
+      // 2. 홈 탭이 아닌 다른 탭에 있다면 홈 탭으로 이동
+      if (activeTabRef.current !== 'home') {
+        setActiveTab('home');
+        return true;
+      }
+
+      // 3. 홈 탭에 있는 상태에서 뒤로가기 누를 때
+      const now = Date.now();
+      if (now - backPressedTimeRef.current < 2000) {
+        // 2초 안에 한번 더 누르면 앱 종료
+        BackHandler.exitApp();
+        return true;
+      } else {
+        backPressedTimeRef.current = now;
+        if (Platform.OS === 'android') {
+          ToastAndroid.show('한 번 더 누르면 앱이 종료됩니다.', ToastAndroid.SHORT);
+        }
+        return true;
+      }
+    };
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', handleBackButton);
+
+    return () => {
+      backHandler.remove();
+    };
+  }, []);
 
   // 4. 서버 모드 냉장고 목록 조회 (로그인 시에만 활성화)
   const { data: serverFridges, isLoading: isServerLoading } = useQuery({
