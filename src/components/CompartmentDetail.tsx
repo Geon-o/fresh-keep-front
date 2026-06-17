@@ -351,6 +351,10 @@ export default function CompartmentDetail({
   const { theme } = useTheme();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
 
+  // 부모의 비동기 리렌더링 props 딜레이를 우회하기 위한 로컬 compartmentId 동기 레퍼런스
+  const currentCompartmentIdRef = useRef(compartmentId);
+  currentCompartmentIdRef.current = compartmentId;
+
   // 드래그 앤 드롭 제스처 관련 상태
   const [draggingItem, setDraggingItem] = useState<Ingredient | null>(null);
   const dragPosition = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
@@ -412,14 +416,14 @@ export default function CompartmentDetail({
 
   const latestParentProps = useRef({
     draggingItem,
-    compartmentId,
+    compartmentId: currentCompartmentIdRef.current,
     handleDropIngredient,
   });
 
   // 매 렌더링 시 동기적으로 최신 값 갱신 (useEffect에 의한 제스처 비동기 갱신 딜레이 해결)
   latestParentProps.current = {
     draggingItem,
-    compartmentId,
+    compartmentId: currentCompartmentIdRef.current,
     handleDropIngredient,
   };
 
@@ -464,6 +468,7 @@ export default function CompartmentDetail({
 
             if (isRightSide && currentX < 35) {
               lastSwappedTime.current = now;
+              currentCompartmentIdRef.current = switchTarget.id; // 즉시 로컬 Ref 갱신하여 딜레이 제거
               onNavigateCompartment(switchTarget.id, switchTarget.label);
               setTimeout(() => {
                 measureShelves();
@@ -471,6 +476,7 @@ export default function CompartmentDetail({
             }
             else if (isLeftSide && currentX > screenWidth - 35) {
               lastSwappedTime.current = now;
+              currentCompartmentIdRef.current = switchTarget.id; // 즉시 로컬 Ref 갱신하여 딜레이 제거
               onNavigateCompartment(switchTarget.id, switchTarget.label);
               setTimeout(() => {
                 measureShelves();
