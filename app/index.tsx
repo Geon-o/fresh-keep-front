@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, Modal, TouchableOpacity, Text, Alert, Platform, TextInput, KeyboardAvoidingView, ActivityIndicator, Animated, Easing, BackHandler } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -20,6 +20,7 @@ export default function Index() {
   const queryClient = useQueryClient();
   const router = useRouter();
   const { theme, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const splashTheme = {
     background: theme.splashBg,
@@ -480,14 +481,16 @@ export default function Index() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top', 'left', 'right']}>
       {activeCompartment !== null ? (
-        <CompartmentDetail
-          compartmentId={activeCompartment.id}
-          compartmentLabel={activeCompartment.label}
-          onBack={() => setActiveCompartment(null)}
-          fridgeId={activeCompartment.fridgeId}
-        />
+        <SafeAreaView style={{ flex: 1 }} edges={['bottom']}>
+          <CompartmentDetail
+            compartmentId={activeCompartment.id}
+            compartmentLabel={activeCompartment.label}
+            onBack={() => setActiveCompartment(null)}
+            fridgeId={activeCompartment.fridgeId}
+          />
+        </SafeAreaView>
       ) : (
         <View style={styles.mainWrapper}>
           {/* 상단 탭 콘텐츠 */}
@@ -520,6 +523,7 @@ export default function Index() {
             backgroundColor: isDark ? '#0F172A' : '#FFFFFF',
             borderTopColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.06)',
             borderTopWidth: 1,
+            paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
           }]}>
             {/* 홈 */}
             <Animated.View style={{ transform: [{ scale: homeTabScale }], flex: 1 }}>
@@ -802,12 +806,10 @@ const styles = StyleSheet.create({
   tabBar: {
     flexDirection: 'row',
     width: '100%',
-    height: Platform.OS === 'ios' ? 70 : 58,
     borderTopWidth: 1,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    paddingBottom: Platform.OS === 'ios' ? 12 : 4,
-    paddingTop: 6,
+    paddingTop: 8,
     justifyContent: 'space-around',
     alignItems: 'center',
     shadowColor: '#000000',
@@ -822,6 +824,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
+    paddingVertical: 6,
     ...Platform.select({
       web: {
         outlineStyle: 'none',
