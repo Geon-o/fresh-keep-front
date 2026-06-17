@@ -1241,48 +1241,53 @@ export default function RefrigeratorVisual({
             </View>
 
             {urgentIngredients.length > 0 ? (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.urgentScrollContainer}
-              >
-                {urgentIngredients.map(item => {
-                  const dday = getDDayInfo(item.expiryDate);
-                  const emoji = CATEGORY_EMOJI[item.category] || '📦';
-                  const fridge = refrigerators.find(r => r.id === item.fridgeId);
-                  const locationLabel = getCompartmentLabel(item.location);
+              <View style={styles.urgentListContainer}>
+                <ScrollView
+                  nestedScrollEnabled={true}
+                  showsVerticalScrollIndicator={true}
+                  contentContainerStyle={{ gap: 8 }}
+                >
+                  {urgentIngredients.map(item => {
+                    const dday = getDDayInfo(item.expiryDate);
+                    const emoji = CATEGORY_EMOJI[item.category] || '📦';
+                    const fridge = refrigerators.find(r => r.id === item.fridgeId);
+                    const locationLabel = getCompartmentLabel(item.location);
 
-                  return (
-                    <TouchableOpacity
-                      key={item.id}
-                      style={[
-                        styles.urgentCard, 
-                        { 
-                          backgroundColor: theme.surface, 
-                          borderColor: theme.borderLight, 
-                          shadowColor: theme.shadow,
-                          borderTopColor: dday.color
-                        }
-                      ]}
-                      activeOpacity={0.8}
-                      onPress={() => onPressCompartment(item.location, locationLabel, item.fridgeId || '')}
-                    >
-                      <View style={[styles.urgentEmojiBadge, { backgroundColor: theme.surfaceTertiary }]}>
-                        <Text style={styles.urgentEmoji}>{emoji}</Text>
-                      </View>
-                      <Text style={[styles.urgentName, { color: theme.textPrimary }]} numberOfLines={1}>
-                        {item.name}
-                      </Text>
-                      <Text style={[styles.urgentLocation, { color: theme.textMuted }]} numberOfLines={1}>
-                        {`${fridge ? fridge.name : '냉장고'} > ${locationLabel}`}
-                      </Text>
-                      <View style={[styles.urgentDDayBadge, { backgroundColor: dday.color + '12', borderColor: dday.color }]}>
-                        <Text style={[styles.urgentDDayText, { color: dday.color }]}>{dday.text}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
+                    return (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={[
+                          styles.urgentListItem, 
+                          { 
+                            backgroundColor: theme.surface, 
+                            borderColor: theme.borderLight, 
+                            shadowColor: theme.shadow,
+                          }
+                        ]}
+                        activeOpacity={0.8}
+                        onPress={() => onPressCompartment(item.location, locationLabel, item.fridgeId || '')}
+                      >
+                        <View style={styles.urgentListLeft}>
+                          <View style={[styles.urgentListEmojiBg, { backgroundColor: theme.surfaceTertiary }]}>
+                            <Text style={styles.urgentListEmoji}>{emoji}</Text>
+                          </View>
+                          <View style={styles.urgentListInfo}>
+                            <Text style={[styles.urgentListName, { color: theme.textPrimary }]} numberOfLines={1}>
+                              {item.name}
+                            </Text>
+                            <Text style={[styles.urgentListLocation, { color: theme.textMuted }]} numberOfLines={1}>
+                              {`${fridge ? fridge.name : '냉장고'} > ${locationLabel}`}
+                            </Text>
+                          </View>
+                        </View>
+                        <View style={[styles.urgentListDDayBadge, { backgroundColor: dday.color + '12', borderColor: dday.color }]}>
+                          <Text style={[styles.urgentListDDayText, { color: dday.color }]}>{dday.text}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
             ) : (
               <View style={[styles.emptyUrgentCard, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
                 <Ionicons name="sparkles" size={24} color={theme.success} style={{ marginBottom: 4 }} />
@@ -1836,6 +1841,59 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     gap: 12,
     paddingBottom: 8,
+  },
+  urgentListContainer: {
+    paddingHorizontal: 20,
+    maxHeight: 220,
+  },
+  urgentListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 12,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  urgentListLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  urgentListEmojiBg: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  urgentListEmoji: {
+    fontSize: 18,
+  },
+  urgentListInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  urgentListName: {
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  urgentListLocation: {
+    fontSize: 10,
+  },
+  urgentListDDayBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  urgentListDDayText: {
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   urgentCard: {
     width: 140,
