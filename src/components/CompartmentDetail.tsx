@@ -363,17 +363,66 @@ export default function CompartmentDetail({
   const lastSwappedTime = useRef<number>(0);
   const screenWidth = Dimensions.get('window').width;
 
+  // 드래그 완료 처리 (드롭)
+  const handleDropIngredient = async (item: Ingredient, dropX: number, dropY: number) => {
+    let droppedShelfId: string | null = null;
+    
+    // 선반 좌표 매칭 루프
+    Object.keys(shelfLayouts.current).forEach(shelfId => {
+      const layout = shelfLayouts.current[shelfId];
+      if (layout) {
+        const inX = dropX >= layout.x && dropX <= layout.x + layout.width;
+        const inY = dropY >= layout.y && dropY <= layout.y + layout.height;
+        if (inX && inY) {
+          droppedShelfId = shelfId;
+        }
+      }
+    });
+
+    if (droppedShelfId && onMoveIngredient) {
+      const targetShelf = droppedShelfId;
+      // 1. 화면 즉시 반영 (낙관적 업데이트)
+      setIngredients(prev => prev.map(ing => 
+        ing.id === item.id 
+          ? { ...ing, location: compartmentId, subLocation: targetShelf as any } 
+          : ing
+      ));
+      
+      // 2. 부모 콜백 호출 (서버/로컬 저장소 저장)
+      try {
+        await onMoveIngredient(
+          item.id,
+          compartmentId,
+          targetShelf,
+          item.category,
+          item.memo || '',
+          item.name,
+          item.quantity,
+          item.unit,
+          item.expiryDate
+        );
+      } catch (error) {
+        console.error('Failed to move ingredient:', error);
+        Alert.alert('이동 실패 ⚠️', '식재료 위치를 변경하는 중 오류가 발생했습니다.');
+      }
+    }
+    
+    setDraggingItem(null);
+  };
+
   const latestParentProps = useRef({
     draggingItem,
     compartmentId,
+    handleDropIngredient,
   });
 
   useEffect(() => {
     latestParentProps.current = {
       draggingItem,
       compartmentId,
+      handleDropIngredient,
     };
-  }, [draggingItem, compartmentId]);
+  }, [draggingItem, compartmentId, handleDropIngredient]);
 
   // 부모 루트용 PanResponder (드래그 활성화 시 제스처 캡처 및 좌표 갱신 담당)
   const parentPanResponder = useRef(
@@ -435,7 +484,7 @@ export default function CompartmentDetail({
         const props = latestParentProps.current;
         if (!props.draggingItem) return;
         setScrollEnabled(true);
-        handleDropIngredient(props.draggingItem, evt.nativeEvent.pageX, evt.nativeEvent.pageY);
+        props.handleDropIngredient(props.draggingItem, evt.nativeEvent.pageX, evt.nativeEvent.pageY);
         setActiveHoverShelfId(null);
       },
       onPanResponderTerminate: () => {
@@ -467,52 +516,7 @@ export default function CompartmentDetail({
     });
   };
 
-  // 드래그 완료 처리 (드롭)
-  const handleDropIngredient = async (item: Ingredient, dropX: number, dropY: number) => {
-    let droppedShelfId: string | null = null;
-    
-    // 선반 좌표 매칭 루프
-    Object.keys(shelfLayouts.current).forEach(shelfId => {
-      const layout = shelfLayouts.current[shelfId];
-      if (layout) {
-        const inX = dropX >= layout.x && dropX <= layout.x + layout.width;
-        const inY = dropY >= layout.y && dropY <= layout.y + layout.height;
-        if (inX && inY) {
-          droppedShelfId = shelfId;
-        }
-      }
-    });
 
-    if (droppedShelfId && onMoveIngredient) {
-      const targetShelf = droppedShelfId;
-      // 1. 화면 즉시 반영 (낙관적 업데이트)
-      setIngredients(prev => prev.map(ing => 
-        ing.id === item.id 
-          ? { ...ing, location: compartmentId, subLocation: targetShelf as any } 
-          : ing
-      ));
-      
-      // 2. 부모 콜백 호출 (서버/로컬 저장소 저장)
-      try {
-        await onMoveIngredient(
-          item.id,
-          compartmentId,
-          targetShelf,
-          item.category,
-          item.memo || '',
-          item.name,
-          item.quantity,
-          item.unit,
-          item.expiryDate
-        );
-      } catch (error) {
-        console.error('Failed to move ingredient:', error);
-        Alert.alert('이동 실패 ⚠️', '식재료 위치를 변경하는 중 오류가 발생했습니다.');
-      }
-    }
-    
-    setDraggingItem(null);
-  };
 
   // 선반 동적 배열 상태 관리 (초기값은 비워두고 useEffect에서 로드)
   const [insideShelves, setInsideShelves] = useState<{ id: string; label: string }[]>([]);
