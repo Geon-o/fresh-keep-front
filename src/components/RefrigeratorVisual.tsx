@@ -1266,30 +1266,6 @@ export default function RefrigeratorVisual({
             )}
           </View>
 
-          {/* 알아두면 유용한 식재료 보관 꿀팁! 💡 */}
-          <TouchableOpacity
-            style={[styles.guideBanner, { shadowColor: theme.shadow, marginTop: 6, marginBottom: 20 }]}
-            activeOpacity={0.9}
-            onPress={() => {
-              setGuideSearchQuery('');
-              setGuideSelectedCategory('all');
-              setGuideModalVisible(true);
-            }}
-          >
-            <View style={styles.guideBannerLeft}>
-              <Text style={styles.guideBannerSubTitle}>신선함을 오래오래 💡</Text>
-              <Text style={styles.guideBannerTitle}>식재료 보관 가이드북</Text>
-              <Text style={styles.guideBannerDesc}>식재료별 수명을 늘리고 영양을 지키는 최적의 보관법을 한눈에 검색해보세요.</Text>
-              <View style={[styles.guideBannerButton, { backgroundColor: theme.surface }]}>
-                <Text style={[styles.guideBannerButtonText, { color: theme.primary }]}>가이드북 열기</Text>
-                <Ionicons name="chevron-forward" size={14} color={theme.primary} />
-              </View>
-            </View>
-            <View style={styles.guideBannerRight}>
-              <Text style={{ fontSize: 52 }}>📖</Text>
-            </View>
-          </TouchableOpacity>
-
           {/* 제철 식재료 추천 */}
           <View style={styles.sectionContainer}>
             <View style={styles.sectionHeaderRow}>
@@ -1333,6 +1309,30 @@ export default function RefrigeratorVisual({
               ))}
             </ScrollView>
           </View>
+
+          {/* 알아두면 유용한 식재료 보관 꿀팁! 💡 */}
+          <TouchableOpacity
+            style={[styles.guideBanner, { shadowColor: theme.shadow }]}
+            activeOpacity={0.9}
+            onPress={() => {
+              setGuideSearchQuery('');
+              setGuideSelectedCategory('all');
+              setGuideModalVisible(true);
+            }}
+          >
+            <View style={styles.guideBannerLeft}>
+              <Text style={styles.guideBannerSubTitle}>신선함을 오래오래 💡</Text>
+              <Text style={styles.guideBannerTitle}>식재료 보관 가이드북</Text>
+              <Text style={styles.guideBannerDesc}>식재료별 수명을 늘리고 영양을 지키는 최적의 보관법을 한눈에 검색해보세요.</Text>
+              <View style={[styles.guideBannerButton, { backgroundColor: theme.surface }]}>
+                <Text style={[styles.guideBannerButtonText, { color: theme.primary }]}>가이드북 열기</Text>
+                <Ionicons name="chevron-forward" size={14} color={theme.primary} />
+              </View>
+            </View>
+            <View style={styles.guideBannerRight}>
+              <Text style={{ fontSize: 52 }}>📖</Text>
+            </View>
+          </TouchableOpacity>
         </ScrollView>
       )}
 
