@@ -462,14 +462,13 @@ export default function RefrigeratorVisual({
       item => item.fridgeId === fridgeId && item.location === compartmentId
     );
     if (compIngredients.length === 0) {
-      return '비어 있음 🍃';
+      return '비어 있음';
     }
     const firstItem = compIngredients[0];
-    const emoji = CATEGORY_EMOJI[firstItem.category] || '';
     if (compIngredients.length === 1) {
-      return `${emoji ? emoji + ' ' : ''}${firstItem.name}`;
+      return firstItem.name;
     }
-    return `${emoji ? emoji + ' ' : ''}${firstItem.name} 외 ${compIngredients.length - 1}개`;
+    return `${firstItem.name} 외 ${compIngredients.length - 1}개`;
   };
 
   // 특정 구획의 D-Day 경고/만료 상태 계산
