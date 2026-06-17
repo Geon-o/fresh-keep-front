@@ -353,7 +353,11 @@ export default function CompartmentDetail({
 
   // 부모의 비동기 리렌더링 props 딜레이를 우회하기 위한 로컬 compartmentId 동기 레퍼런스
   const currentCompartmentIdRef = useRef(compartmentId);
-  currentCompartmentIdRef.current = compartmentId;
+  const [prevPropId, setPrevPropId] = useState(compartmentId);
+  if (compartmentId !== prevPropId) {
+    setPrevPropId(compartmentId);
+    currentCompartmentIdRef.current = compartmentId;
+  }
 
   // 드래그 앤 드롭 제스처 관련 상태
   const [draggingItem, setDraggingItem] = useState<Ingredient | null>(null);
@@ -414,6 +418,8 @@ export default function CompartmentDetail({
           item.unit,
           item.expiryDate
         );
+        // 이동 성공 후 현재 보관실 식재료 목록 리로드하여 화면 싱크 맞춤
+        await loadData(targetCompartmentId);
       } catch (error) {
         console.error('Failed to move ingredient:', error);
         Alert.alert('이동 실패 ⚠️', '식재료 위치를 변경하는 중 오류가 발생했습니다.');
@@ -537,6 +543,7 @@ export default function CompartmentDetail({
 
   // 선반 절대 좌표 측정
   const measureShelves = () => {
+    shelfLayouts.current = {}; // 이전 좌표 데이터 초기화 (오염 방지)
     Object.keys(shelfRefs.current).forEach(shelfId => {
       const ref = shelfRefs.current[shelfId];
       if (ref) {
@@ -583,125 +590,136 @@ export default function CompartmentDetail({
   const isSavingRef = useRef(false);
 
   // 선반 구성 및 식재료 불러오기 (서버 vs 로컬 분기)
-  useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      try {
-        // 1. 선반 구성 불러오기 (비로그인 모드일 때만 로컬스토리지 활용)
-        if (!isLoggedIn) {
-          const configStr = await AsyncStorage.getItem(`@shelf_config_${fridgeId}_${compartmentId}`);
-          if (configStr) {
-            const config = JSON.parse(configStr);
-            setInsideShelves(config.insideShelves || DEFAULT_INSIDE_SHELVES);
-            setDoorShelves(config.doorShelves || DEFAULT_DOOR_SHELVES);
-            setHasDoorStorage(config.hasDoorStorage !== undefined ? config.hasDoorStorage : true);
-          } else {
-            setInsideShelves(DEFAULT_INSIDE_SHELVES);
-            setDoorShelves(DEFAULT_DOOR_SHELVES);
-            setHasDoorStorage(true);
-            const config = { insideShelves: DEFAULT_INSIDE_SHELVES, doorShelves: DEFAULT_DOOR_SHELVES, hasDoorStorage: true };
-            await AsyncStorage.setItem(`@shelf_config_${fridgeId}_${compartmentId}`, JSON.stringify(config));
-          }
+  const loadData = async (targetId: string = compartmentId) => {
+    setIsLoading(true);
+    try {
+      // 1. 선반 구성 불러오기 (비로그인 모드일 때만 로컬스토리지 활용)
+      if (!isLoggedIn) {
+        const configStr = await AsyncStorage.getItem(`@shelf_config_${fridgeId}_${targetId}`);
+        if (configStr) {
+          const config = JSON.parse(configStr);
+          setInsideShelves(config.insideShelves || DEFAULT_INSIDE_SHELVES);
+          setDoorShelves(config.doorShelves || DEFAULT_DOOR_SHELVES);
+          setHasDoorStorage(config.hasDoorStorage !== undefined ? config.hasDoorStorage : true);
+        } else {
+          setInsideShelves(DEFAULT_INSIDE_SHELVES);
+          setDoorShelves(DEFAULT_DOOR_SHELVES);
+          setHasDoorStorage(true);
+          const config = { insideShelves: DEFAULT_INSIDE_SHELVES, doorShelves: DEFAULT_DOOR_SHELVES, hasDoorStorage: true };
+          await AsyncStorage.setItem(`@shelf_config_${fridgeId}_${targetId}`, JSON.stringify(config));
         }
+      }
 
-        // 2. 식재료 로드
-        if (isLoggedIn) {
-          // 서버에서 해당 냉장고 레이아웃 정보 로드 후 매핑
-          const layout = await getFridgeLayout(Number(fridgeId));
+      // 2. 식재료 로드
+      if (isLoggedIn) {
+        // 서버에서 해당 냉장고 레이아웃 정보 로드 후 매핑
+        const layout = await getFridgeLayout(Number(fridgeId));
+        
+        // targetId 매칭 구획 찾기
+        const serverComp = layout.compartments.find(comp => {
+          const isLeft = targetId.includes('left');
+          const isRight = targetId.includes('right');
+          if (targetId.startsWith('freezer')) {
+            if (comp.storageType !== 'FROZEN') return false;
+          } else {
+            if (comp.storageType !== 'REFRIGERATED') return false;
+          }
+          if (isLeft && !comp.name.includes('좌')) return false;
+          if (isRight && !comp.name.includes('우')) return false;
+          return true;
+        });
+
+        if (serverComp) {
+          setServerCompartmentId(serverComp.id);
           
-          // compartmentId 매칭 구획 찾기
-          const serverComp = layout.compartments.find(comp => {
-            const isLeft = compartmentId.includes('left');
-            const isRight = compartmentId.includes('right');
-            if (compartmentId.startsWith('freezer')) {
-              if (comp.storageType !== 'FROZEN') return false;
-            } else {
-              if (comp.storageType !== 'REFRIGERATED') return false;
-            }
-            if (isLeft && !comp.name.includes('좌')) return false;
-            if (isRight && !comp.name.includes('우')) return false;
-            return true;
-          });
-
-          if (serverComp) {
-            setServerCompartmentId(serverComp.id);
-            
-            // 서버에서 저장된 선반 구성 로드
-            if (serverComp.insideShelves) {
-              try {
-                setInsideShelves(JSON.parse(serverComp.insideShelves));
-              } catch (e) {
-                console.error('Failed to parse insideShelves from server', e);
-                setInsideShelves(DEFAULT_INSIDE_SHELVES);
-              }
-            } else {
+          // 서버에서 저장된 선반 구성 로드
+          if (serverComp.insideShelves) {
+            try {
+              setInsideShelves(JSON.parse(serverComp.insideShelves));
+            } catch (e) {
+              console.error('Failed to parse insideShelves from server', e);
               setInsideShelves(DEFAULT_INSIDE_SHELVES);
             }
+          } else {
+            setInsideShelves(DEFAULT_INSIDE_SHELVES);
+          }
 
-            if (serverComp.doorShelves) {
-              try {
-                setDoorShelves(JSON.parse(serverComp.doorShelves));
-              } catch (e) {
-                console.error('Failed to parse doorShelves from server', e);
-                setDoorShelves(DEFAULT_DOOR_SHELVES);
-              }
-            } else {
+          if (serverComp.doorShelves) {
+            try {
+              setDoorShelves(JSON.parse(serverComp.doorShelves));
+            } catch (e) {
+              console.error('Failed to parse doorShelves from server', e);
               setDoorShelves(DEFAULT_DOOR_SHELVES);
             }
-
-            if (serverComp.hasDoorStorage !== undefined && serverComp.hasDoorStorage !== null) {
-              setHasDoorStorage(serverComp.hasDoorStorage);
-            } else {
-              setHasDoorStorage(true);
-            }
-
-            const mapped = serverComp.ingredients.map(ing => {
-              const deserialized = deserializeMemo(ing.memo);
-              return {
-                id: String(ing.id),
-                name: ing.name,
-                location: compartmentId,
-                subLocation: deserialized.subLocation as any,
-                category: deserialized.category,
-                expiryDate: ing.expirationDate,
-                quantity: ing.quantity,
-                unit: ing.unit,
-                memo: deserialized.memo || undefined,
-                fridgeId: String(fridgeId),
-              };
-            });
-            setIngredients(mapped);
           } else {
-            // 매칭 실패 시 기본값 세팅
-            setInsideShelves(DEFAULT_INSIDE_SHELVES);
             setDoorShelves(DEFAULT_DOOR_SHELVES);
-            setHasDoorStorage(true);
-            setIngredients([]);
-            if (layout.compartments.length > 0) {
-              // 매칭 실패 시 첫 번째 구획 사용
-              setServerCompartmentId(layout.compartments[0].id);
-            }
           }
-        } else {
-          // 로컬 로드
-          const ingredientsStr = await AsyncStorage.getItem('@ingredients');
-          if (ingredientsStr) {
-            const allIngredients: Ingredient[] = JSON.parse(ingredientsStr);
-            const filtered = allIngredients.filter(item => item.fridgeId === fridgeId && item.location === compartmentId);
-            setIngredients(filtered);
+
+          if (serverComp.hasDoorStorage !== undefined && serverComp.hasDoorStorage !== null) {
+            setHasDoorStorage(serverComp.hasDoorStorage);
           } else {
-            // 로컬 저장소에 데이터 없음 → 빈 상태로 시작
-            setIngredients([]);
+            setHasDoorStorage(true);
+          }
+
+          const mapped = serverComp.ingredients.map(ing => {
+            const deserialized = deserializeMemo(ing.memo);
+            return {
+              id: String(ing.id),
+              name: ing.name,
+              location: targetId,
+              subLocation: deserialized.subLocation as any,
+              category: deserialized.category,
+              expiryDate: ing.expirationDate,
+              quantity: ing.quantity,
+              unit: ing.unit,
+              memo: deserialized.memo || undefined,
+              fridgeId: String(fridgeId),
+            };
+          });
+          setIngredients(mapped);
+        } else {
+          // 매칭 실패 시 기본값 세팅
+          setInsideShelves(DEFAULT_INSIDE_SHELVES);
+          setDoorShelves(DEFAULT_DOOR_SHELVES);
+          setHasDoorStorage(true);
+          setIngredients([]);
+          if (layout.compartments.length > 0) {
+            // 매칭 실패 시 첫 번째 구획 사용
+            setServerCompartmentId(layout.compartments[0].id);
           }
         }
-      } catch (e) {
-        console.error('Failed to load data', e);
-      } finally {
-        setIsLoading(false);
+      } else {
+        // 로컬 로드
+        const ingredientsStr = await AsyncStorage.getItem('@ingredients');
+        if (ingredientsStr) {
+          const allIngredients: Ingredient[] = JSON.parse(ingredientsStr);
+          const filtered = allIngredients.filter(item => item.fridgeId === fridgeId && item.location === targetId);
+          setIngredients(filtered);
+        } else {
+          // 로컬 저장소에 데이터 없음 → 빈 상태로 시작
+          setIngredients([]);
+        }
       }
-    };
-    loadData();
+    } catch (e) {
+      console.error('Failed to load data', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData(compartmentId);
   }, [compartmentId, fridgeId, isLoggedIn]);
+
+  // 로딩 완료 후 선반 뷰 마운트 시점에 자동 좌표 측정 실행
+  useEffect(() => {
+    if (!isLoading) {
+      const timer = setTimeout(() => {
+        measureShelves();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading]);
 
   // 선반 구성 저장 헬퍼
   const saveShelfConfig = async (
