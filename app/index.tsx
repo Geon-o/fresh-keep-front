@@ -308,6 +308,24 @@ export default function Index() {
     loadLocalRefrigerators();
   }, []);
 
+  // 기존 로컬 저장소에 남아있던 더미 데이터 1회성 청소
+  useEffect(() => {
+    const cleanLegacyDummyData = async () => {
+      try {
+        const isCleaned = await AsyncStorage.getItem('@dummy_cleaned_v3');
+        if (!isCleaned) {
+          // 예전 테스트용으로 로컬 스토리지에 남아있던 식재료 더미 데이터 완전 제거
+          await AsyncStorage.removeItem('@ingredients');
+          // 1회성 청소 완료 플래그 저장
+          await AsyncStorage.setItem('@dummy_cleaned_v3', 'true');
+        }
+      } catch (e) {
+        console.error('Failed to clean legacy dummy data', e);
+      }
+    };
+    cleanLegacyDummyData();
+  }, []);
+
   // 슬라이드 데이터 페이지 구성 (등록된 냉장고들 + 3개 미만일 때 추가 버튼 노출)
   const pages: ({ type: 'fridge'; data: typeof refrigerators[0] } | { type: 'add' })[] = [];
   refrigerators.forEach(fridge => {
