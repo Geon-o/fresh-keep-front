@@ -524,7 +524,9 @@ export default function Index() {
             borderTopColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.06)',
             borderTopWidth: 1,
             paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
+            height: (Platform.OS === 'ios' ? 70 : 58) + (insets.bottom > 0 ? insets.bottom - 8 : 0),
           }]}>
+
             {/* 홈 */}
             <Animated.View style={{ transform: [{ scale: homeTabScale }], flex: 1 }}>
               <TouchableOpacity
