@@ -1110,6 +1110,111 @@ export default function RefrigeratorVisual({
           contentContainerStyle={styles.dashboardContent}
           showsVerticalScrollIndicator={false}
         >
+          {/* 식재료 신선도 요약 */}
+          <View style={styles.sectionContainer}>
+            <View style={[styles.statsCard, { backgroundColor: theme.surface, borderColor: theme.borderLight, shadowColor: theme.shadow }]}>
+              {/* 만료 */}
+              <View style={[styles.statsItem, styles.statsItemBorder]}>
+                <Text style={styles.statsLabel}>만료 🚨</Text>
+                <View style={[styles.statsCountBadge, totalExpired > 0 && { backgroundColor: theme.ddayExpired + '15' }]}>
+                  <Text style={[styles.statsCountText, { color: totalExpired > 0 ? theme.ddayExpired : theme.textSecondary }]}>
+                    {totalExpired}
+                  </Text>
+                </View>
+              </View>
+
+              {/* 임박 */}
+              <View style={[styles.statsItem, styles.statsItemBorder]}>
+                <Text style={styles.statsLabel}>임박 ⚠️</Text>
+                <View style={[styles.statsCountBadge, totalImminent > 0 && { backgroundColor: theme.ddayImminent + '15' }]}>
+                  <Text style={[styles.statsCountText, { color: totalImminent > 0 ? theme.ddayImminent : theme.textSecondary }]}>
+                    {totalImminent}
+                  </Text>
+                </View>
+              </View>
+
+              {/* 안전 */}
+              <View style={styles.statsItem}>
+                <Text style={styles.statsLabel}>안전 🍃</Text>
+                <View style={styles.statsCountBadge}>
+                  <Text style={[styles.statsCountText, { color: theme.ddaySafe }]}>
+                    {totalSafe}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* 유통기한 임박 식재료 (세로 스크롤 리스트) */}
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={[styles.sectionTitle, { paddingHorizontal: 0, marginBottom: 0, color: theme.textPrimary }]}>빨리 먹어야 해요! ⏰</Text>
+              {urgentIngredients.length > 0 && (
+                <Text style={[styles.sectionSubText, { color: theme.textTertiary }]}>총 {urgentIngredients.length}개</Text>
+              )}
+            </View>
+
+            {urgentIngredients.length > 0 ? (
+              <View style={styles.urgentListContainer}>
+                <ScrollView
+                  nestedScrollEnabled={true}
+                  showsVerticalScrollIndicator={true}
+                  contentContainerStyle={{ gap: 8 }}
+                >
+                  {urgentIngredients.map(item => {
+                    const dday = getDDayInfo(item.expiryDate);
+                    const emoji = CATEGORY_EMOJI[item.category] || '📦';
+                    const fridge = refrigerators.find(r => r.id === item.fridgeId);
+                    const locationLabel = getCompartmentLabel(item.location);
+
+                    return (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={[
+                          styles.urgentListItem, 
+                          { 
+                            backgroundColor: theme.surface, 
+                            borderColor: theme.borderLight, 
+                            shadowColor: theme.shadow,
+                          }
+                        ]}
+                        activeOpacity={0.8}
+                        onPress={() => onPressCompartment(item.location, locationLabel, item.fridgeId || '')}
+                      >
+                        <View style={styles.urgentListLeft}>
+                          <View style={[styles.urgentListEmojiBg, { backgroundColor: theme.surfaceTertiary }]}>
+                            <Text style={styles.urgentListEmoji}>{emoji}</Text>
+                          </View>
+                          <View style={styles.urgentListInfo}>
+                            <Text style={[styles.urgentListName, { color: theme.textPrimary }]} numberOfLines={1}>
+                              {item.name}
+                            </Text>
+                            <Text style={[styles.urgentListLocation, { color: theme.textMuted }]} numberOfLines={1}>
+                              {`${fridge ? fridge.name : '냉장고'} > ${locationLabel}`}
+                            </Text>
+                          </View>
+                        </View>
+                        <View style={[styles.urgentListDDayBadge, { backgroundColor: dday.color + '12', borderColor: dday.color }]}>
+                          <Text style={[styles.urgentListDDayText, { color: dday.color }]}>{dday.text}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            ) : (
+              <View style={[styles.emptyUrgentCard, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
+                <Ionicons name="sparkles" size={24} color={theme.success} style={{ marginBottom: 4 }} />
+                <Text style={[styles.emptyUrgentText, { color: theme.textSecondary }]}>
+                  소비가 임박한 식재료가 없습니다.
+                </Text>
+                <Text style={[styles.emptyUrgentSub, { color: theme.textMuted }]}>
+                  모든 식재료가 신선하게 보관되고 있어요! 🍃
+                </Text>
+              </View>
+            )}
+          </View>
+
           {/* 오늘의 식중독 지수 */}
           <View style={styles.sectionContainer}>
             {weatherInfo.loading ? (
@@ -1195,111 +1300,6 @@ export default function RefrigeratorVisual({
               <Ionicons name="chevron-forward" size={12} color={theme.primaryOnPrimary} />
             </View>
           </TouchableOpacity>
-
-          {/* 식재료 신선도 요약 */}
-          <View style={styles.sectionContainer}>
-            <View style={[styles.statsCard, { backgroundColor: theme.surface, borderColor: theme.borderLight, shadowColor: theme.shadow }]}>
-              {/* 만료 */}
-              <View style={[styles.statsItem, styles.statsItemBorder]}>
-                <Text style={styles.statsLabel}>만료 🚨</Text>
-                <View style={[styles.statsCountBadge, totalExpired > 0 && { backgroundColor: theme.ddayExpired + '15' }]}>
-                  <Text style={[styles.statsCountText, { color: totalExpired > 0 ? theme.ddayExpired : theme.textSecondary }]}>
-                    {totalExpired}
-                  </Text>
-                </View>
-              </View>
-
-              {/* 임박 */}
-              <View style={[styles.statsItem, styles.statsItemBorder]}>
-                <Text style={styles.statsLabel}>임박 ⚠️</Text>
-                <View style={[styles.statsCountBadge, totalImminent > 0 && { backgroundColor: theme.ddayImminent + '15' }]}>
-                  <Text style={[styles.statsCountText, { color: totalImminent > 0 ? theme.ddayImminent : theme.textSecondary }]}>
-                    {totalImminent}
-                  </Text>
-                </View>
-              </View>
-
-              {/* 안전 */}
-              <View style={styles.statsItem}>
-                <Text style={styles.statsLabel}>안전 🍃</Text>
-                <View style={styles.statsCountBadge}>
-                  <Text style={[styles.statsCountText, { color: theme.ddaySafe }]}>
-                    {totalSafe}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </View>
-
-          {/* 유통기한 임박 식재료 (가로 스크롤 카드) */}
-          <View style={styles.sectionContainer}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={[styles.sectionTitle, { paddingHorizontal: 0, marginBottom: 0, color: theme.textPrimary }]}>빨리 먹어야 해요! ⏰</Text>
-              {urgentIngredients.length > 0 && (
-                <Text style={[styles.sectionSubText, { color: theme.textTertiary }]}>총 {urgentIngredients.length}개</Text>
-              )}
-            </View>
-
-            {urgentIngredients.length > 0 ? (
-              <View style={styles.urgentListContainer}>
-                <ScrollView
-                  nestedScrollEnabled={true}
-                  showsVerticalScrollIndicator={true}
-                  contentContainerStyle={{ gap: 8 }}
-                >
-                  {urgentIngredients.map(item => {
-                    const dday = getDDayInfo(item.expiryDate);
-                    const emoji = CATEGORY_EMOJI[item.category] || '📦';
-                    const fridge = refrigerators.find(r => r.id === item.fridgeId);
-                    const locationLabel = getCompartmentLabel(item.location);
-
-                    return (
-                      <TouchableOpacity
-                        key={item.id}
-                        style={[
-                          styles.urgentListItem, 
-                          { 
-                            backgroundColor: theme.surface, 
-                            borderColor: theme.borderLight, 
-                            shadowColor: theme.shadow,
-                          }
-                        ]}
-                        activeOpacity={0.8}
-                        onPress={() => onPressCompartment(item.location, locationLabel, item.fridgeId || '')}
-                      >
-                        <View style={styles.urgentListLeft}>
-                          <View style={[styles.urgentListEmojiBg, { backgroundColor: theme.surfaceTertiary }]}>
-                            <Text style={styles.urgentListEmoji}>{emoji}</Text>
-                          </View>
-                          <View style={styles.urgentListInfo}>
-                            <Text style={[styles.urgentListName, { color: theme.textPrimary }]} numberOfLines={1}>
-                              {item.name}
-                            </Text>
-                            <Text style={[styles.urgentListLocation, { color: theme.textMuted }]} numberOfLines={1}>
-                              {`${fridge ? fridge.name : '냉장고'} > ${locationLabel}`}
-                            </Text>
-                          </View>
-                        </View>
-                        <View style={[styles.urgentListDDayBadge, { backgroundColor: dday.color + '12', borderColor: dday.color }]}>
-                          <Text style={[styles.urgentListDDayText, { color: dday.color }]}>{dday.text}</Text>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            ) : (
-              <View style={[styles.emptyUrgentCard, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
-                <Ionicons name="sparkles" size={24} color={theme.success} style={{ marginBottom: 4 }} />
-                <Text style={[styles.emptyUrgentText, { color: theme.textSecondary }]}>
-                  소비가 임박한 식재료가 없습니다.
-                </Text>
-                <Text style={[styles.emptyUrgentSub, { color: theme.textMuted }]}>
-                  모든 식재료가 신선하게 보관되고 있어요! 🍃
-                </Text>
-              </View>
-            )}
-          </View>
 
           {/* 제철 식재료 추천 */}
           <View style={styles.sectionContainer}>
