@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, TouchableOpacity, View, Text, ScrollView, Platform, Alert, TextInput, Modal, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ingredient, IngredientCategory } from '../types';
@@ -130,6 +130,8 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
   const [formUnit, setFormUnit] = useState('개');
   const [formExpiryDate, setFormExpiryDate] = useState('');
   const [formMemo, setFormMemo] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const isSavingRef = useRef(false);
 
   // 선반 구성 및 식재료 불러오기 (서버 vs 로컬 분기)
   useEffect(() => {
@@ -370,6 +372,8 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
 
   // 식재료 저장 (추가/수정 공용)
   const handleSaveIngredient = async () => {
+    if (isSavingRef.current) return;
+
     if (!formName.trim()) {
       if (Platform.OS === 'web') {
         window.alert('식재료 이름을 입력해주세요.');
@@ -390,7 +394,10 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
       return;
     }
 
-    const memoContent = serializeMemo(formCategory, selectedShelfId, formMemo);
+    isSavingRef.current = true;
+    setIsSaving(true);
+    try {
+      const memoContent = serializeMemo(formCategory, selectedShelfId, formMemo);
 
     if (isLoggedIn) {
       try {
@@ -487,12 +494,16 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
       await saveIngredients(updatedIngredients);
     }
 
-    setModalVisible(false);
-    
-    if (selectedShelfForDetail) {
-      setTimeout(() => {
-        setShelfDetailModalVisible(true);
-      }, 100);
+      setModalVisible(false);
+      
+      if (selectedShelfForDetail) {
+        setTimeout(() => {
+          setShelfDetailModalVisible(true);
+        }, 100);
+      }
+    } finally {
+      isSavingRef.current = false;
+      setIsSaving(false);
     }
   };
 
@@ -925,7 +936,11 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
         visible={modalVisible}
         transparent
         animationType="fade"
-        onRequestClose={handleCloseAddEditModal}
+        onRequestClose={() => {
+          if (!isSaving) {
+            handleCloseAddEditModal();
+          }
+        }}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -935,8 +950,9 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
                 {modalMode === 'add' ? '식재료 등록' : '식재료 정보 및 수정'}
               </Text>
               <TouchableOpacity
-                style={styles.modalCloseButton}
+                style={[styles.modalCloseButton, isSaving && { opacity: 0.5 }]}
                 onPress={handleCloseAddEditModal}
+                disabled={isSaving}
               >
                 <Text style={styles.modalCloseText}>✕</Text>
               </TouchableOpacity>
@@ -1084,20 +1100,31 @@ export default function CompartmentDetail({ compartmentId, compartmentLabel, onB
             {/* 하단 푸터 버튼 */}
             <View style={styles.modalFooter}>
               <TouchableOpacity
-                style={[styles.footerButton, styles.buttonCancel]}
+                style={[styles.footerButton, styles.buttonCancel, isSaving && { opacity: 0.5 }]}
                 onPress={handleCloseAddEditModal}
                 activeOpacity={0.7}
+                disabled={isSaving}
               >
                 <Text style={styles.buttonTextCancel}>취소</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.footerButton, styles.buttonSave]}
+                style={[styles.footerButton, styles.buttonSave, isSaving && { opacity: 0.7 }]}
                 onPress={handleSaveIngredient}
                 activeOpacity={0.7}
+                disabled={isSaving}
               >
-                <Text style={styles.buttonTextSave}>
-                  {modalMode === 'add' ? '등록' : '수정 완료'}
-                </Text>
+                {isSaving ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                    <Text style={styles.buttonTextSave}>
+                      {modalMode === 'add' ? '등록 중...' : '저장 중...'}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={styles.buttonTextSave}>
+                    {modalMode === 'add' ? '등록' : '수정 완료'}
+                  </Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
