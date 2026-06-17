@@ -1110,37 +1110,73 @@ export default function RefrigeratorVisual({
           contentContainerStyle={styles.dashboardContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* 식재료 신선도 요약 */}
+          {/* 식재료 신선도 요약 대시보드 */}
           <View style={styles.sectionContainer}>
-            <View style={[styles.statsCard, { backgroundColor: theme.surface, borderColor: theme.borderLight, shadowColor: theme.shadow }]}>
+            <View style={styles.statsCardsRow}>
               {/* 만료 */}
-              <View style={[styles.statsItem, styles.statsItemBorder]}>
-                <Text style={styles.statsLabel}>만료 🚨</Text>
-                <View style={[styles.statsCountBadge, totalExpired > 0 && { backgroundColor: theme.ddayExpired + '15' }]}>
-                  <Text style={[styles.statsCountText, { color: totalExpired > 0 ? theme.ddayExpired : theme.textSecondary }]}>
-                    {totalExpired}
-                  </Text>
+              <View 
+                style={[
+                  styles.statsMiniCard, 
+                  { 
+                    backgroundColor: totalExpired > 0 ? theme.ddayExpired + '06' : theme.surface, 
+                    borderColor: totalExpired > 0 ? theme.ddayExpired + '25' : theme.borderLight,
+                    shadowColor: theme.shadow 
+                  }
+                ]}
+              >
+                <View style={[styles.statsIconBadge, { backgroundColor: totalExpired > 0 ? theme.ddayExpired + '15' : theme.surfaceSecondary }]}>
+                  <Ionicons name="alert-circle-outline" size={18} color={totalExpired > 0 ? theme.ddayExpired : theme.textMuted} />
                 </View>
+                <Text style={[styles.statsCountText, { color: totalExpired > 0 ? theme.ddayExpired : theme.textPrimary }]}>
+                  {totalExpired}
+                </Text>
+                <Text style={[styles.statsMiniLabel, { color: theme.textSecondary }]}>
+                  만료
+                </Text>
               </View>
 
               {/* 임박 */}
-              <View style={[styles.statsItem, styles.statsItemBorder]}>
-                <Text style={styles.statsLabel}>임박 ⚠️</Text>
-                <View style={[styles.statsCountBadge, totalImminent > 0 && { backgroundColor: theme.ddayImminent + '15' }]}>
-                  <Text style={[styles.statsCountText, { color: totalImminent > 0 ? theme.ddayImminent : theme.textSecondary }]}>
-                    {totalImminent}
-                  </Text>
+              <View 
+                style={[
+                  styles.statsMiniCard, 
+                  { 
+                    backgroundColor: totalImminent > 0 ? theme.ddayImminent + '06' : theme.surface, 
+                    borderColor: totalImminent > 0 ? theme.ddayImminent + '25' : theme.borderLight,
+                    shadowColor: theme.shadow 
+                  }
+                ]}
+              >
+                <View style={[styles.statsIconBadge, { backgroundColor: totalImminent > 0 ? theme.ddayImminent + '15' : theme.surfaceSecondary }]}>
+                  <Ionicons name="time-outline" size={18} color={totalImminent > 0 ? theme.ddayImminent : theme.textMuted} />
                 </View>
+                <Text style={[styles.statsCountText, { color: totalImminent > 0 ? theme.ddayImminent : theme.textPrimary }]}>
+                  {totalImminent}
+                </Text>
+                <Text style={[styles.statsMiniLabel, { color: theme.textSecondary }]}>
+                  임박
+                </Text>
               </View>
 
               {/* 안전 */}
-              <View style={styles.statsItem}>
-                <Text style={styles.statsLabel}>안전 🍃</Text>
-                <View style={styles.statsCountBadge}>
-                  <Text style={[styles.statsCountText, { color: theme.ddaySafe }]}>
-                    {totalSafe}
-                  </Text>
+              <View 
+                style={[
+                  styles.statsMiniCard, 
+                  { 
+                    backgroundColor: theme.surface, 
+                    borderColor: theme.borderLight,
+                    shadowColor: theme.shadow 
+                  }
+                ]}
+              >
+                <View style={[styles.statsIconBadge, { backgroundColor: theme.ddaySafe + '10' }]}>
+                  <Ionicons name="leaf-outline" size={18} color={theme.ddaySafe} />
                 </View>
+                <Text style={[styles.statsCountText, { color: theme.ddaySafe }]}>
+                  {totalSafe}
+                </Text>
+                <Text style={[styles.statsMiniLabel, { color: theme.textSecondary }]}>
+                  안전
+                </Text>
               </View>
             </View>
           </View>
@@ -1802,40 +1838,40 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  statsCard: {
+  statsCardsRow: {
     flexDirection: 'row',
-    borderRadius: 20,
-    paddingVertical: 16,
-    borderWidth: 1,
+    justifyContent: 'space-between',
     marginHorizontal: 20,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    elevation: 2,
+    gap: 10,
   },
-  statsItem: {
+  statsMiniCard: {
     flex: 1,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  statsItemBorder: {
-    borderRightWidth: 1,
-    borderRightColor: '#ECEFF1',
-  },
-  statsLabel: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#90A4AE',
-  },
-  statsCountBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 2,
-    borderRadius: 10,
+  statsIconBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6,
   },
   statsCountText: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  statsMiniLabel: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   urgentScrollContainer: {
     paddingHorizontal: 20,
