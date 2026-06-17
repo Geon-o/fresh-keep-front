@@ -358,6 +358,11 @@ export default function CompartmentDetail({
   const [draggingItem, setDraggingItem] = useState<Ingredient | null>(null);
   const dragPosition = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const [dragCurrentCoords, setDragCurrentCoords] = useState<{ x: number, y: number }>({ x: 0, y: 0 });
+
+  // 구획 전환 시 페이드 및 슬라이드 인 애니메이션 제어용 상태
+  const contentOpacity = useRef(new Animated.Value(1)).current;
+  const contentTranslateX = useRef(new Animated.Value(0)).current;
+  const transitionDirection = useRef<'left' | 'right' | null>(null);
   
   // 드래그 중이 아닐 때만 프로퍼티의 변경을 레퍼런스에 반영 (드래그 전환 도중 이전 프로퍼티 덮어쓰기 완전 차단)
   if (draggingItem === null) {
@@ -483,6 +488,7 @@ export default function CompartmentDetail({
 
             if (isRightSide && currentX < 35) {
               lastSwappedTime.current = now;
+              transitionDirection.current = 'left'; // 우 -> 좌 전환 방향 기록
               currentCompartmentIdRef.current = switchTarget.id; // 즉시 로컬 Ref 갱신하여 딜레이 제거
               latestParentProps.current.compartmentId = switchTarget.id; // 리렌더링 전 제스처 이벤트용 Ref 동기식 즉시 변경!
               console.log('[onPanResponderMove] Navigating (Right -> Left):', {
@@ -497,6 +503,7 @@ export default function CompartmentDetail({
             }
             else if (isLeftSide && currentX > screenWidth - 35) {
               lastSwappedTime.current = now;
+              transitionDirection.current = 'right'; // 좌 -> 우 전환 방향 기록
               currentCompartmentIdRef.current = switchTarget.id; // 즉시 로컬 Ref 갱신하여 딜레이 제거
               latestParentProps.current.compartmentId = switchTarget.id; // 리렌더링 전 제스처 이벤트용 Ref 동기식 즉시 변경!
               console.log('[onPanResponderMove] Navigating (Left -> Right):', {
@@ -711,9 +718,34 @@ export default function CompartmentDetail({
     loadData(compartmentId);
   }, [compartmentId, fridgeId, isLoggedIn]);
 
-  // 로딩 완료 후 선반 뷰 마운트 시점에 자동 좌표 측정 실행
+  // 로딩 완료 후 선반 뷰 마운트 시점에 자동 좌표 측정 및 애니메이션 실행
   useEffect(() => {
     if (!isLoading) {
+      // 구획 전환 시 슬라이드 및 페이드 인 애니메이션 적용
+      if (transitionDirection.current === 'right') {
+        contentTranslateX.setValue(60); // 우측에서 슬라이드인
+      } else if (transitionDirection.current === 'left') {
+        contentTranslateX.setValue(-60); // 좌측에서 슬라이드인
+      } else {
+        contentTranslateX.setValue(0);
+      }
+      contentOpacity.setValue(0);
+
+      Animated.parallel([
+        Animated.timing(contentOpacity, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+        Animated.timing(contentTranslateX, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        transitionDirection.current = null;
+      });
+
       const timer = setTimeout(() => {
         measureShelves();
       }, 100);
@@ -1263,7 +1295,7 @@ export default function CompartmentDetail({
             </View>
           </View>
 
-          <View style={styles.body}>
+          <Animated.View style={[styles.body, { opacity: contentOpacity, transform: [{ translateX: contentTranslateX }] }]}>
             {/* 좌측: 안쪽 보관실 (선반) */}
             <View style={[styles.sectionInside, hasDoorStorage ? { marginRight: 8 } : { marginRight: 0, flex: 1 }]}>
               <View style={styles.sectionHeaderInside}>
@@ -1431,7 +1463,7 @@ export default function CompartmentDetail({
                 </View>
               </View>
             )}
-          </View>
+          </Animated.View>
         </>
       )}
 
