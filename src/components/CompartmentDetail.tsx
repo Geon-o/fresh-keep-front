@@ -126,7 +126,7 @@ interface DraggableBadgeProps {
   screenWidth: number;
   theme: ThemeColors;
   styles: any;
-  handleDropIngredient: (item: Ingredient, dropX: number, dropY: number) => Promise<void>;
+  handleDropIngredient: (item: Ingredient, dropX: number, dropY: number, targetCompartmentId: string) => Promise<void>;
   getFourDoorSwitchTarget: (compId: string) => { id: string; label: string } | null;
   getDDayInfo: (expiryDate: string) => { text: string; color: string };
 }
@@ -364,7 +364,7 @@ export default function CompartmentDetail({
   const screenWidth = Dimensions.get('window').width;
 
   // 드래그 완료 처리 (드롭)
-  const handleDropIngredient = async (item: Ingredient, dropX: number, dropY: number) => {
+  const handleDropIngredient = async (item: Ingredient, dropX: number, dropY: number, targetCompartmentId: string) => {
     let droppedShelfId: string | null = null;
     
     // 선반 좌표 매칭 루프
@@ -384,7 +384,7 @@ export default function CompartmentDetail({
       // 1. 화면 즉시 반영 (낙관적 업데이트)
       setIngredients(prev => prev.map(ing => 
         ing.id === item.id 
-          ? { ...ing, location: compartmentId, subLocation: targetShelf as any } 
+          ? { ...ing, location: targetCompartmentId, subLocation: targetShelf as any } 
           : ing
       ));
       
@@ -392,7 +392,7 @@ export default function CompartmentDetail({
       try {
         await onMoveIngredient(
           item.id,
-          compartmentId,
+          targetCompartmentId,
           targetShelf,
           item.category,
           item.memo || '',
@@ -416,13 +416,12 @@ export default function CompartmentDetail({
     handleDropIngredient,
   });
 
-  useEffect(() => {
-    latestParentProps.current = {
-      draggingItem,
-      compartmentId,
-      handleDropIngredient,
-    };
-  }, [draggingItem, compartmentId, handleDropIngredient]);
+  // 매 렌더링 시 동기적으로 최신 값 갱신 (useEffect에 의한 제스처 비동기 갱신 딜레이 해결)
+  latestParentProps.current = {
+    draggingItem,
+    compartmentId,
+    handleDropIngredient,
+  };
 
   // 부모 루트용 PanResponder (드래그 활성화 시 제스처 캡처 및 좌표 갱신 담당)
   const parentPanResponder = useRef(
@@ -484,7 +483,7 @@ export default function CompartmentDetail({
         const props = latestParentProps.current;
         if (!props.draggingItem) return;
         setScrollEnabled(true);
-        props.handleDropIngredient(props.draggingItem, evt.nativeEvent.pageX, evt.nativeEvent.pageY);
+        props.handleDropIngredient(props.draggingItem, evt.nativeEvent.pageX, evt.nativeEvent.pageY, props.compartmentId);
         setActiveHoverShelfId(null);
       },
       onPanResponderTerminate: () => {
