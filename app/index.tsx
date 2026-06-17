@@ -82,7 +82,7 @@ export default function Index() {
       } else {
         backPressedTimeRef.current = now;
         if (Platform.OS === 'android') {
-          ToastAndroid.show('뒤로가기 버튼을 한 번 더 누르면 앱이 종료됩니다.', ToastAndroid.SHORT);
+          ToastAndroid.show('한 번 더 뒤로가면 앱이 꺼집니다.', ToastAndroid.SHORT);
         }
         return true;
       }
