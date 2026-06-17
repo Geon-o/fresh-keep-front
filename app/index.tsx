@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, Modal, TouchableOpacity, Text, Alert, Platform, TextInput, KeyboardAvoidingView, ActivityIndicator, Animated, Easing, BackHandler, ToastAndroid } from 'react-native';
+import { StyleSheet, View, Modal, TouchableOpacity, Text, Alert, Platform, TextInput, KeyboardAvoidingView, ActivityIndicator, Animated, Easing, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
@@ -51,6 +51,38 @@ export default function Index() {
   const activeCompartmentRef = useRef(activeCompartment);
   const backPressedTimeRef = useRef(0);
 
+  // 커스텀 토스트 상태 및 애니메이션 설정
+  const [toastText, setToastText] = useState('');
+  const [toastVisible, setToastVisible] = useState(false);
+  const toastOpacity = useRef(new Animated.Value(0)).current;
+  const toastTimeoutRef = useRef<any>(null);
+
+  const showToast = (message: string) => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+    setToastText(message);
+    setToastVisible(true);
+
+    // Fade In
+    Animated.timing(toastOpacity, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+
+    // 2초 후 서서히 사라짐
+    toastTimeoutRef.current = setTimeout(() => {
+      Animated.timing(toastOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start(() => {
+        setToastVisible(false);
+      });
+    }, 2000);
+  };
+
   useEffect(() => {
     activeTabRef.current = activeTab;
   }, [activeTab]);
@@ -81,9 +113,7 @@ export default function Index() {
         return true;
       } else {
         backPressedTimeRef.current = now;
-        if (Platform.OS === 'android') {
-          ToastAndroid.show('✅ 한 번 더 뒤로가면 앱이 꺼집니다.', ToastAndroid.SHORT);
-        }
+        showToast('✅ 한 번 더 뒤로가면 앱이 꺼집니다.');
         return true;
       }
     };
@@ -690,6 +720,14 @@ export default function Index() {
           </View>
         </View>
       )}
+      {/* 커스텀 토스트 오버레이 */}
+      {toastVisible && (
+        <Animated.View style={[styles.toastContainer, { opacity: toastOpacity }]}>
+          <View style={[styles.toastContent, { backgroundColor: theme.textPrimary }]}>
+            <Text style={[styles.toastText, { color: theme.background }]}>{toastText}</Text>
+          </View>
+        </Animated.View>
+      )}
     </SafeAreaView>
   );
 }
@@ -928,5 +966,28 @@ const styles = StyleSheet.create({
   },
   renameSaveButtonTextDisabled: {
     color: '#E0E7FF',
+  },
+  toastContainer: {
+    position: 'absolute',
+    bottom: 110,
+    left: 20,
+    right: 20,
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  toastContent: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  toastText: {
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });
