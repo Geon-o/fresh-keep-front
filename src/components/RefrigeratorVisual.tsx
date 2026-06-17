@@ -1166,6 +1166,36 @@ export default function RefrigeratorVisual({
             )}
           </View>
 
+          {/* 가이드북 퀵 배너 (컴팩트 버전) */}
+          <TouchableOpacity
+            style={[
+              styles.guideBannerCompact, 
+              { 
+                backgroundColor: theme.surfaceSecondary, 
+                borderColor: theme.borderLight,
+                shadowColor: theme.shadow 
+              }
+            ]}
+            activeOpacity={0.8}
+            onPress={() => {
+              setGuideSearchQuery('');
+              setGuideSelectedCategory('all');
+              setGuideModalVisible(true);
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Text style={{ fontSize: 24 }}>📖</Text>
+              <View>
+                <Text style={[styles.guideBannerTitleCompact, { color: theme.textPrimary }]}>식재료 보관 가이드북</Text>
+                <Text style={{ fontSize: 11, color: theme.textTertiary, marginTop: 1 }}>최적의 보관법을 검색해 보세요!</Text>
+              </View>
+            </View>
+            <View style={[styles.guideBannerButtonCompact, { backgroundColor: theme.primary }]}>
+              <Text style={{ color: theme.primaryOnPrimary, fontSize: 11, fontWeight: 'bold' }}>가이드북 열기</Text>
+              <Ionicons name="chevron-forward" size={12} color={theme.primaryOnPrimary} />
+            </View>
+          </TouchableOpacity>
+
           {/* 식재료 신선도 요약 */}
           <View style={styles.sectionContainer}>
             <View style={[styles.statsCard, { backgroundColor: theme.surface, borderColor: theme.borderLight, shadowColor: theme.shadow }]}>
@@ -1310,29 +1340,6 @@ export default function RefrigeratorVisual({
             </ScrollView>
           </View>
 
-          {/* 알아두면 유용한 식재료 보관 꿀팁! 💡 */}
-          <TouchableOpacity
-            style={[styles.guideBanner, { shadowColor: theme.shadow }]}
-            activeOpacity={0.9}
-            onPress={() => {
-              setGuideSearchQuery('');
-              setGuideSelectedCategory('all');
-              setGuideModalVisible(true);
-            }}
-          >
-            <View style={styles.guideBannerLeft}>
-              <Text style={styles.guideBannerSubTitle}>신선함을 오래오래 💡</Text>
-              <Text style={styles.guideBannerTitle}>식재료 보관 가이드북</Text>
-              <Text style={styles.guideBannerDesc}>식재료별 수명을 늘리고 영양을 지키는 최적의 보관법을 한눈에 검색해보세요.</Text>
-              <View style={[styles.guideBannerButton, { backgroundColor: theme.surface }]}>
-                <Text style={[styles.guideBannerButtonText, { color: theme.primary }]}>가이드북 열기</Text>
-                <Ionicons name="chevron-forward" size={14} color={theme.primary} />
-              </View>
-            </View>
-            <View style={styles.guideBannerRight}>
-              <Text style={{ fontSize: 52 }}>📖</Text>
-            </View>
-          </TouchableOpacity>
         </ScrollView>
       )}
 
@@ -2368,6 +2375,33 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  guideBannerCompact: {
+    marginHorizontal: 20,
+    borderRadius: 18,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    marginTop: 6,
+    marginBottom: 6,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  guideBannerTitleCompact: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  guideBannerButtonCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 2,
   },
   modalContainer: {
     flex: 1,
