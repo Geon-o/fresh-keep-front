@@ -802,10 +802,12 @@ const styles = StyleSheet.create({
   tabBar: {
     flexDirection: 'row',
     width: '100%',
-    height: Platform.OS === 'ios' ? 78 : 66,
+    height: Platform.OS === 'ios' ? 70 : 58,
     borderTopWidth: 1,
-    paddingBottom: Platform.OS === 'ios' ? 18 : 6,
-    paddingTop: 8,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: Platform.OS === 'ios' ? 12 : 4,
+    paddingTop: 6,
     justifyContent: 'space-around',
     alignItems: 'center',
     shadowColor: '#000000',
@@ -828,11 +830,12 @@ const styles = StyleSheet.create({
     }),
   },
   tabLabel: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '600',
-    marginTop: 4,
+    marginTop: 2,
     letterSpacing: -0.3,
   },
+
   selectorModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.45)',
