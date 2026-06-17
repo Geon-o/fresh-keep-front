@@ -369,6 +369,15 @@ export default function CompartmentDetail({
 
   // 드래그 완료 처리 (드롭)
   const handleDropIngredient = async (item: Ingredient, dropX: number, dropY: number, targetCompartmentId: string) => {
+    console.log('[handleDropIngredient] Called:', {
+      itemName: item.name,
+      originalLocation: item.location,
+      originalSubLocation: item.subLocation,
+      dropX,
+      dropY,
+      targetCompartmentId,
+      currentPropsCompartmentId: compartmentId
+    });
     let droppedShelfId: string | null = null;
     
     // 선반 좌표 매칭 루프
@@ -470,6 +479,11 @@ export default function CompartmentDetail({
               lastSwappedTime.current = now;
               currentCompartmentIdRef.current = switchTarget.id; // 즉시 로컬 Ref 갱신하여 딜레이 제거
               latestParentProps.current.compartmentId = switchTarget.id; // 리렌더링 전 제스처 이벤트용 Ref 동기식 즉시 변경!
+              console.log('[onPanResponderMove] Navigating (Right -> Left):', {
+                targetId: switchTarget.id,
+                currentCompartmentIdRef: currentCompartmentIdRef.current,
+                latestParentPropsCompartmentId: latestParentProps.current.compartmentId
+              });
               onNavigateCompartment(switchTarget.id, switchTarget.label);
               setTimeout(() => {
                 measureShelves();
@@ -479,6 +493,11 @@ export default function CompartmentDetail({
               lastSwappedTime.current = now;
               currentCompartmentIdRef.current = switchTarget.id; // 즉시 로컬 Ref 갱신하여 딜레이 제거
               latestParentProps.current.compartmentId = switchTarget.id; // 리렌더링 전 제스처 이벤트용 Ref 동기식 즉시 변경!
+              console.log('[onPanResponderMove] Navigating (Left -> Right):', {
+                targetId: switchTarget.id,
+                currentCompartmentIdRef: currentCompartmentIdRef.current,
+                latestParentPropsCompartmentId: latestParentProps.current.compartmentId
+              });
               onNavigateCompartment(switchTarget.id, switchTarget.label);
               setTimeout(() => {
                 measureShelves();
@@ -489,6 +508,11 @@ export default function CompartmentDetail({
       },
       onPanResponderRelease: (evt, gestureState) => {
         const props = latestParentProps.current;
+        console.log('[onPanResponderRelease] release triggered:', {
+          propsCompartmentId: props.compartmentId,
+          refCompartmentId: currentCompartmentIdRef.current,
+          propsDraggingItem: props.draggingItem?.name,
+        });
         if (!props.draggingItem) return;
         setScrollEnabled(true);
         props.handleDropIngredient(props.draggingItem, evt.nativeEvent.pageX, evt.nativeEvent.pageY, props.compartmentId);
