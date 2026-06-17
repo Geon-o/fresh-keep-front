@@ -564,7 +564,7 @@ export default function Index() {
                   styles.tabLabel,
                   { color: activeTab === 'ingredients' ? activeTabColor : inactiveTabColor }
                 ]}>
-                  식재료
+                  식재료 목록
                 </Text>
               </TouchableOpacity>
             </Animated.View>

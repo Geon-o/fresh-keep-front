@@ -1532,7 +1532,7 @@ export default function RefrigeratorVisual({
 
       {mode === 'ingredients' && (
         <View style={{ flex: 1 }}>
-          <Text style={[styles.pageTitle, { color: theme.textPrimary, paddingTop: 16 }]}>식재료 보관 팁 💡</Text>
+          <Text style={[styles.pageTitle, { color: theme.textPrimary, paddingTop: 16 }]}>식재료 목록 📋</Text>
           {/* 검색 바 */}
           <View style={[styles.searchContainer, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderLight }]}>
             <Ionicons name="search" size={18} color={theme.textTertiary} />
