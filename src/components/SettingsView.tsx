@@ -74,10 +74,10 @@ export default function SettingsView({
 
   const handleOpenTerms = (type: 'service' | 'privacy') => {
     if (type === 'service') {
-      setModalTitle('서비스 이용약관 📄');
+      setModalTitle('서비스 이용약관');
       setModalContent(SERVICE_TERMS);
     } else {
-      setModalTitle('개인정보 처리방침 🔒');
+      setModalTitle('개인정보 처리방침');
       setModalContent(PRIVACY_POLICY);
     }
     setModalVisible(true);
@@ -89,7 +89,7 @@ export default function SettingsView({
       contentContainerStyle={styles.contentContainer} 
       showsVerticalScrollIndicator={false}
     >
-      <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>설정 ⚙️</Text>
+      <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>설정</Text>
 
       {/* 1. 프로필 영역 */}
       {isLoggedIn && user ? (

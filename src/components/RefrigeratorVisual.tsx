@@ -1456,7 +1456,7 @@ export default function RefrigeratorVisual({
           contentContainerStyle={[styles.dashboardContent, { paddingBottom: 80 }]}
           showsVerticalScrollIndicator={false}
         >
-          <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>나의 냉장고 🧊</Text>
+          <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>나의 냉장고</Text>
           {/* 나의 냉장고 보관소 */}
           <View style={[styles.sectionContainer, { marginTop: 0 }]}>
             <View style={styles.carouselWrapper}>
@@ -1532,7 +1532,7 @@ export default function RefrigeratorVisual({
 
       {mode === 'ingredients' && (
         <View style={{ flex: 1 }}>
-          <Text style={[styles.pageTitle, { color: theme.textPrimary, paddingTop: 16 }]}>식재료 목록 📋</Text>
+          <Text style={[styles.pageTitle, { color: theme.textPrimary, paddingTop: 16 }]}>식재료 목록</Text>
           {/* 검색 바 */}
           <View style={[styles.searchContainer, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderLight }]}>
             <Ionicons name="search" size={18} color={theme.textTertiary} />
@@ -1556,8 +1556,15 @@ export default function RefrigeratorVisual({
               <TouchableOpacity
                 style={[
                   styles.filterChip, 
-                  { backgroundColor: theme.surfaceTertiary },
-                  selectedFilter === 'all' && [styles.filterChipActive, { backgroundColor: theme.primary }]
+                  { 
+                    backgroundColor: theme.surfaceTertiary,
+                    borderWidth: 1,
+                    borderColor: theme.borderLight
+                  },
+                  selectedFilter === 'all' && [
+                    styles.filterChipActive, 
+                    { backgroundColor: theme.primary, borderColor: theme.primary }
+                  ]
                 ]}
                 onPress={() => setSelectedFilter('all')}
               >
@@ -1568,37 +1575,58 @@ export default function RefrigeratorVisual({
               <TouchableOpacity
                 style={[
                   styles.filterChip, 
-                  { backgroundColor: theme.surfaceTertiary },
-                  selectedFilter === 'expired' && [styles.filterChipActive, { backgroundColor: theme.ddayExpired }]
+                  { 
+                    backgroundColor: theme.surfaceTertiary,
+                    borderWidth: 1,
+                    borderColor: theme.borderLight
+                  },
+                  selectedFilter === 'expired' && [
+                    styles.filterChipActive, 
+                    { backgroundColor: theme.ddayExpired, borderColor: theme.ddayExpired }
+                  ]
                 ]}
                 onPress={() => setSelectedFilter('expired')}
               >
                 <Text style={[styles.filterChipText, { color: theme.textSecondary }, selectedFilter === 'expired' && { color: '#FFFFFF' }]}>
-                  만료 🚨 {totalExpired}
+                  만료 {totalExpired}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
                   styles.filterChip, 
-                  { backgroundColor: theme.surfaceTertiary },
-                  selectedFilter === 'imminent' && [styles.filterChipActive, { backgroundColor: theme.ddayImminent }]
+                  { 
+                    backgroundColor: theme.surfaceTertiary,
+                    borderWidth: 1,
+                    borderColor: theme.borderLight
+                  },
+                  selectedFilter === 'imminent' && [
+                    styles.filterChipActive, 
+                    { backgroundColor: theme.ddayImminent, borderColor: theme.ddayImminent }
+                  ]
                 ]}
                 onPress={() => setSelectedFilter('imminent')}
               >
                 <Text style={[styles.filterChipText, { color: theme.textSecondary }, selectedFilter === 'imminent' && { color: '#FFFFFF' }]}>
-                  임박 ⚠️ {totalImminent}
+                  임박 {totalImminent}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
                   styles.filterChip, 
-                  { backgroundColor: theme.surfaceTertiary },
-                  selectedFilter === 'safe' && [styles.filterChipActive, { backgroundColor: theme.ddaySafe }]
+                  { 
+                    backgroundColor: theme.surfaceTertiary,
+                    borderWidth: 1,
+                    borderColor: theme.borderLight
+                  },
+                  selectedFilter === 'safe' && [
+                    styles.filterChipActive, 
+                    { backgroundColor: theme.ddaySafe, borderColor: theme.ddaySafe }
+                  ]
                 ]}
                 onPress={() => setSelectedFilter('safe')}
               >
                 <Text style={[styles.filterChipText, { color: theme.textSecondary }, selectedFilter === 'safe' && { color: '#FFFFFF' }]}>
-                  안전 🍃 {totalSafe}
+                  안전 {totalSafe}
                 </Text>
               </TouchableOpacity>
             </ScrollView>
@@ -1741,8 +1769,15 @@ export default function RefrigeratorVisual({
                       key={cat}
                       style={[
                         styles.filterChip,
-                        { backgroundColor: theme.surfaceTertiary },
-                        isActive && [styles.filterChipActive, { backgroundColor: theme.primary }]
+                        { 
+                          backgroundColor: theme.surfaceTertiary,
+                          borderWidth: 1,
+                          borderColor: theme.borderLight
+                        },
+                        isActive && [
+                          styles.filterChipActive, 
+                          { backgroundColor: theme.primary, borderColor: theme.primary }
+                        ]
                       ]}
                       onPress={() => setGuideSelectedCategory(cat)}
                     >
