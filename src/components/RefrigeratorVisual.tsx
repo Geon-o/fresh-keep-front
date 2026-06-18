@@ -423,10 +423,30 @@ export default function RefrigeratorVisual({
     loadIngredients();
   }, [refrigerators, isLoggedIn]);
 
-  // 냉장고 목록 크기나 로그인 상태가 바뀌면 캐러셀 인덱스를 0으로 초기화
+  // 냉장고 목록 크기나 로그인 상태가 바뀌면 캐러셀 인덱스를 0으로 초기화하던 부분 수정:
+  // @active_fridge_index 등 부모에서 넘어오는 activeIndex를 유지하기 위해 length가 유효한 범위라면 0으로 덮어쓰지 않도록 함.
   useEffect(() => {
-    setActiveIndex(0);
+    if (activeIndex >= refrigerators.length) {
+      setActiveIndex(0);
+    }
   }, [refrigerators.length, isLoggedIn]);
+
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  // activeIndex 변경 시 ScrollView의 x 오프셋을 물리적으로 스크롤 이동
+  useEffect(() => {
+    if (mode === 'fridge') {
+      const timer = setTimeout(() => {
+        if (scrollViewRef.current) {
+          scrollViewRef.current.scrollTo({
+            x: activeIndex * screenWidth,
+            animated: false,
+          });
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [activeIndex, mode, screenWidth, refrigerators.length]);
 
   // D-Day 정보 계산 헬퍼 함수
   const getDDayInfo = (expiryDate: string) => {
@@ -1439,6 +1459,7 @@ export default function RefrigeratorVisual({
           <View style={[styles.sectionContainer, { marginTop: 0 }]}>
             <View style={styles.carouselWrapper}>
               <ScrollView
+                ref={scrollViewRef}
                 horizontal
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
