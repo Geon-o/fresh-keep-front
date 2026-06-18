@@ -227,7 +227,7 @@ const DraggableBadge = ({
           const props = latestProps.current;
           props.setScrollEnabled(false); // 스크롤 차단
           props.setDraggingItem(props.item);
-          props.dragPosition.setValue({ x: startX - 70, y: startY - 20 });
+          props.dragPosition.setValue({ x: startX - 70, y: startY - 50 });
           props.setDragCurrentCoords({ x: startX, y: startY });
           props.measureShelves(); // 선반 좌표 수집
         }, 700);
@@ -248,7 +248,7 @@ const DraggableBadge = ({
           }
         } else {
           // 드래그 중인 경우
-          props.dragPosition.setValue({ x: currentX - 70, y: currentY - 20 });
+          props.dragPosition.setValue({ x: currentX - 70, y: currentY - 50 });
           props.setDragCurrentCoords({ x: currentX, y: currentY });
 
           // 호버 선반 추적
@@ -461,7 +461,7 @@ export default function CompartmentDetail({
         const currentY = evt.nativeEvent.pageY;
 
         // 드래그 위치 업데이트
-        dragPosition.setValue({ x: currentX - 70, y: currentY - 20 });
+        dragPosition.setValue({ x: currentX - 70, y: currentY - 50 });
         setDragCurrentCoords({ x: currentX, y: currentY });
 
         // 호버 선반 추적
