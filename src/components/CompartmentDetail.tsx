@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, TouchableOpacity, View, Text, ScrollView, Platform, Alert, TextInput, Modal, ActivityIndicator, PanResponder, Dimensions, Animated } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
+import { Ionicons } from '@expo/vector-icons';
 import { Ingredient, IngredientCategory } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { getFridgeLayout, updateCompartmentShelves } from '../api/fridgeService';
@@ -362,7 +363,7 @@ export default function CompartmentDetail({
   // 구획 전환 시 페이드 및 슬라이드 인 애니메이션 제어용 상태
   const contentOpacity = useRef(new Animated.Value(1)).current;
   const contentTranslateX = useRef(new Animated.Value(0)).current;
-  const transitionDirection = useRef<'left' | 'right' | null>(null);
+  const transitionDirection = useRef<'left' | 'right' | 'up' | 'down' | null>(null);
   
   // 드래그 중이 아닐 때만 프로퍼티의 변경을 레퍼런스에 반영 (드래그 전환 도중 이전 프로퍼티 덮어쓰기 완전 차단)
   if (draggingItem === null) {
@@ -375,6 +376,63 @@ export default function CompartmentDetail({
   const shelfLayouts = useRef<Record<string, { x: number; y: number; width: number; height: number }>>({});
   const lastSwappedTime = useRef<number>(0);
   const screenWidth = Dimensions.get('window').width;
+
+  // 사이드 버튼을 통한 이동 처리 핸들러
+  const handleNavigateSide = (targetId: string, targetLabel: string, direction: 'left' | 'right' | 'up' | 'down') => {
+    if (!onNavigateCompartment) return;
+    
+    // 전환 방향 기록 및 애니메이션 트리거 준비
+    transitionDirection.current = direction;
+    currentCompartmentIdRef.current = targetId;
+    
+    onNavigateCompartment(targetId, targetLabel);
+  };
+
+  // 현재 compartmentId 기준 내비게이션 대상 매핑 헬퍼
+  const getNavigationTargets = () => {
+    const isFourDoor = compartmentId.includes('_left') || compartmentId.includes('_right');
+    
+    if (isFourDoor) {
+      // 4문형 냉장고인 경우 (상/하/좌/우)
+      if (compartmentId === 'fridge_left') {
+        return {
+          right: { id: 'fridge_right', label: '냉장실 (우)' },
+          down: { id: 'freezer_left', label: '냉동실 (좌)' },
+        };
+      }
+      if (compartmentId === 'fridge_right') {
+        return {
+          left: { id: 'fridge_left', label: '냉장실 (좌)' },
+          down: { id: 'freezer_right', label: '냉동실 (우)' },
+        };
+      }
+      if (compartmentId === 'freezer_left') {
+        return {
+          right: { id: 'freezer_right', label: '냉동실 (우)' },
+          up: { id: 'fridge_left', label: '냉장실 (좌)' },
+        };
+      }
+      if (compartmentId === 'freezer_right') {
+        return {
+          left: { id: 'freezer_left', label: '냉동실 (좌)' },
+          up: { id: 'fridge_right', label: '냉장실 (우)' },
+        };
+      }
+    } else {
+      // 2문형 / 양문형 냉장고인 경우 (상/하만 지원)
+      if (compartmentId === 'fridge') {
+        return {
+          down: { id: 'freezer', label: '냉동실' },
+        };
+      }
+      if (compartmentId === 'freezer') {
+        return {
+          up: { id: 'fridge', label: '냉장실' },
+        };
+      }
+    }
+    return {};
+  };
 
   // 드래그 완료 처리 (드롭)
   const handleDropIngredient = async (item: Ingredient, dropX: number, dropY: number, targetCompartmentId: string) => {
@@ -489,43 +547,24 @@ export default function CompartmentDetail({
             if (isRightSide && currentX < 35) {
               lastSwappedTime.current = now;
               transitionDirection.current = 'left'; // 우 -> 좌 전환 방향 기록
-              currentCompartmentIdRef.current = switchTarget.id; // 즉시 로컬 Ref 갱신하여 딜레이 제거
-              latestParentProps.current.compartmentId = switchTarget.id; // 리렌더링 전 제스처 이벤트용 Ref 동기식 즉시 변경!
-              console.log('[onPanResponderMove] Navigating (Right -> Left):', {
-                targetId: switchTarget.id,
-                currentCompartmentIdRef: currentCompartmentIdRef.current,
-                latestParentPropsCompartmentId: latestParentProps.current.compartmentId
-              });
+              currentCompartmentIdRef.current = switchTarget.id;
+              latestParentProps.current.compartmentId = switchTarget.id;
               onNavigateCompartment(switchTarget.id, switchTarget.label);
-              setTimeout(() => {
-                measureShelves();
-              }, 150);
+              setTimeout(() => { measureShelves(); }, 150);
             }
             else if (isLeftSide && currentX > screenWidth - 35) {
               lastSwappedTime.current = now;
               transitionDirection.current = 'right'; // 좌 -> 우 전환 방향 기록
-              currentCompartmentIdRef.current = switchTarget.id; // 즉시 로컬 Ref 갱신하여 딜레이 제거
-              latestParentProps.current.compartmentId = switchTarget.id; // 리렌더링 전 제스처 이벤트용 Ref 동기식 즉시 변경!
-              console.log('[onPanResponderMove] Navigating (Left -> Right):', {
-                targetId: switchTarget.id,
-                currentCompartmentIdRef: currentCompartmentIdRef.current,
-                latestParentPropsCompartmentId: latestParentProps.current.compartmentId
-              });
+              currentCompartmentIdRef.current = switchTarget.id;
+              latestParentProps.current.compartmentId = switchTarget.id;
               onNavigateCompartment(switchTarget.id, switchTarget.label);
-              setTimeout(() => {
-                measureShelves();
-              }, 150);
+              setTimeout(() => { measureShelves(); }, 150);
             }
           }
         }
       },
       onPanResponderRelease: (evt, gestureState) => {
         const props = latestParentProps.current;
-        console.log('[onPanResponderRelease] release triggered:', {
-          propsCompartmentId: props.compartmentId,
-          refCompartmentId: currentCompartmentIdRef.current,
-          propsDraggingItem: props.draggingItem?.name,
-        });
         if (!props.draggingItem) return;
         setScrollEnabled(true);
         props.handleDropIngredient(props.draggingItem, evt.nativeEvent.pageX, evt.nativeEvent.pageY, props.compartmentId);
