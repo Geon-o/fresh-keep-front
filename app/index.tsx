@@ -294,13 +294,19 @@ export default function Index() {
       : localRefrigerators;
   }, [isLoggedIn, serverFridges, localRefrigerators]);
 
-  // 앱 로드 시 로컬 저장소에서 냉장고 목록 불러오기 (로컬 백업 보존)
+  // 앱 로드 시 로컬 저장소에서 냉장고 목록 및 직전 활성 냉장고 인덱스 불러오기
   useEffect(() => {
     const loadLocalRefrigerators = async () => {
       try {
         const stored = await AsyncStorage.getItem('@refrigerators');
         if (stored) {
           setLocalRefrigerators(JSON.parse(stored));
+        }
+        
+        // 직전에 활성화되었던 냉장고 인덱스 복구
+        const lastIndex = await AsyncStorage.getItem('@active_fridge_index');
+        if (lastIndex) {
+          setActiveIndex(Number(lastIndex));
         }
       } catch (e) {
         console.error('Failed to load local refrigerators', e);
@@ -456,11 +462,14 @@ export default function Index() {
   };
 
   // 냉장고 삭제 확인 알림
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (!activeFridge) return;
-    const performDelete = () => {
-      handleDeleteFridge(activeFridge.id);
+    const performDelete = async () => {
+      await handleDeleteFridge(activeFridge.id);
       setActiveIndex(0);
+      try {
+        await AsyncStorage.setItem('@active_fridge_index', '0');
+      } catch (e) {}
     };
 
     Alert.alert(
@@ -497,7 +506,13 @@ export default function Index() {
     setRenameModalVisible(true);
   };
 
-  const handlePressCompartment = (id: string, label: string, fridgeId: string) => {
+  const handlePressCompartment = async (id: string, label: string, fridgeId: string) => {
+    // 사용자가 현재 보고 있던 냉장고 인덱스를 로컬에 영구 저장하여 보관실 뒤로가기 혹은 새로고침 시 즉시 동기화
+    try {
+      await AsyncStorage.setItem('@active_fridge_index', String(activeIndex));
+    } catch (e) {
+      console.error(e);
+    }
     setActiveCompartment({ id, label, fridgeId });
   };
 
@@ -606,7 +621,14 @@ export default function Index() {
                 refrigerators={refrigerators}
                 onPressCompartment={handlePressCompartment}
                 activeIndex={activeIndex}
-                setActiveIndex={setActiveIndex}
+                setActiveIndex={async (idx) => {
+                  setActiveIndex(idx);
+                  try {
+                    await AsyncStorage.setItem('@active_fridge_index', String(idx));
+                  } catch (e) {
+                    console.error(e);
+                  }
+                }}
                 onOpenAddSelector={handleOpenAddSelector}
                 onOpenRenameModal={handleOpenRenameModal}
                 onEditFridgeType={handleOpenEditSelector}
