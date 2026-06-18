@@ -598,7 +598,11 @@ export default function CompartmentDetail({
 
   // 선반 구성 및 식재료 불러오기 (서버 vs 로컬 분기)
   const loadData = async (targetId: string = compartmentId) => {
-    setIsLoading(true);
+    // 최초 진입 시(선반 정보가 비어있을 때)에만 전체 로딩 화면을 띄워 Flicker 방지
+    const isInitial = insideShelves.length === 0 && doorShelves.length === 0;
+    if (isInitial) {
+      setIsLoading(true);
+    }
     try {
       // 1. 선반 구성 불러오기 (비로그인 모드일 때만 로컬스토리지 활용)
       if (!isLoggedIn) {
@@ -710,7 +714,12 @@ export default function CompartmentDetail({
     } catch (e) {
       console.error('Failed to load data', e);
     } finally {
-      setIsLoading(false);
+      const isInitial = insideShelves.length === 0 && doorShelves.length === 0;
+      if (isInitial) {
+        setIsLoading(false);
+      }
+      // 데이터 로드가 끝났으므로 부드러운 전환 애니메이션 및 선반 좌표 측정 명시적 실행
+      triggerTransitionAnimation();
     }
   };
 
@@ -718,40 +727,37 @@ export default function CompartmentDetail({
     loadData(compartmentId);
   }, [compartmentId, fridgeId, isLoggedIn]);
 
-  // 로딩 완료 후 선반 뷰 마운트 시점에 자동 좌표 측정 및 애니메이션 실행
-  useEffect(() => {
-    if (!isLoading) {
-      // 구획 전환 시 슬라이드 및 페이드 인 애니메이션 적용
-      if (transitionDirection.current === 'right') {
-        contentTranslateX.setValue(60); // 우측에서 슬라이드인
-      } else if (transitionDirection.current === 'left') {
-        contentTranslateX.setValue(-60); // 좌측에서 슬라이드인
-      } else {
-        contentTranslateX.setValue(0);
-      }
-      contentOpacity.setValue(0);
-
-      Animated.parallel([
-        Animated.timing(contentOpacity, {
-          toValue: 1,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-        Animated.timing(contentTranslateX, {
-          toValue: 0,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        transitionDirection.current = null;
-      });
-
-      const timer = setTimeout(() => {
-        measureShelves();
-      }, 100);
-      return () => clearTimeout(timer);
+  // 구획 전환 시 슬라이드 및 페이드 인 애니메이션 연동 실행 함수
+  const triggerTransitionAnimation = () => {
+    if (transitionDirection.current === 'right') {
+      contentTranslateX.setValue(60); // 우측에서 슬라이드인
+    } else if (transitionDirection.current === 'left') {
+      contentTranslateX.setValue(-60); // 좌측에서 슬라이드인
+    } else {
+      contentTranslateX.setValue(0);
     }
-  }, [isLoading]);
+    contentOpacity.setValue(0);
+
+    Animated.parallel([
+      Animated.timing(contentOpacity, {
+        toValue: 1,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      Animated.timing(contentTranslateX, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      transitionDirection.current = null;
+    });
+
+    // 레이아웃 배치가 끝난 시점에 맞추어 선반 좌표 실시간 측정
+    setTimeout(() => {
+      measureShelves();
+    }, 100);
+  };
 
   // 선반 구성 저장 헬퍼
   const saveShelfConfig = async (
