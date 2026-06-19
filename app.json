@@ -46,6 +46,12 @@
         {
           "kakaoAppKey": "ab9576d1c7245b08b1fdd4811f79762f"
         }
+      ],
+      [
+        "@react-native-seoul/naver-login",
+        {
+          "urlScheme": "freshkeep"
+        }
       ]
     ],
     "experiments": {
