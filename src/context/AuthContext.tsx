@@ -198,16 +198,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // 1. Google 로그인 처리
       if (provider === 'google') {
         try {
-          const { GoogleSignin } = require('@react-native-google-signin/google-signin');
-          GoogleSignin.configure({
-            webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-            iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-            offlineAccess: false,
-          });
-          
-          await GoogleSignin.hasPlayServices();
-          const userInfo = await GoogleSignin.signIn();
-          idToken = userInfo.idToken;
+          // NativeModules에 RNGoogleSignin 바이너리 모듈이 실제로 존재하는지 1차 자가 진증 검사
+          const { NativeModules } = require('react-native');
+          if (NativeModules.RNGoogleSignin) {
+            const { GoogleSignin } = require('@react-native-google-signin/google-signin');
+            GoogleSignin.configure({
+              webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+              iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+              offlineAccess: false,
+            });
+            
+            await GoogleSignin.hasPlayServices();
+            const userInfo = await GoogleSignin.signIn();
+            idToken = userInfo.idToken;
+          } else {
+            console.warn('Google Native module (RNGoogleSignin) not found in binary (Expo Go environment). Skipping to fallback.');
+          }
         } catch (sdkError: any) {
           console.warn('Google Native SDK Sign-In failed or was skipped, falling back to mock login:', sdkError.message);
         }
@@ -215,11 +221,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // 2. Kakao 로그인 처리
       else if (provider === 'kakao') {
         try {
-          const KakaoSDK = require('@react-native-seoul/kakao-login');
-          const tokenResult = await KakaoSDK.login();
-          idToken = tokenResult.idToken;
-          if (!idToken) {
-            idToken = tokenResult.accessToken; 
+          const { NativeModules } = require('react-native');
+          // Kakao SDK가 제공하는 RNKakaoLogins 모듈의 네이티브 존재 유무 파악
+          if (NativeModules.RNKakaoLogins) {
+            const KakaoSDK = require('@react-native-seoul/kakao-login');
+            const tokenResult = await KakaoSDK.login();
+            idToken = tokenResult.idToken;
+            if (!idToken) {
+              idToken = tokenResult.accessToken; 
+            }
+          } else {
+            console.warn('Kakao Native module (RNKakaoLogins) not found in binary (Expo Go environment). Skipping to fallback.');
           }
         } catch (sdkError: any) {
           console.warn('Kakao Native SDK Sign-In failed, falling back to mock login:', sdkError.message);
@@ -228,18 +240,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // 3. Naver 로그인 처리
       else if (provider === 'naver') {
         try {
-          const NaverSDK = require('@react-native-seoul/naver-login');
-          NaverSDK.initialize({
-            consumerKey: process.env.EXPO_PUBLIC_NAVER_CLIENT_ID,
-            consumerSecret: 'dummy_secret', // 클라이언트 단에는 보안상 secret이 필요 없으므로 더미 입력
-            appName: process.env.EXPO_PUBLIC_NAVER_CLIENT_NAME || 'freshkeep',
-            serviceUrlScheme: 'freshkeep',
-          });
-          
-          const { successResponse } = await NaverSDK.login();
-          if (successResponse) {
-            // 네이버는 엑세스 토큰이 핵심이므로, JWT 규격 동기화를 위해 검증 엔드포인트에 accessToken 전달
-            idToken = successResponse.accessToken;
+          const { NativeModules } = require('react-native');
+          // Naver 로그인 모듈 NaverLoginBridge 존재 유무 파악
+          if (NativeModules.NaverLoginBridge) {
+            const NaverSDK = require('@react-native-seoul/naver-login');
+            NaverSDK.initialize({
+              consumerKey: process.env.EXPO_PUBLIC_NAVER_CLIENT_ID,
+              consumerSecret: 'dummy_secret',
+              appName: process.env.EXPO_PUBLIC_NAVER_CLIENT_NAME || 'freshkeep',
+              serviceUrlScheme: 'freshkeep',
+            });
+            
+            const { successResponse } = await NaverSDK.login();
+            if (successResponse) {
+              idToken = successResponse.accessToken;
+            }
+          } else {
+            console.warn('Naver Native module (NaverLoginBridge) not found in binary (Expo Go environment). Skipping to fallback.');
           }
         } catch (sdkError: any) {
           console.warn('Naver Native SDK Sign-In failed, falling back to mock login:', sdkError.message);
