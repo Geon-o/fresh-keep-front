@@ -216,15 +216,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       else if (provider === 'kakao') {
         try {
           const KakaoSDK = require('@react-native-seoul/kakao-login');
-          // Kakao SDK가 제공하는 login 호출
           const tokenResult = await KakaoSDK.login();
-          idToken = tokenResult.idToken; // OpenID Connect 활성화 시 idToken 획득 가능
+          idToken = tokenResult.idToken;
           if (!idToken) {
-            // idToken 발급 설정이 안 되어있을 경우 accessToken 활용 모의 페이로드 대행
             idToken = tokenResult.accessToken; 
           }
         } catch (sdkError: any) {
           console.warn('Kakao Native SDK Sign-In failed, falling back to mock login:', sdkError.message);
+        }
+      }
+      // 3. Naver 로그인 처리
+      else if (provider === 'naver') {
+        try {
+          const NaverSDK = require('@react-native-seoul/naver-login');
+          NaverSDK.initialize({
+            consumerKey: process.env.EXPO_PUBLIC_NAVER_CLIENT_ID,
+            consumerSecret: 'dummy_secret', // 클라이언트 단에는 보안상 secret이 필요 없으므로 더미 입력
+            appName: process.env.EXPO_PUBLIC_NAVER_CLIENT_NAME || 'freshkeep',
+            serviceUrlScheme: 'freshkeep',
+          });
+          
+          const { successResponse } = await NaverSDK.login();
+          if (successResponse) {
+            // 네이버는 엑세스 토큰이 핵심이므로, JWT 규격 동기화를 위해 검증 엔드포인트에 accessToken 전달
+            idToken = successResponse.accessToken;
+          }
+        } catch (sdkError: any) {
+          console.warn('Naver Native SDK Sign-In failed, falling back to mock login:', sdkError.message);
         }
       }
 
