@@ -40,7 +40,13 @@
           }
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "@react-native-seoul/kakao-login",
+        {
+          "kakaoAppKey": "ab9576d1c7245b08b1fdd4811f79762f"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
