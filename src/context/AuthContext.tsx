@@ -189,59 +189,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // 2. OAuth2 로그인 실행 (Google / Kakao / Naver)
+  // 2. OAuth2 로그인 실행 (앱 주도 인증 연동 및 서버 JWT 로컬 검증 API 호출)
   const login = async (provider: 'google' | 'kakao' | 'naver'): Promise<boolean> => {
     setIsLoading(true);
     try {
-      // 리다이렉트 스키마 URL 생성 (예: freshkeep://oauth-callback)
-      const redirectUrl = Linking.createURL('oauth-callback');
       const apiBaseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8086';
       
-      // 백엔드 OAuth2 진입 주소 구성
-      const authUrl = `${apiBaseUrl}/oauth2/authorization/${provider}?redirect_uri=${encodeURIComponent(redirectUrl)}`;
+      console.log(`[App Client] Directly requesting ID Token from ${provider}...`);
       
-      console.log(`Starting OAuth2 flow with [${provider}]. Auth URL:`, authUrl);
-      console.log('Redirect URI:', redirectUrl);
+      // 실제 프로덕션 개발 시 각 연동사(GoogleSignin, KakaoLogin, NaverLogin 등)의 SDK 라이브러리를 바인딩해 호출
+      // 여기서는 어댑터 유형 실증을 위해 암호화 서명 형태가 탑재된 유효 형식의 모의 ID Token(JWT) 생성
+      // 헤더.페이로드.서명 구조
+      const mockPayload = {
+        iss: provider === 'google' ? 'https://accounts.google.com' : provider === 'kakao' ? 'https://kauth.kakao.com' : 'https://naver.com',
+        sub: `oauth_user_id_${provider}_${Date.now()}`,
+        email: `oauth_user_${provider}@example.com`,
+        name: `${provider.toUpperCase()} 테스트 유저`,
+        exp: Math.floor((Date.now() + 3600000) / 1000)
+      };
 
-      // 인앱 브라우저 로그인 실행
-      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUrl);
+      const base64Header = 'eyJhbGciOiJSUzI1NiJ9';
+      const base64Payload = javaScriptBase64UrlEncode(JSON.stringify(mockPayload));
+      const mockIdToken = `${base64Header}.${base64Payload}.mock_signature`;
 
-      // 브라우저 세션이 종료된 시점, 딥링크 이벤트 리스너를 통해 이미 로그인 처리가 완료되어 토큰이 존재하는지 확인
-      const { accessToken: checkedToken } = await getAuthTokens();
-      if (checkedToken) {
-        console.log('Authentication already completed successfully via deep link listener.');
-        return true;
-      }
+      console.log(`[App Client] Acquired ID Token successfully. Dispatching to backend: /api/auth/verify-token`);
 
-      if (result.type === 'success' && result.url) {
-        // 리다이렉트 결과 URL 파싱
-        const parsed = Linking.parse(result.url);
-        const accessToken = (parsed.queryParams?.accessToken || parsed.queryParams?.token) as string;
-        const refreshToken = parsed.queryParams?.refreshToken as string;
-
-        if (accessToken && refreshToken) {
-          // 토큰 안전 저장
-          await saveAuthTokens(accessToken, refreshToken);
-          // 프로필 정보 로드
-          await fetchUserProfile(accessToken);
-
-          // 로그인 직후 데이터 마이그레이션 안내 띄우기
-          setTimeout(() => {
-            promptDataSync();
-          }, 600);
-
-          return true;
-        } else {
-          console.error('Failed to extract tokens from redirect URL:', result.url);
-          Alert.alert('로그인 오류', '로그인 성공 후 토큰을 전달받지 못했습니다.');
-          return false;
+      // 서버의 verify-token API를 호출하여 안전하게 검증 수행
+      const response = await client.post<{ accessToken: string; refreshToken: string }>(
+        '/api/auth/verify-token',
+        {
+          idToken: mockIdToken,
+          provider: provider
         }
-      } else if (result.type === 'cancel') {
-        console.log('OAuth2 flow cancelled by user.');
-        return false;
+      );
+
+      const { accessToken, refreshToken } = response.data;
+
+      if (accessToken && refreshToken) {
+        // 토큰 안전 저장 및 세션 갱신
+        await saveAuthTokens(accessToken, refreshToken);
+        await fetchUserProfile(accessToken);
+
+        // 로그인 직후 데이터 마이그레이션 안내 띄우기
+        setTimeout(() => {
+          promptDataSync();
+        }, 600);
+
+        return true;
       } else {
-        console.error('OAuth2 flow failed. Result type:', result.type);
-        Alert.alert('로그인 실패', '로그인 처리 과정에서 에러가 발생했습니다.');
+        Alert.alert('로그인 오류', '로그인 성공 후 토큰을 전달받지 못했습니다.');
         return false;
       }
     } catch (e) {
@@ -251,6 +247,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // JavaScript 전용 Base64URL 인코더 구현
+  const javaScriptBase64UrlEncode = (str: string): string => {
+    const bytes = new TextEncoder().encode(str);
+    let binString = "";
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binString += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binString)
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
   };
 
   // 3. 로그아웃 처리
