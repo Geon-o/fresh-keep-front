@@ -6,6 +6,7 @@ export interface ServerFridge {
   name: string;
   type: 'FOUR_DOOR' | 'SIDE_BY_SIDE' | 'TWO_DOOR';
   role: 'OWNER' | 'MEMBER';
+  uuid: string;
 }
 
 export interface ServerIngredient {

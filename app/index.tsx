@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, Modal, TouchableOpacity, Text, Alert, Platform, TextInput, KeyboardAvoidingView, ActivityIndicator, Animated, Easing, BackHandler } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Linking from 'expo-linking';
 import * as SplashScreen from 'expo-splash-screen';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
@@ -11,6 +12,7 @@ import RefrigeratorVisual from '../src/components/RefrigeratorVisual';
 import CompartmentDetail from '../src/components/CompartmentDetail';
 import SettingsView from '../src/components/SettingsView';
 import RefrigeratorSelector from '../src/components/RefrigeratorSelector';
+import QrShareModal from '../src/components/QrShareModal';
 import { useAuth } from '../src/context/AuthContext';
 import { serializeMemo } from '../src/utils/memoSerializer';
 import { getFridges, createFridge, deleteFridge, updateFridge, convertTypeToFrontend, getFridgeLayout } from '../src/api/fridgeService';
@@ -24,6 +26,12 @@ export default function Index() {
   const { theme, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const [isGlobalLoading, setIsGlobalLoading] = useState(false);
+
+  // 2.7. 냉장고 QR 공유 모달 상태
+  const [qrShareVisible, setQrShareVisible] = useState(false);
+  const [shareFridgeName, setShareFridgeName] = useState('');
+  const [shareFridgeUuid, setShareFridgeUuid] = useState('');
+  const [pendingShareUuid, setPendingShareUuid] = useState<string | null>(null);
 
   const splashTheme = {
     background: theme.splashBg,
@@ -91,6 +99,63 @@ export default function Index() {
     }, 2000);
   };
 
+  // 딥링크 수신 및 처리 리스너
+  useEffect(() => {
+    const handleDeepLink = async (event: { url: string }) => {
+      console.log('App received deep link:', event.url);
+      try {
+        const parsed = Linking.parse(event.url);
+        const uuid = parsed.queryParams?.uuid as string;
+        if (uuid && event.url.includes('share-fridge')) {
+          setPendingShareUuid(uuid);
+        }
+      } catch (e) {
+        console.error('Failed to parse deep link URL', e);
+      }
+    };
+
+    // 포그라운드 상태 딥링크 리스너
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+
+    // 백그라운드/완전종료 상태에서 딥링크 기동 처리
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        handleDeepLink({ url });
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  // 익명 로그인이 완료(isLoggedIn)된 후, 대기 중이던 공유 요청(pendingShareUuid)을 자동 처리
+  useEffect(() => {
+    const processPendingShare = async () => {
+      if (isLoggedIn && pendingShareUuid) {
+        const uuidToProcess = pendingShareUuid;
+        setPendingShareUuid(null); // 중복 실행 방지 위해 클리어
+        setIsGlobalLoading(true);
+        try {
+          const { client } = await import('../src/api/client');
+          await client.post('/api/fridges/share', { fridgeUuid: uuidToProcess });
+          
+          // 캐시 갱신
+          queryClient.invalidateQueries({ queryKey: ['fridges'] });
+          Alert.alert('공동 관리 냉장고 추가 성공 🎉', '공유된 냉장고가 정상적으로 목록에 추가되었습니다.');
+        } catch (e: any) {
+          console.error('Failed to join shared fridge via deep link', e);
+          const errMsg = e.response?.data?.message || '이미 공유 등록된 냉장고이거나 유효하지 않은 공유 링크입니다.';
+          Alert.alert('공유 냉장고 연동 실패 ❌', errMsg);
+        } finally {
+          setIsGlobalLoading(false);
+        }
+      }
+    };
+
+    processPendingShare();
+  }, [isLoggedIn, pendingShareUuid]);
+
   useEffect(() => {
     activeTabRef.current = activeTab;
   }, [activeTab]);
@@ -155,19 +220,15 @@ export default function Index() {
     return () => clearTimeout(timer);
   }, []);
 
-  // 냉장고 목록 로딩 완료 및 최소 노출 시간 경과 시 스플래시 스크린 숨김 처리
+  // 앱 컴포넌트가 마운트되는 즉시 OS 네이티브 스플래시를 숨김 처리하여 커스텀 애니메이션 스플래시가 보이도록 유도
   useEffect(() => {
-    if (!isRefrigeratorsLoading && isMinTimeElapsed) {
-      const hideSplash = async () => {
-        try {
-          await SplashScreen.hideAsync();
-        } catch (e) {
-          // 이미 닫혔거나 에러 발생 시 무시
-        }
-      };
-      hideSplash();
-    }
-  }, [isRefrigeratorsLoading, isMinTimeElapsed]);
+    const hideNativeSplash = async () => {
+      try {
+        await SplashScreen.hideAsync();
+      } catch (e) {}
+    };
+    hideNativeSplash();
+  }, []);
 
   // 스플래시 오버레이를 띄울지 여부 (로딩 중이거나 최소 시간이 지나지 않았을 때)
   const showSplashOverlay = isRefrigeratorsLoading || !isMinTimeElapsed;
@@ -290,6 +351,7 @@ export default function Index() {
           id: String(f.id),
           type: convertTypeToFrontend(f.type),
           name: f.name,
+          uuid: f.uuid,
         }))
       : localRefrigerators;
   }, [isLoggedIn, serverFridges, localRefrigerators]);
@@ -633,6 +695,12 @@ export default function Index() {
                 onOpenRenameModal={handleOpenRenameModal}
                 onEditFridgeType={handleOpenEditSelector}
                 onDeleteFridge={handleDeleteConfirm}
+                onShareFridge={(fridgeName, fridgeUuid) => {
+                  setShareFridgeName(fridgeName);
+                  setShareFridgeUuid(fridgeUuid);
+                  setQrShareVisible(true);
+                }}
+                onScanQr={() => router.push('/qr-scan')}
               />
             ) : (
               <SettingsView
@@ -856,6 +924,14 @@ export default function Index() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* 냉장고 QR 공유 모달 */}
+      <QrShareModal
+        visible={qrShareVisible}
+        onClose={() => setQrShareVisible(false)}
+        fridgeName={shareFridgeName}
+        fridgeUuid={shareFridgeUuid}
+      />
       {/* 100% 신뢰성 있는 인앱 비주얼 스플래시 스크린 */}
       {showSplashOverlay && (
         <View style={[styles.splashOverlayContainer, { backgroundColor: splashTheme.background }]}>

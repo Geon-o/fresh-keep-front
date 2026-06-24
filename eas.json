@@ -13,7 +13,11 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://casio-james-smoke-comm.trycloudflare.com"
+        "EXPO_PUBLIC_API_URL": "https://recovery-pharmacy-penny-holiday.trycloudflare.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "480114036487-r29f4fv8c4vp4dqpja6ios3j6ij9o7ko.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "480114036487-r29f4fv8c4vp4dqpja6ios3j6ij9o7ko.apps.googleusercontent.com",
+        "EXPO_PUBLIC_NAVER_CLIENT_ID": "U72qHp6tSzgSxO14l12G",
+        "EXPO_PUBLIC_NAVER_CLIENT_NAME": "freshkeep"
       }
     },
     "production": {}

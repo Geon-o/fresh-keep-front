@@ -263,7 +263,7 @@ const STORAGE_TIPS: StorageTip[] = [
 
 interface RefrigeratorVisualProps {
   mode?: 'home' | 'ingredients' | 'fridge';
-  refrigerators: { id: string; type: FridgeType; name: string }[];
+  refrigerators: { id: string; type: FridgeType; name: string; uuid?: string }[];
   onPressCompartment: (id: string, label: string, fridgeId: string) => void;
   activeIndex: number;
   setActiveIndex: (index: number) => void;
@@ -271,6 +271,8 @@ interface RefrigeratorVisualProps {
   onOpenRenameModal: () => void;
   onEditFridgeType: () => void;
   onDeleteFridge: () => void;
+  onShareFridge?: (fridgeName: string, fridgeUuid: string) => void;
+  onScanQr?: () => void;
 }
 
 export default function RefrigeratorVisual({
@@ -282,7 +284,9 @@ export default function RefrigeratorVisual({
   onOpenAddSelector,
   onOpenRenameModal,
   onEditFridgeType,
-  onDeleteFridge
+  onDeleteFridge,
+  onShareFridge,
+  onScanQr
 }: RefrigeratorVisualProps) {
   const { width: screenWidth } = useWindowDimensions();
   const { isLoggedIn } = useAuth();
@@ -1445,15 +1449,26 @@ export default function RefrigeratorVisual({
         >
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: 20, marginBottom: 20 }}>
             <Text style={[styles.pageTitle, { color: theme.textPrimary, marginBottom: 0 }]}>나의 냉장고</Text>
-            {activeFridge && (
-              <TouchableOpacity
-                style={[styles.fridgeSettingButton, { backgroundColor: theme.surfaceTertiary, padding: 8, borderRadius: 10 }]}
-                activeOpacity={0.7}
-                onPress={() => setFridgeSettingsVisible(true)}
-              >
-                <Ionicons name="settings-outline" size={20} color={theme.textPrimary} />
-              </TouchableOpacity>
-            )}
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              {onScanQr && (
+                <TouchableOpacity
+                  style={[styles.fridgeSettingButton, { backgroundColor: theme.surfaceTertiary, padding: 8, borderRadius: 10 }]}
+                  activeOpacity={0.7}
+                  onPress={onScanQr}
+                >
+                  <Ionicons name="scan-outline" size={20} color={theme.textPrimary} />
+                </TouchableOpacity>
+              )}
+              {activeFridge && (
+                <TouchableOpacity
+                  style={[styles.fridgeSettingButton, { backgroundColor: theme.surfaceTertiary, padding: 8, borderRadius: 10 }]}
+                  activeOpacity={0.7}
+                  onPress={() => setFridgeSettingsVisible(true)}
+                >
+                  <Ionicons name="settings-outline" size={20} color={theme.textPrimary} />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
           {/* 나의 냉장고 보관소 */}
           <View style={[styles.sectionContainer, { marginTop: 0 }]}>
@@ -2037,6 +2052,26 @@ export default function RefrigeratorVisual({
                       </View>
                       <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
                     </TouchableOpacity>
+
+                    {/* 냉장고 공유 (QR) */}
+                    {onShareFridge && activeFridge && activeFridge.uuid && (
+                      <TouchableOpacity
+                        style={[styles.settingsActionRow, { borderBottomWidth: 1, borderBottomColor: theme.borderLight }]}
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          setFridgeSettingsVisible(false);
+                          onShareFridge(activeFridge.name, activeFridge.uuid!);
+                        }}
+                      >
+                        <View style={styles.settingsActionLeft}>
+                          <View style={[styles.settingsIconBadge, { backgroundColor: theme.primaryLight }]}>
+                            <Ionicons name="qr-code-outline" size={18} color={theme.primary} />
+                          </View>
+                          <Text style={[styles.settingsActionText, { color: theme.textSecondary }]}>냉장고 공유 (QR)</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+                      </TouchableOpacity>
+                    )}
 
                     {/* 냉장고 삭제 */}
                     <TouchableOpacity

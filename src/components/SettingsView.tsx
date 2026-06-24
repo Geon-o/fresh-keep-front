@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Platform, Modal } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Platform, Modal, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { FridgeType } from '../types';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 
 interface SettingsViewProps {
   isLoggedIn: boolean;
-  user: { id: number; name: string; email: string; provider: string } | null;
+  user: { id: number; name: string; provider: string } | null;
   onLogout: () => void;
   onLogin: () => void;
 }
@@ -14,45 +15,29 @@ interface SettingsViewProps {
 const SERVICE_TERMS = `제1조 (목적)
 본 약관은 FreshKeep(이하 "서비스")이 제공하는 모바일 앱 및 제반 서비스의 이용 조건, 절차 및 회원과 서비스 간의 권리, 의무에 관한 기본 사항을 규정함을 목적으로 합니다.
 
-제2조 (회원가입 및 계정 관리)
-1. 회원은 소셜 인증(이메일, 이름 등 제공)을 통해 본 서비스의 회원으로 등록할 수 있습니다.
-2. 회원은 본인의 로그인 계정 정보를 안전하게 관리하여야 하며, 제3자의 무단 사용이 의심될 경우 지체 없이 서비스에 알려 조치를 받아야 합니다.
+제2조 (계정 및 백업 키 관리)
+1. 본 서비스는 개인정보의 유출 방지를 위해 소셜 로그인을 제공하지 않으며, 무작위 생성 백업 키와 기기 UUID 기반의 익명 로그인으로 서비스가 제공됩니다.
+2. 회원은 본인의 백업 키를 타인에게 유출하지 않고 안전하게 직접 관리해야 하며, 백업 키를 유실할 경우 데이터를 복구할 수 없습니다.
 
 제3조 (서비스 제공 및 중단)
 1. 서비스는 식품 유통기한 추적, 보관실 레이아웃 시각화, 식중독 지수 위생 예보, 제철 식재료 검색 가이드를 제공합니다.
-2. 시스템 점검, 통신 장애 등 부득이한 사유 발생 시 서비스 제공이 일시 중단될 수 있으며, 이 경우 사전에 공지합니다.
-
-제4조 (회원의 의무 및 이용 제한)
-1. 회원은 타인의 계정 정보나 식재료 정보를 무단 도용해서는 안 됩니다.
-2. 서비스의 정상적인 운영을 방해하는 해킹, 비정상적 트래픽 유발 등의 행위 시 서비스 이용이 제한되거나 법적 책임이 따를 수 있습니다.
-
-제5조 (면책 조항)
-본 서비스의 식중독 지수 예보 및 유통기한 알림은 보조적 기상 통계 및 입력 데이터에 기반하며, 실제 식재료의 개별 신선도와 부패 상태에 따른 최종 섭취 적합 여부는 회원의 직접 확인 및 주의 의무 하에 결정됩니다. 서비스는 이로 인해 발생한 위생 문제에 책임을 지지 않습니다.`;
+2. 시스템 점검, 통신 장애 등 부득이한 사유 발생 시 서비스 제공이 일시 중단될 수 있으며, 이 경우 사전에 공지합니다.`;
 
 const PRIVACY_POLICY = `개인정보 처리방침
 
-FreshKeep은 회원의 개인정보를 소중하게 처리하며, 관련 개인정보보호법에 규정된 의무를 준수합니다.
+FreshKeep은 개인정보 유출을 원천적으로 차단하기 위해 로그인 절차에서 이메일, 전화번호 등의 실식별 개인정보를 일절 수집하지 않습니다.
 
 1. 수집하는 개인정보의 항목
-서비스는 편리한 연동 및 회원 관리를 위해 아래의 최소한의 정보만을 수집합니다.
-- 필수 수집 항목: 소셜 계정의 이메일 주소, 이름
-- 자동 생성 수집 항목: 기기 OS 타입, 푸시 알림 토큰(수신 동의 시)
+서비스는 아래의 비인식 식별값 및 단말 정보만을 활용합니다.
+- 기기 UUID (자동 생성)
+- 냉장고 및 식재료 정보 (직접 기입)
 
 2. 개인정보의 수집 및 이용 목적
 수집된 정보는 다음의 한정된 목적을 위해서만 활용됩니다.
-- 회원 식별 및 가입 확인
-- 다중 기기 간 냉장고 데이터 실시간 동기화
-- 개인별 유통기한 리포트 제공 및 시스템 알림 발송
+- 생성한 냉장고 정보를 안전하게 데이터베이스에 저장하고 타 기기 및 공유자와 실시간 동기화하기 위함.
 
 3. 개인정보의 보유 및 이용 기간
-- 회원의 개인정보는 회원 탈퇴 시 지체 없이 파기됩니다.
-- 단, 회원 정보 오용 방지 및 관계 법령(전자상거래 등에서의 소비자보호에 관한 법률 등)의 규정에 의하여 보존할 필요가 있는 경우 해당 기간 동안 안전하게 보관합니다.
-
-4. 개인정보의 제3자 제공 및 위탁
-서비스는 회원의 동의 없이 개인정보를 외부에 무단 제공하거나 제3자에게 위탁하지 않습니다. 단, 법적 요구 등 법률에 따른 정당한 요구가 있을 경우에는 예외로 합니다.
-
-5. 회원의 권리와 행사 방법
-회원은 언제든지 앱 내 설정을 통해 탈퇴하거나 수집된 정보의 열람 및 정정을 청구할 수 있습니다.`;
+- 수집된 식재료 정보 및 냉장고 정보는 익명 세션 초기화 시 지체 없이 파기됩니다.`;
 
 export default function SettingsView({
   isLoggedIn,
@@ -61,10 +46,20 @@ export default function SettingsView({
   onLogin
 }: SettingsViewProps) {
   const { theme, themeMode, setThemeMode, isDark } = useTheme();
+  const { getBackupKey, restoreBackup, logout } = useAuth();
   
   const [modalVisible, setModalVisible] = useState(false);
   const [modalTitle, setModalTitle] = useState('');
   const [modalContent, setModalContent] = useState('');
+
+  const [backupKey, setBackupKey] = useState<string | null>(null);
+  const [showKey, setShowKey] = useState(false);
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      getBackupKey().then(key => setBackupKey(key));
+    }
+  }, [isLoggedIn]);
 
   const handleOpenTerms = (type: 'service' | 'privacy') => {
     if (type === 'service') {
@@ -77,6 +72,17 @@ export default function SettingsView({
     setModalVisible(true);
   };
 
+  const handleResetSession = () => {
+    Alert.alert(
+      '데이터 초기화 ⚠️',
+      '현재 기기의 익명 세션을 만료하고 완전히 새로운 빈 세션을 발급받습니다. 저장하지 않은 데이터는 모두 삭제됩니다. 계속하시겠습니까?',
+      [
+        { text: '취소', style: 'cancel' },
+        { text: '초기화', style: 'destructive', onPress: logout }
+      ]
+    );
+  };
+
   return (
     <ScrollView 
       style={[styles.container, { backgroundColor: theme.background }]} 
@@ -85,66 +91,47 @@ export default function SettingsView({
     >
       <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>설정</Text>
 
-      {/* 1. 프로필 영역 */}
-      {isLoggedIn && user ? (
-        <View style={[
-          styles.membershipCard, 
-          { 
-            backgroundColor: isDark ? theme.surface : '#0D47A1', 
-            borderColor: isDark ? theme.glassBorder : 'rgba(255, 255, 255, 0.15)',
-            shadowColor: isDark ? theme.shadow : '#0D47A1',
-            overflow: 'hidden',
-          }
-        ]}>
-          {/* Card background glowing circles */}
-          <View style={{
-            position: 'absolute',
-            right: -60,
-            bottom: -60,
-            width: 180,
-            height: 180,
-            borderRadius: 90,
-            backgroundColor: isDark ? 'rgba(187, 222, 251, 0.04)' : 'rgba(255, 255, 255, 0.08)',
-          }} />
-          <View style={{
-            position: 'absolute',
-            left: -40,
-            top: -40,
-            width: 120,
-            height: 120,
-            borderRadius: 60,
-            backgroundColor: isDark ? 'rgba(187, 222, 251, 0.02)' : 'rgba(255, 255, 255, 0.04)',
-          }} />
+      {/* 1. 백업 키 관리 영역 */}
+      <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>내 백업 키</Text>
+      <View style={[
+        styles.membershipCard, 
+        { 
+          backgroundColor: isDark ? theme.surface : '#0D47A1', 
+          borderColor: isDark ? theme.glassBorder : 'rgba(255, 255, 255, 0.15)',
+          shadowColor: isDark ? theme.shadow : '#0D47A1',
+          overflow: 'hidden',
+          marginBottom: 16,
+        }
+      ]}>
+        {/* Card background glowing circles */}
+        <View style={{
+          position: 'absolute',
+          right: -60,
+          bottom: -60,
+          width: 180,
+          height: 180,
+          borderRadius: 90,
+          backgroundColor: isDark ? 'rgba(187, 222, 251, 0.04)' : 'rgba(255, 255, 255, 0.08)',
+        }} />
 
-          <View style={styles.profileWrapper}>
-            <View style={[styles.avatarCircle, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.2)' }]}>
-              <Text style={styles.avatarText}>👤</Text>
-            </View>
-            <View style={styles.profileInfo}>
-              <Text style={[styles.profileName, { color: '#FFFFFF' }]}>{user.name}님</Text>
-              <Text style={[styles.profileEmail, { color: isDark ? theme.textSecondary : '#BBDEFB' }]}>{user.email}</Text>
-              <View style={[styles.providerBadge, { backgroundColor: isDark ? theme.surfaceSecondary : 'rgba(255, 255, 255, 0.15)' }]}>
-                <Text style={[styles.providerText, { color: isDark ? theme.primaryText : '#FFFFFF' }]}>{user.provider.toUpperCase()} 계정</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-      ) : (
-        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.borderLight, shadowColor: theme.shadow }]}>
-          <View style={styles.loginGuideWrapper}>
-            <Text style={[styles.loginGuideTitle, { color: theme.textPrimary }]}>로그인이 필요합니다 🔑</Text>
-            <Text style={[styles.loginGuideDesc, { color: theme.textTertiary }]}>서버 동기화 및 다중 기기 연동을 위해 로그인해 보세요.</Text>
-            <TouchableOpacity 
-              style={[styles.loginButton, { backgroundColor: theme.primary, shadowColor: theme.primary }]} 
-              activeOpacity={0.8} 
-              onPress={onLogin}
-            >
-              <Ionicons name="log-in-outline" size={18} color={theme.primaryOnPrimary} style={{ marginRight: 6 }} />
-              <Text style={[styles.loginButtonText, { color: theme.primaryOnPrimary }]}>로그인 / 회원가입</Text>
+        <View style={{ paddingHorizontal: 4, paddingVertical: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 10, padding: 12, justifyContent: 'space-between', marginBottom: 12 }}>
+            <Text style={{ color: '#FFFFFF', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 16, fontWeight: '700', letterSpacing: 1.2 }}>
+              {backupKey ? (showKey ? backupKey : 'FK-••••-••••-••••') : '불러오는 중...'}
+            </Text>
+            <TouchableOpacity onPress={() => setShowKey(!showKey)} style={{ padding: 4 }}>
+              <Ionicons name={showKey ? "eye-off-outline" : "eye-outline"} size={22} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
+          
+          <View style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.2)' }}>
+            <Text style={{ color: '#FCA5A5', fontSize: 12, fontWeight: 'bold', marginBottom: 4 }}>⚠️ 보안 주의사항</Text>
+            <Text style={{ color: '#E2E8F0', fontSize: 11, lineHeight: 16 }}>
+              기기를 분실하거나 앱 삭제 시 백업 키가 없으면 어떠한 방법으로도 데이터를 복구할 수 없습니다. 타인에게 공유하지 마시고, 안전한 곳에 별도로 메모하여 보관해 주세요.
+            </Text>
+          </View>
         </View>
-      )}
+      </View>
 
       {/* 1.5. 테마 설정 영역 */}
       <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>화면 테마 설정</Text>
@@ -203,17 +190,15 @@ export default function SettingsView({
         </TouchableOpacity>
       </View>
 
-      {/* 3. 로그아웃 버튼 (로그인 시에만 노출) */}
-      {isLoggedIn && (
-        <TouchableOpacity 
-          style={[styles.logoutButton, { backgroundColor: theme.surfaceTertiary, borderColor: theme.borderLight }]} 
-          activeOpacity={0.8} 
-          onPress={onLogout}
-        >
-          <Ionicons name="log-out-outline" size={18} color={theme.textSecondary} style={{ marginRight: 6 }} />
-          <Text style={[styles.logoutButtonText, { color: theme.textSecondary }]}>로그아웃</Text>
-        </TouchableOpacity>
-      )}
+      {/* 3. 데이터 초기화 버튼 (익명 로그아웃 역할) */}
+      <TouchableOpacity 
+        style={[styles.logoutButton, { backgroundColor: theme.surfaceTertiary, borderColor: theme.borderLight }]} 
+        activeOpacity={0.8} 
+        onPress={handleResetSession}
+      >
+        <Ionicons name="trash-outline" size={18} color={theme.textSecondary} style={{ marginRight: 6 }} />
+        <Text style={[styles.logoutButtonText, { color: theme.textSecondary }]}>익명 세션 초기화</Text>
+      </TouchableOpacity>
 
       {/* 약관 상세 보기 모달 */}
       <Modal

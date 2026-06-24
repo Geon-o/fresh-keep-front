@@ -8,7 +8,9 @@ import { useTheme } from '../src/context/ThemeContext';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login, loginAsDeveloper, isLoading, isLoggedIn } = useAuth();
+  const { isLoading, isLoggedIn } = useAuth();
+  const login = async (provider: string) => false;
+  const loginAsDeveloper = async () => false;
   const { theme, isDark } = useTheme();
 
   // Floating bubble animations

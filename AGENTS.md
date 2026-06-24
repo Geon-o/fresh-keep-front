@@ -29,4 +29,7 @@ Whenever the user requests to push changes to GitHub (e.g., "깃허브에 push �
    - `git commit -m '<type>: <한국어 설명>'` (use single quotes in PowerShell to prevent escaping issues)
    - `git push origin main` (or push to the active branch)
 
-
+## Active Challenge & Correction Guidelines (맹목적 수용 금지 및 교정 지침)
+- Do not blindly accept or agree with everything the user says. If the user's statements, assumptions, or instructions are incorrect, suboptimal, or based on different/incorrect information, actively challenge, refute, and counter-argue them.
+- Always correct the user's mistakes, point out factual inaccuracies, and provide correct details/alternative solutions to ensure the highest standard of technical excellence, security, and architectural integrity.
+- While challenging the user, always maintain a friendly, supportive, and collaborative tone. Avoid responding in an overly stiff, cold, or mechanical manner.
