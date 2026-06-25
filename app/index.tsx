@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Linking from 'expo-linking';
 import * as SplashScreen from 'expo-splash-screen';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { FridgeType, Ingredient } from '../src/types';
 import RefrigeratorVisual from '../src/components/RefrigeratorVisual';
@@ -23,6 +23,7 @@ export default function Index() {
   const { isLoggedIn, user, logout } = useAuth();
   const queryClient = useQueryClient();
   const router = useRouter();
+  const pathname = usePathname();
   const { theme, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const [isGlobalLoading, setIsGlobalLoading] = useState(false);
@@ -66,6 +67,11 @@ export default function Index() {
   const activeTabRef = useRef(activeTab);
   const activeCompartmentRef = useRef(activeCompartment);
   const backPressedTimeRef = useRef(0);
+  const pathnameRef = useRef(pathname);
+
+  useEffect(() => {
+    pathnameRef.current = pathname;
+  }, [pathname]);
 
   // 커스텀 토스트 상태 및 애니메이션 설정
   const [toastText, setToastText] = useState('');
@@ -166,6 +172,11 @@ export default function Index() {
 
   useEffect(() => {
     const handleBackButton = () => {
+      // 메인 홈 화면(/)이 아닐 때는 BackHandler가 간섭하지 않고 기본 네비게이션 뒤로가기(스택 팝)가 작동하도록 함
+      if (pathnameRef.current !== '/') {
+        return false;
+      }
+
       // 1. 구획 상세(CompartmentDetail)가 열려있다면 구획 닫기
       if (activeCompartmentRef.current !== null) {
         setActiveCompartment(null);

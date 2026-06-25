@@ -7,6 +7,19 @@ import { ThemeAlertPortal } from "../src/components/ThemeAlert";
 import * as SplashScreen from 'expo-splash-screen';
 import { ThemeProvider, useTheme } from "../src/context/ThemeContext";
 
+import * as KeepAwake from 'expo-keep-awake';
+
+// KeepAwake 에러 방지 패치
+const originalActivate = KeepAwake.activateKeepAwakeAsync;
+// eslint-disable-next-line import/namespace
+KeepAwake.activateKeepAwakeAsync = async (...args) => {
+  try {
+    return await originalActivate(...args);
+  } catch (e) {
+    console.warn('Keep awake activation failed silently:', e);
+  }
+};
+
 // 앱 시작 시 자동 스플래시 스크린 숨김을 방지하고 수동으로 제어
 SplashScreen.preventAutoHideAsync().catch(() => {});
 

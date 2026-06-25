@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
 import { getAuthTokens, saveAuthTokens, clearAuthTokens } from '../utils/secureStore';
@@ -38,6 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const isAuthenticatingRef = useRef(false);
 
   // 1. 앱 구동 시 기기 UUID 확인 후 익명 로그인 처리
   useEffect(() => {
@@ -67,6 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Axios client에서 401 재인증 실패 시 강제 재인증(익명) 처리할 콜백 등록
     registerUnauthorizedCallback(async () => {
       await clearAuthTokens();
+      await AsyncStorage.removeItem('@backup_key');
       setIsLoggedIn(false);
       setUser(null);
       await loginAnonymously();
@@ -84,13 +86,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       return false;
     } catch (e) {
-      console.warn('Failed to fetch user profile', e);
       return false;
     }
   };
 
   // 익명 로그인 수행
   const loginAnonymously = async (): Promise<boolean> => {
+    if (isAuthenticatingRef.current) {
+      console.log('Anonymous login already in progress, skipping duplicate request.');
+      return false;
+    }
+    isAuthenticatingRef.current = true;
     try {
       // 1. AsyncStorage에서 기기 UUID 조회 또는 신규 생성
       let deviceUuid = await AsyncStorage.getItem('@device_uuid');
@@ -99,17 +105,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await AsyncStorage.setItem('@device_uuid', deviceUuid);
       }
 
-      console.log('Authenticating anonymously with device UUID:', deviceUuid);
-
       // 2. 백엔드 익명 인증 API 호출
-      const response = await client.post<{ accessToken: string; refreshToken: string }>(
+      const response = await client.post<{ accessToken: string; refreshToken: string; backupKey?: string }>(
         '/api/auth/anonymous',
         { deviceUuid }
       );
 
-      const { accessToken, refreshToken } = response.data;
+      const { accessToken, refreshToken, backupKey } = response.data;
       if (accessToken && refreshToken) {
         await saveAuthTokens(accessToken, refreshToken);
+        if (backupKey) {
+          await AsyncStorage.setItem('@backup_key', backupKey);
+        }
         await fetchUserProfile();
         return true;
       }
@@ -117,16 +124,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.error('Anonymous login failed', e);
       return false;
+    } finally {
+      isAuthenticatingRef.current = false;
     }
   };
 
-  // 백업 키 조회
+  // 백업 키 조회 (로컬 저장소에서 직접 조회하도록 하이브리드 적용)
   const getBackupKey = async (): Promise<string | null> => {
     try {
-      const response = await client.get<{ backupKey: string }>('/api/auth/backup-key');
-      return response.data.backupKey;
+      return await AsyncStorage.getItem('@backup_key');
     } catch (e) {
-      console.error('Failed to fetch backup key', e);
+      console.error('Failed to get backup key from storage', e);
       return null;
     }
   };
@@ -141,14 +149,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await AsyncStorage.setItem('@device_uuid', deviceUuid);
       }
 
-      const response = await client.post<{ accessToken: string; refreshToken: string }>(
+      const response = await client.post<{ accessToken: string; refreshToken: string; backupKey?: string }>(
         '/api/auth/restore',
         { backupKey, deviceUuid }
       );
 
-      const { accessToken, refreshToken } = response.data;
+      const { accessToken, refreshToken, backupKey: restoredBackupKey } = response.data;
       if (accessToken && refreshToken) {
         await saveAuthTokens(accessToken, refreshToken);
+        if (restoredBackupKey) {
+          await AsyncStorage.setItem('@backup_key', restoredBackupKey);
+        }
         await fetchUserProfile();
         queryClient.invalidateQueries({ queryKey: ['fridges'] });
         Alert.alert('복구 성공 🎉', '이전 기기의 데이터가 정상적으로 복구되었습니다.');
@@ -170,6 +181,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     try {
       await clearAuthTokens();
+      await AsyncStorage.removeItem('@backup_key');
+      await AsyncStorage.removeItem('@device_uuid');
+      await AsyncStorage.removeItem('@refrigerators');
+      await AsyncStorage.removeItem('@ingredients');
       setIsLoggedIn(false);
       setUser(null);
       queryClient.clear();
