@@ -12,7 +12,7 @@ import * as KeepAwake from 'expo-keep-awake';
 // KeepAwake 에러 방지 패치
 const originalActivate = KeepAwake.activateKeepAwakeAsync;
 // eslint-disable-next-line import/namespace
-KeepAwake.activateKeepAwakeAsync = async (...args) => {
+(KeepAwake as any).activateKeepAwakeAsync = async (...args: any[]) => {
   try {
     return await originalActivate(...args);
   } catch (e) {

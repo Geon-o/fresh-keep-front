@@ -304,6 +304,10 @@ export default function RefrigeratorVisual({
   const [guideSearchQuery, setGuideSearchQuery] = useState('');
   const [guideSelectedCategory, setGuideSelectedCategory] = useState<string>('all');
 
+  // AI 안내 팝업 상태
+  const [showGuideNotice, setShowGuideNotice] = useState(false);
+  const [isGuideNoticeChecked, setIsGuideNoticeChecked] = useState(false);
+
   // DB에서 저장된 전체 가이드 리스트 가져오기
   const [dbGuides, setDbGuides] = useState<StorageTip[]>([]);
 
@@ -314,24 +318,46 @@ export default function RefrigeratorVisual({
   const typingTimeoutRef = useRef<any>(null);
 
   useEffect(() => {
-    if (guideModalVisible && isLoggedIn) {
-      const fetchDbGuides = async () => {
+    if (guideModalVisible) {
+      // 1. 일주일 동안 보지 않기 기간 체크
+      const checkNoticePreference = async () => {
         try {
-          const results = await getAllStorageGuides();
-          const mapped: StorageTip[] = results.map(item => ({
-            name: item.name,
-            emoji: item.emoji || '💡',
-            category: item.category,
-            tip: item.tip,
-            youtubeQuery: item.youtubeQuery,
-            video: item.video
-          }));
-          setDbGuides(mapped);
-        } catch (err) {
-          console.error("Failed to load all DB guides:", err);
+          const hideUntilStr = await AsyncStorage.getItem('@hide_guide_notice_until');
+          if (hideUntilStr) {
+            const hideUntil = parseInt(hideUntilStr, 10);
+            if (Date.now() < hideUntil) {
+              setShowGuideNotice(false);
+              return;
+            }
+          }
+          setShowGuideNotice(true);
+          setIsGuideNoticeChecked(false);
+        } catch (e) {
+          console.error("Failed to read notice preference", e);
+          setShowGuideNotice(true);
         }
       };
-      fetchDbGuides();
+      checkNoticePreference();
+
+      if (isLoggedIn) {
+        const fetchDbGuides = async () => {
+          try {
+            const results = await getAllStorageGuides();
+            const mapped: StorageTip[] = results.map(item => ({
+              name: item.name,
+              emoji: item.emoji || '💡',
+              category: item.category,
+              tip: item.tip,
+              youtubeQuery: item.youtubeQuery,
+              video: item.video
+            }));
+            setDbGuides(mapped);
+          } catch (err) {
+            console.error("Failed to load all DB guides:", err);
+          }
+        };
+        fetchDbGuides();
+      }
     }
   }, [guideModalVisible, isLoggedIn]);
 
@@ -793,6 +819,19 @@ export default function RefrigeratorVisual({
     }
   };
 
+  // AI 안내 팝업 닫기 및 일주일 보지 않기 설정 저장
+  const handleCloseGuideNotice = async () => {
+    if (isGuideNoticeChecked) {
+      try {
+        const oneWeekLater = Date.now() + 7 * 24 * 60 * 60 * 1000;
+        await AsyncStorage.setItem('@hide_guide_notice_until', oneWeekLater.toString());
+      } catch (e) {
+        console.error("Failed to save notice preference", e);
+      }
+    }
+    setShowGuideNotice(false);
+  };
+
   // AI 하이브리드 보관 팁 실시간 검색 처리
   const handleSearchGuide = async () => {
     const cleanQuery = guideSearchQuery.trim();
@@ -852,6 +891,7 @@ export default function RefrigeratorVisual({
       const errMsg = err.response?.data?.message || '식재료 보관법 정보를 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.';
       setGuideError(errMsg);
       setApiGuides([]);
+      Alert.alert("안내 ⚠️", errMsg);
     } finally {
       setIsGuideLoading(false);
     }
@@ -1981,6 +2021,97 @@ export default function RefrigeratorVisual({
               )
             )}
           </View>
+
+          {/* AI 안내 팝업 오버레이 */}
+          {showGuideNotice && (
+            <View style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.4)',
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: 9999,
+              padding: 24
+            }}>
+              <View style={{
+                width: '100%',
+                backgroundColor: theme.surface,
+                borderRadius: 20,
+                padding: 20,
+                borderWidth: 1,
+                borderColor: theme.borderLight,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.15,
+                shadowRadius: 10,
+                elevation: 5,
+                gap: 16
+              }}>
+                {/* 팝업 헤더 */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={{ fontSize: 20 }}>💡</Text>
+                  <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.textPrimary }}>
+                    AI 보관 팁 안내
+                  </Text>
+                </View>
+
+                {/* 팝업 내용 */}
+                <Text style={{
+                  fontSize: 14,
+                  color: theme.textSecondary,
+                  lineHeight: 22
+                }}>
+                  식재료 보관 팁은 AI 분석을 통해 제공되는 정보이며, 실제 식품 상태와 보관 환경에 따라 정확하지 않을 수 있으니 참고용으로만 사용해 주세요.
+                </Text>
+
+                {/* 팝업 하단 바 */}
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginTop: 8,
+                  borderTopWidth: 1,
+                  borderTopColor: theme.borderLight,
+                  paddingTop: 16
+                }}>
+                  {/* 왼쪽: 일주일 동안 보지 않기 */}
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                    activeOpacity={0.7}
+                    onPress={() => setIsGuideNoticeChecked(prev => !prev)}
+                  >
+                    <Ionicons
+                      name={isGuideNoticeChecked ? "checkbox" : "square-outline"}
+                      size={20}
+                      color={isGuideNoticeChecked ? theme.primary : theme.textTertiary}
+                    />
+                    <Text style={{ fontSize: 13, color: theme.textSecondary }}>
+                      일주일 동안 보지 않기
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* 오른쪽: 확인 버튼 */}
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: theme.primary,
+                      paddingVertical: 8,
+                      paddingHorizontal: 16,
+                      borderRadius: 10
+                    }}
+                    activeOpacity={0.8}
+                    onPress={handleCloseGuideNotice}
+                  >
+                    <Text style={{ color: theme.primaryOnPrimary, fontWeight: 'bold', fontSize: 13 }}>
+                      확인
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          )}
         </SafeAreaView>
       </Modal>
 
