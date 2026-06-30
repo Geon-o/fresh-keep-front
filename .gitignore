@@ -45,3 +45,4 @@ app-example
 
 # conversation logs
 conversation_log.jsonl
+conversation_summary.md
