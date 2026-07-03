@@ -30,6 +30,20 @@ export default function NicknameSettingScreen() {
     setIsDuplicate(false);
     setIsInvalid(false);
     setErrorMessage('');
+
+    // 현재 사용 중인 닉네임과 동일한지 실시간 감지
+    const trimmed = text.trim();
+    if (trimmed && trimmed === user?.name) {
+      setIsInvalid(true);
+      setErrorMessage('현재 사용 중인 닉네임입니다.');
+    }
+  };
+
+  const handleClear = () => {
+    setNickname('');
+    setIsDuplicate(false);
+    setIsInvalid(false);
+    setErrorMessage('');
   };
 
   const handleUpdate = async () => {
@@ -41,8 +55,15 @@ export default function NicknameSettingScreen() {
       setErrorMessage('닉네임을 입력해 주세요.');
       return;
     }
+
+    // 2. 현재 사용 중인 닉네임과 동일한지 최종 확인
+    if (trimmed === user?.name) {
+      setIsInvalid(true);
+      setErrorMessage('현재 사용 중인 닉네임입니다.');
+      return;
+    }
     
-    // 2. 특수문자, 공백, 이모지 방지 및 한글/영문/숫자 2~20자 길이 검증
+    // 3. 특수문자, 공백, 이모지 방지 및 한글/영문/숫자 2~20자 길이 검증
     const nicknameRegex = /^[a-zA-Z0-9가-힣]{2,20}$/;
     if (!nicknameRegex.test(trimmed)) {
       setIsInvalid(true);
@@ -97,24 +118,41 @@ export default function NicknameSettingScreen() {
         {/* 입력 카드 */}
         <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
           <Text style={[styles.cardLabel, { color: descColor }]}>새 닉네임</Text>
-          <TextInput
+          <View
             style={[
-              styles.textInput,
+              styles.inputContainer,
               {
                 backgroundColor: inputBgColor,
-                color: titleColor,
                 borderColor: hasError ? '#EF4444' : (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)'),
                 borderWidth: hasError ? 1.5 : 1
               }
             ]}
-            value={nickname}
-            onChangeText={handleChangeText}
-            placeholder="닉네임을 입력하세요"
-            placeholderTextColor={descColor}
-            maxLength={20}
-            autoFocus
-            selectTextOnFocus
-          />
+          >
+            <TextInput
+              style={[
+                styles.textInput,
+                {
+                  color: titleColor,
+                }
+              ]}
+              value={nickname}
+              onChangeText={handleChangeText}
+              placeholder="닉네임을 입력하세요"
+              placeholderTextColor={descColor}
+              maxLength={20}
+              autoFocus
+              selectTextOnFocus
+            />
+            {nickname.length > 0 && (
+              <TouchableOpacity
+                onPress={handleClear}
+                activeOpacity={0.7}
+                style={styles.clearButton}
+              >
+                <Ionicons name="close-circle" size={18} color={descColor} />
+              </TouchableOpacity>
+            )}
+          </View>
           {errorMessage ? (
             <Text style={styles.errorText}>{errorMessage}</Text>
           ) : (
@@ -187,13 +225,24 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 10,
   },
-  textInput: {
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     height: 48,
     borderRadius: 10,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+  },
+  textInput: {
+    flex: 1,
+    height: '100%',
     fontSize: 15,
     fontWeight: '600',
-    marginBottom: 8,
+  },
+  clearButton: {
+    paddingHorizontal: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   helperText: {
     fontSize: 11,
