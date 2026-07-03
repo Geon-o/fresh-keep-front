@@ -13,6 +13,9 @@ export default function NicknameSettingScreen() {
 
   const [nickname, setNickname] = useState(user?.name || '');
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isDuplicate, setIsDuplicate] = useState(false);
+  const [isInvalid, setIsInvalid] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   // 2026 Toss-style Color Tokens
   const backgroundColor = isDark ? '#101012' : '#F3F4F6';
@@ -22,18 +25,36 @@ export default function NicknameSettingScreen() {
   const descColor = isDark ? '#A3A3A3' : '#6B7280';
   const inputBgColor = isDark ? '#2C2C2E' : '#F9FAFB';
 
+  const handleChangeText = (text: string) => {
+    setNickname(text);
+    setIsDuplicate(false);
+    setIsInvalid(false);
+    setErrorMessage('');
+  };
+
   const handleUpdate = async () => {
     const trimmed = nickname.trim();
+    
+    // 1. 공백 및 필수값 확인
     if (!trimmed) {
-      Alert.alert('알림 ⚠️', '닉네임을 입력해 주세요.');
+      setIsInvalid(true);
+      setErrorMessage('닉네임을 입력해 주세요.');
       return;
     }
-    if (trimmed.length > 20) {
-      Alert.alert('알림 ⚠️', '닉네임은 최대 20자까지 가능합니다.');
+    
+    // 2. 특수문자, 공백, 이모지 방지 및 한글/영문/숫자 2~20자 길이 검증
+    const nicknameRegex = /^[a-zA-Z0-9가-힣]{2,20}$/;
+    if (!nicknameRegex.test(trimmed)) {
+      setIsInvalid(true);
+      setErrorMessage('한글, 영문, 숫자 조합의 2~20자 닉네임을 입력해 주세요.');
       return;
     }
 
     setIsUpdating(true);
+    setIsDuplicate(false);
+    setIsInvalid(false);
+    setErrorMessage('');
+
     try {
       const success = await updateNickname(trimmed);
       if (success) {
@@ -43,13 +64,23 @@ export default function NicknameSettingScreen() {
       } else {
         Alert.alert('알림 ⚠️', '닉네임 변경에 실패했습니다. 다시 시도해 주세요.');
       }
-    } catch (e) {
-      console.error(e);
-      Alert.alert('알림 ⚠️', '오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+    } catch (e: any) {
+      if (e.response?.status === 409 || e.response?.data?.message === 'DUPLICATE_NICKNAME') {
+        setIsDuplicate(true);
+        setErrorMessage('이미 사용 중인 닉네임입니다.');
+      } else if (e.response?.status === 400 || e.response?.data?.message === 'INVALID_NICKNAME') {
+        setIsInvalid(true);
+        setErrorMessage('한글, 영문, 숫자 조합의 2~20자 닉네임을 입력해 주세요.');
+      } else {
+        console.error(e);
+        Alert.alert('알림 ⚠️', '닉네임 변경에 실패했습니다. 다시 시도해 주세요.');
+      }
     } finally {
       setIsUpdating(false);
     }
   };
+
+  const hasError = isDuplicate || isInvalid;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor }]} edges={['top', 'left', 'right', 'bottom']}>
@@ -72,20 +103,25 @@ export default function NicknameSettingScreen() {
               {
                 backgroundColor: inputBgColor,
                 color: titleColor,
-                borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)'
+                borderColor: hasError ? '#EF4444' : (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)'),
+                borderWidth: hasError ? 1.5 : 1
               }
             ]}
             value={nickname}
-            onChangeText={setNickname}
+            onChangeText={handleChangeText}
             placeholder="닉네임을 입력하세요"
             placeholderTextColor={descColor}
             maxLength={20}
             autoFocus
             selectTextOnFocus
           />
-          <Text style={[styles.helperText, { color: descColor }]}>
-            최대 20자까지 입력 가능합니다.
-          </Text>
+          {errorMessage ? (
+            <Text style={styles.errorText}>{errorMessage}</Text>
+          ) : (
+            <Text style={[styles.helperText, { color: descColor }]}>
+              특수문자, 공백, 이모지는 입력 불가하며 2~20자까지 가능합니다.
+            </Text>
+          )}
         </View>
 
         {/* 확인 버튼 */}
@@ -153,7 +189,6 @@ const styles = StyleSheet.create({
   },
   textInput: {
     height: 48,
-    borderWidth: 1,
     borderRadius: 10,
     paddingHorizontal: 16,
     fontSize: 15,
@@ -163,6 +198,11 @@ const styles = StyleSheet.create({
   helperText: {
     fontSize: 11,
     fontWeight: '500',
+  },
+  errorText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#EF4444',
   },
   submitButton: {
     height: 48,
