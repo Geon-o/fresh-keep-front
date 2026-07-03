@@ -22,8 +22,10 @@ export default function SettingsView({
   const backgroundColor = isDark ? '#101012' : '#F3F4F6';
   const cardColor = isDark ? '#1C1C1E' : '#FFFFFF';
   const borderColor = isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.03)';
+  const dividerColor = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)';
   const titleColor = isDark ? '#F5F5F5' : '#1F2937';
   const descColor = isDark ? '#A3A3A3' : '#6B7280';
+  const iconColor = isDark ? '#9CA3AF' : '#4B5563';
 
   // 현재 활성화된 테마 모드 텍스트 반환
   const currentThemeText = themeMode === 'light' 
@@ -38,75 +40,101 @@ export default function SettingsView({
       contentContainerStyle={styles.contentContainer} 
       showsVerticalScrollIndicator={false}
     >
+      {/* 상단 프로필 헤더 영역 */}
       <View style={styles.headerContainer}>
         <Text style={[styles.headerTitle, { color: titleColor }]}>설정</Text>
+        
         <TouchableOpacity 
           activeOpacity={0.7} 
           onPress={() => router.push('/settings/nickname')}
-          style={styles.nicknamePressable}
+          style={styles.profileSection}
         >
           <Text style={[styles.nicknameText, { color: titleColor }]}>
             {isLoggedIn && user ? user.name : '익명 사용자'}님
           </Text>
-          <Ionicons name="chevron-forward" size={16} color={descColor} style={{ marginLeft: 4 }} />
-        </TouchableOpacity>
-      </View>
-
-      {/* 2. 보안 및 복구 카드 */}
-      <View style={[styles.cardSection, { backgroundColor: cardColor, borderColor }]}>
-        <Text style={[styles.cardSectionTitle, { color: descColor }]}>보안 및 복구</Text>
-        
-        <TouchableOpacity 
-          style={styles.listRow} 
-          activeOpacity={0.7} 
-          onPress={() => router.push('/settings/backup')}
-        >
-          <Text style={[styles.listRowText, { color: titleColor }]}>복구 키 확인 및 백업</Text>
-          <Ionicons name="chevron-forward" size={16} color={descColor} />
-        </TouchableOpacity>
-      </View>
-
-      {/* 3. 화면 설정 카드 */}
-      <View style={[styles.cardSection, { backgroundColor: cardColor, borderColor }]}>
-        <Text style={[styles.cardSectionTitle, { color: descColor }]}>인터페이스</Text>
-        
-        <TouchableOpacity 
-          style={styles.listRow} 
-          activeOpacity={0.7} 
-          onPress={() => router.push('/settings/theme')}
-        >
-          <View style={styles.listRowLeft}>
-            <Text style={[styles.listRowText, { color: titleColor }]}>화면 테마 설정</Text>
-            <Text style={[styles.currentValueText, { color: descColor }]}>{currentThemeText}</Text>
+          <View style={[styles.chevronWrapper, { backgroundColor: isDark ? '#2C2C2E' : '#E5E7EB' }]}>
+            <Ionicons name="chevron-forward" size={14} color={descColor} />
           </View>
-          <Ionicons name="chevron-forward" size={16} color={descColor} />
         </TouchableOpacity>
       </View>
 
-      {/* 4. 약관 및 정책 카드 */}
-      <View style={[styles.cardSection, { backgroundColor: cardColor, borderColor }]}>
-        <Text style={[styles.cardSectionTitle, { color: descColor }]}>법적 정보 및 기타</Text>
-        
-        <TouchableOpacity 
-          style={styles.listRow} 
-          activeOpacity={0.7} 
-          onPress={() => router.push('/settings/terms')}
-        >
-          <Text style={[styles.listRowText, { color: titleColor }]}>서비스 이용약관</Text>
-          <Ionicons name="chevron-forward" size={16} color={descColor} />
-        </TouchableOpacity>
+      {/* 1. 서비스 이용 섹션 */}
+      <View style={styles.sectionWrapper}>
+        <Text style={[styles.cardSectionTitle, { color: descColor }]}>서비스 이용</Text>
+        <View style={[styles.cardSection, { backgroundColor: cardColor, borderColor }]}>
+          {/* 복구 키 확인 및 백업 */}
+          <TouchableOpacity 
+            style={styles.listRow} 
+            activeOpacity={0.7} 
+            onPress={() => router.push('/settings/backup')}
+          >
+            <View style={styles.listRowLeft}>
+              <View style={[styles.iconWrapper, { backgroundColor: isDark ? '#2A2A2D' : '#F3F4F6' }]}>
+                <Ionicons name="key-outline" size={18} color={iconColor} />
+              </View>
+              <Text style={[styles.listRowText, { color: titleColor }]}>복구 키 확인 및 백업</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={descColor} />
+          </TouchableOpacity>
+
+          <View style={[styles.divider, { backgroundColor: dividerColor }]} />
+
+          {/* 화면 테마 설정 */}
+          <TouchableOpacity 
+            style={styles.listRow} 
+            activeOpacity={0.7} 
+            onPress={() => router.push('/settings/theme')}
+          >
+            <View style={styles.listRowLeft}>
+              <View style={[styles.iconWrapper, { backgroundColor: isDark ? '#2A2A2D' : '#F3F4F6' }]}>
+                <Ionicons name="contrast-outline" size={18} color={iconColor} />
+              </View>
+              <Text style={[styles.listRowText, { color: titleColor }]}>화면 테마 설정</Text>
+            </View>
+            <View style={styles.listRowRight}>
+              <Text style={[styles.currentValueText, { color: descColor }]}>{currentThemeText}</Text>
+              <Ionicons name="chevron-forward" size={16} color={descColor} />
+            </View>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* 5. 계정 관리 카드 */}
-      <View style={[styles.cardSection, { backgroundColor: cardColor, borderColor }]}>
-        <TouchableOpacity 
-          style={styles.listRow} 
-          activeOpacity={0.7} 
-          onPress={() => router.push('/settings/reset')}
-        >
-          <Text style={[styles.listRowText, { color: '#EF4444', fontWeight: '600' }]}>초기화</Text>
-          <Ionicons name="chevron-forward" size={16} color="#EF4444" />
-        </TouchableOpacity>
+      {/* 2. 관리 및 법적 정보 섹션 */}
+      <View style={styles.sectionWrapper}>
+        <Text style={[styles.cardSectionTitle, { color: descColor }]}>정보 및 관리</Text>
+        <View style={[styles.cardSection, { backgroundColor: cardColor, borderColor }]}>
+          {/* 서비스 이용약관 */}
+          <TouchableOpacity 
+            style={styles.listRow} 
+            activeOpacity={0.7} 
+            onPress={() => router.push('/settings/terms')}
+          >
+            <View style={styles.listRowLeft}>
+              <View style={[styles.iconWrapper, { backgroundColor: isDark ? '#2A2A2D' : '#F3F4F6' }]}>
+                <Ionicons name="document-text-outline" size={18} color={iconColor} />
+              </View>
+              <Text style={[styles.listRowText, { color: titleColor }]}>서비스 이용약관</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={descColor} />
+          </TouchableOpacity>
+
+          <View style={[styles.divider, { backgroundColor: dividerColor }]} />
+
+          {/* 초기화 */}
+          <TouchableOpacity 
+            style={styles.listRow} 
+            activeOpacity={0.7} 
+            onPress={() => router.push('/settings/reset')}
+          >
+            <View style={styles.listRowLeft}>
+              <View style={[styles.iconWrapper, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.05)' }]}>
+                <Ionicons name="trash-outline" size={18} color="#EF4444" />
+              </View>
+              <Text style={[styles.listRowText, { color: '#EF4444', fontWeight: '600' }]}>초기화</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#EF4444" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* 하단 메타 정보 영역 */}
@@ -125,66 +153,94 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingHorizontal: 20, // 20px로 넓혀 시각적 안정감 부여
+    paddingTop: 20,
     paddingBottom: 80,
   },
   headerContainer: {
-    marginBottom: 24,
+    marginBottom: 28,
     paddingHorizontal: 4,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '800',
-    letterSpacing: -0.5,
+    letterSpacing: -0.6,
   },
-  nicknamePressable: {
+  profileSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 24,
+    justifyContent: 'space-between',
+    marginTop: 20,
+    paddingVertical: 8,
   },
   nicknameText: {
-    fontSize: 20,
-    fontWeight: '700',
-    letterSpacing: -0.3,
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.4,
   },
-  // 토스 스타일 카드 섹션
-  cardSection: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 16,
-    marginBottom: 12,
+  chevronWrapper: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  sectionWrapper: {
+    marginBottom: 22,
   },
   cardSectionTitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
-    marginBottom: 12,
+    letterSpacing: -0.2,
+    marginBottom: 8,
+    paddingHorizontal: 6,
   },
-  // 리스트 아이템 행 (chevron 화살표 포함)
+  cardSection: {
+    borderRadius: 20, // 부드러운 곡률의 20px 모서리
+    borderWidth: 1,
+    paddingHorizontal: 16,
+  },
   listRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 4,
+    paddingVertical: 14,
   },
   listRowLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
+  },
+  iconWrapper: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   listRowText: {
     fontSize: 15,
     fontWeight: '600',
+    letterSpacing: -0.3,
+  },
+  listRowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   currentValueText: {
     fontSize: 14,
     fontWeight: '500',
   },
-  // 하단 메타 영역
+  divider: {
+    height: 1,
+    width: '100%',
+  },
   footerContainer: {
     alignItems: 'center',
     gap: 8,
-    marginTop: 24,
+    marginTop: 28,
     marginBottom: 16,
   },
   footerText: {
