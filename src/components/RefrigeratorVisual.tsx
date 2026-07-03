@@ -796,8 +796,12 @@ export default function RefrigeratorVisual({
   const handleOpenYoutube = async (input: string, name: string) => {
     // 특정 비디오 ID 다이렉트 재생 시 유튜브 앱의 지역/저작권/기기별 차단 오류가 종종 발생하므로,
     // 해당 식재료 명칭의 최적 검색 쿼리를 바탕으로 한 검색 결과 페이지를 제공하여 에러를 100% 원천 예방하고 다양한 정보를 선택해 보게 합니다.
-    // 식재료명 뒤에 항상 "보관법"을 붙여 정확한 검색 결과를 제공합니다.
-    const searchQuery = `${name} 보관법`;
+    // 제철 식재료 등의 검색(예: 레시피)인 경우 전달받은 input을 사용하고, 그렇지 않으면 기본적으로 "[식재료명] 보관법"으로 검색되도록 분기 처리합니다.
+    let searchQuery = input;
+    const isVideoId = /^[a-zA-Z0-9_-]{11}$/.test(input);
+    if (!searchQuery || searchQuery === name || isVideoId) {
+      searchQuery = `${name} 보관법`;
+    }
     const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(searchQuery)}`;
 
     try {
