@@ -8,8 +8,7 @@ import { useTheme } from '../src/context/ThemeContext';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { isLoading, isLoggedIn } = useAuth();
-  const login = async (provider: string) => false;
+  const { isLoading } = useAuth();
   const loginAsDeveloper = async () => false;
   const { theme, isDark } = useTheme();
 
@@ -58,17 +57,7 @@ export default function LoginScreen() {
     };
   }, []);
 
-  const handleLogin = async (provider: 'google' | 'kakao' | 'naver') => {
-    const success = await login(provider);
-    if (success) {
-      // 로그인 성공 시 메인 대시보드로 이동
-      if (router.canGoBack()) {
-        router.back();
-      } else {
-        router.replace('/');
-      }
-    }
-  };
+
 
   const handleDeveloperLogin = async () => {
     const success = await loginAsDeveloper();
@@ -127,7 +116,7 @@ export default function LoginScreen() {
             <Text style={[styles.subtitle, { color: theme.textSecondary }]}>스마트한 냉장고 식재료 관리 파트너</Text>
           </View>
 
-          {/* 소셜 로그인 카드 */}
+          {/* 기기 데이터 복구 카드 */}
           <View style={[
             styles.card, 
             { 
@@ -143,34 +132,18 @@ export default function LoginScreen() {
               </View>
             ) : (
               <View style={styles.buttonContainer}>
-                {/* 카카오 로그인 */}
+                <Text style={[styles.infoText, { color: theme.textSecondary }]}>
+                  FreshKeep은 기기별 안전한 로컬 저장과 백엔드 익명 세션을 기반으로 별도의 가입 없이 즉시 작동합니다.{"\n\n"}
+                  이전 기기의 백업 키를 가지고 계신가요?
+                </Text>
+                
                 <TouchableOpacity
-                  style={[styles.kakaoButton, { backgroundColor: theme.kakao, shadowColor: theme.kakao }]}
+                  style={[styles.restoreButton, { backgroundColor: theme.primary, shadowColor: theme.primary }]}
                   activeOpacity={0.85}
-                  onPress={() => handleLogin('kakao')}
+                  onPress={() => router.push('/settings/backup-restore')}
                 >
-                  <Text style={styles.kakaoIcon}>💬</Text>
-                  <Text style={[styles.kakaoButtonText, { color: theme.kakaoText }]}>Kakao로 시작하기</Text>
-                </TouchableOpacity>
-
-                {/* 네이버 로그인 */}
-                <TouchableOpacity
-                  style={[styles.naverButton, { backgroundColor: theme.naver, shadowColor: theme.naver }]}
-                  activeOpacity={0.85}
-                  onPress={() => handleLogin('naver')}
-                >
-                  <Text style={styles.naverIcon}>🍀</Text>
-                  <Text style={[styles.naverButtonText, { color: theme.naverText }]}>Naver로 시작하기</Text>
-                </TouchableOpacity>
-
-                {/* 구글 로그인 */}
-                <TouchableOpacity
-                  style={[styles.googleButton, { backgroundColor: theme.surface, borderColor: theme.border, shadowColor: theme.shadow }]}
-                  activeOpacity={0.85}
-                  onPress={() => handleLogin('google')}
-                >
-                  <Text style={styles.googleIcon}>🔑</Text>
-                  <Text style={[styles.googleButtonText, { color: theme.textSecondary }]}>Google로 시작하기</Text>
+                  <Text style={styles.restoreIcon}>📥</Text>
+                  <Text style={styles.restoreButtonText}>기존 데이터 복구하기</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -327,73 +300,31 @@ const styles = StyleSheet.create({
   buttonContainer: {
     gap: 12,
   },
-  kakaoButton: {
+  restoreButton: {
     flexDirection: 'row',
     height: 52,
-    backgroundColor: '#FEE500', // 카카오 브랜드 옐로우
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#FEE500',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 2,
   },
-  kakaoIcon: {
+  restoreIcon: {
     fontSize: 18,
     marginRight: 10,
   },
-  kakaoButtonText: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#191919',
-  },
-  googleButton: {
-    flexDirection: 'row',
-    height: 52,
-    backgroundColor: '#FFFFFF', // 구글 브랜드 화이트
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  googleIcon: {
-    fontSize: 16,
-    marginRight: 10,
-  },
-  googleButtonText: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#334155',
-  },
-  naverButton: {
-    flexDirection: 'row',
-    height: 52,
-    backgroundColor: '#03C75A', // 네이버 브랜드 그린
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#03C75A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  naverIcon: {
-    fontSize: 18,
-    marginRight: 10,
-  },
-  naverButtonText: {
+  restoreButtonText: {
     fontSize: 15,
     fontWeight: 'bold',
     color: '#FFFFFF',
+  },
+  infoText: {
+    fontSize: 14,
+    lineHeight: 22,
+    textAlign: 'center',
+    marginBottom: 20,
   },
 
   footerContainer: {

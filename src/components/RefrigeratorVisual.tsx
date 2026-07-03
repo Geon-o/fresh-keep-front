@@ -1,10 +1,9 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions, TextInput, FlatList, Platform, ActivityIndicator, Linking, Alert, Modal, Image } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useEffect, useState, useRef } from 'react';
+import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions, TextInput, Platform, ActivityIndicator, Linking, Alert, Modal } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { searchStorageGuides, getAllStorageGuides } from '../api/guideService';
+
 import * as Location from 'expo-location';
 import * as WebBrowser from 'expo-web-browser';
 import { FridgeType, Ingredient } from '../types';
@@ -219,47 +218,8 @@ const SEASONAL_INGREDIENTS: SeasonalIngredient[] = [
   { name: '우엉', emoji: '🥖', recommendDish: '우엉조림 & 우엉차', searchQuery: '우엉 레시피', months: [1, 2, 3] }
 ];
 
-interface YoutubeVideo {
-  title: string;
-  channelName: string;
-  videoId: string;
-  duration: string;
-}
 
-interface StorageTip {
-  name: string;
-  emoji: string;
-  category: string;
-  tip: string;
-  video?: YoutubeVideo | null;
-  youtubeQuery?: string;
-}
 
-const STORAGE_TIPS: StorageTip[] = [
-  { name: '대파', emoji: '🌱', category: '채소', tip: '송송 썰어 키친타월로 물기를 완전히 제거한 후 냉동 보관하면 최대 6개월간 쓸 수 있어요.', video: { title: '대파 1년 보관법! 용도별 보관 및 손질 꿀팁', channelName: '살림의 달인', videoId: 'Jpx6hR2tP1U', duration: '07:12' } },
-  { name: '양파', emoji: '🧅', category: '채소', tip: '망에 하나씩 분리해 넣거나, 껍질을 벗겨 랩으로 개별 포장한 뒤 냉장실 야채칸에 보관하세요. 단, 감자와는 같이 두지 마세요.', video: { title: '양파 무르지 않게 보관하는 핵심 비법 2가지', channelName: '자취생 요리연구소', videoId: 'u6N-4Hl57pQ', duration: '06:04' } },
-  { name: '바나나', emoji: '🍌', category: '과일', tip: '꼭지 부분을 랩으로 감싸 보관하면 에틸렌 가스가 차단되어 갈변 속도를 늦출 수 있어요.', video: { title: '바나나 2주 동안 싱싱하게 보관하는 법', channelName: '과일 팩토리', videoId: '6p6N2kG_m_0', duration: '04:15' } },
-  { name: '달걀', emoji: '🥚', category: '유제품', tip: '뾰족한 곳이 아래로 향하게 보관하세요. 둥근 부분에 숨구멍이 있어 신선함이 오래 유지돼요.', video: { title: '달걀 보관의 오해와 진실! 신선한 냉장법', channelName: '푸드 가이드', videoId: 'tEaA0jG9R70', duration: '05:30' } },
-  { name: '토마토', emoji: '🍅', category: '채소', tip: '냉장 보관하면 당도가 떨어지고 껍질이 두꺼워집니다. 꼭지를 떼어 그늘진 실온에 보관하세요.', video: { title: '토마토 냉장고에 넣지 마세요! 올바른 보관법', channelName: '웰빙 주방', videoId: 'K34Z_LwBf08', duration: '05:08' } },
-  { name: '감자', emoji: '🥔', category: '채소', tip: '신선한 사과 한 개를 같이 넣어두면, 사과에서 나오는 에틸렌 가스가 감자 싹의 성장을 막아줘요.', video: { title: '감자 싹 안 나게 사과로 보관하는 황금 비율', channelName: '농부의 꿀팁', videoId: 'Z9q4p-uM51A', duration: '06:42' } },
-  { name: '두부', emoji: '⬜', category: '기타', tip: '밀폐용기에 맑은 물과 소금 한 꼬집을 넣은 뒤 두부를 담가 보관하면 상하는 것을 늦출 수 있어요.', video: { title: '두부 남았을 때 소금물로 5일 더 신선하게!', channelName: '리얼 살림팁', videoId: 'SsnXo5k6q8g', duration: '04:20' } },
-  { name: '소고기', emoji: '🥩', category: '육류/수산', tip: '단기간 보관 시 올리브오일을 얇게 바르고 랩으로 감싸 신선실에 두고, 장기 보관 시 냉동 포장하세요.', video: { title: '소고기 냉동 보관 및 올리브오일 핏물 빼기 비법', channelName: '고기학개론', videoId: 'W1B0z5-v0vI', duration: '08:14' } },
-  { name: '고등어', emoji: '🐟', category: '육류/수산', tip: '아가미와 내장을 제거하고 깨끗이 씻은 후 물기를 없애고 청주를 뿌려 지퍼백에 밀봉하여 냉동 보관하세요.', video: { title: '비린내 ZERO! 고등어 냉동 보관 및 손질법', channelName: '바다 요리사', videoId: 'hN_x7wQ-74Y', duration: '07:05' } },
-  { name: '슬라이스 치즈', emoji: '🧀', category: '유제품', tip: '남은 치즈는 공기가 통하지 않게 지퍼백에 밀봉 보관하거나, 종이호일로 한 장씩 겹쳐 포장해 두세요.', video: { title: '슬라이스 치즈 개별 밀봉과 종이호일 포장법', channelName: '치즈 홀릭', videoId: 'L59pW8GjM4Q', duration: '04:40' } },
-  { name: '마늘', emoji: '🧄', category: '채소', tip: '통마늘은 망에 넣어 통풍 잘되는 곳에 두고, 다진 마늘은 아이스 트레이에 얼려 한 조각씩 밀폐 보관하세요.', video: { title: '깐마늘 한 달 동안 썩지 않게 보관하기', channelName: '마늘 백과사전', videoId: 'y5jA1pU-6t0', duration: '06:12' } },
-  { name: '버섯', emoji: '🍄', category: '채소', tip: '씻지 않고 신문지나 키친타월에 싸서 보관하면 여분의 습기를 빨아들여 신선하게 오래 유지됩니다.', video: { title: '느타리/팽이/표고버섯 수분 제어 보관 가이드', channelName: '건강 식탁', videoId: 'q8pW-t9y5t4', duration: '05:25' } },
-  { name: '사과', emoji: '🍎', category: '과일', tip: '사과의 에틸렌 가스는 다른 채소의 숙성을 촉진해 상하게 하므로 반드시 개별 밀봉 보관하세요.', video: { title: '사과 개별 랩 랩핑 밀봉 이유와 보관 꿀팁', channelName: '과수원 아들', videoId: 'W9jU-t8yQ6Q', duration: '04:55' } },
-  { name: '깻잎', emoji: '🍃', category: '채소', tip: '씻지 않은 상태에서 물기를 털어내고 키친타월로 감싸 지퍼백에 세워서 보관하면 무르는 것을 예방해요.', video: { title: '깻잎 끝까지 초록색으로 보관하는 세로 밀폐법', channelName: '채소 가든', videoId: 'E6tY-q8w5tQ', duration: '03:50' } },
-  { name: '시금치', emoji: '🥬', category: '채소', tip: '뿌리 부분이 아래로 가게 세워서 야채 칸에 보관하고, 흙이 묻은 상태라면 신문지에 감싸 수분을 지켜주세요.', video: { title: '시금치 데치기 전 수분 보전 흙 신문지 보관법', channelName: '그린 라이프', videoId: 'R5pT-y9t4uI', duration: '06:18' } },
-  { name: '콩나물', emoji: '🌱', category: '채소', tip: '밀폐 용기에 콩나물이 잠길 정도로 깨끗한 찬물을 붓고, 2~3일에 한 번씩 새로운 물로 교체해 냉장 보관하세요.', video: { title: '콩나물 물 채워 야채칸에 보관하기 (일주일 신선)', channelName: '반찬의 정석', videoId: 'U8tY-q9u4tE', duration: '04:09' } },
-  { name: '당근', emoji: '🥕', category: '채소', tip: '흙을 씻어내지 않은 채 신문지에 하나씩 싸서 비닐 팩에 세워 담으면 수분이 보존되어 한 달 내내 싱싱해요.', video: { title: '당근 흙 묻은 채로 장기 보관하여 한 달 지키기', channelName: '농가 직송', videoId: 'Y6uI-t8r4eQ', duration: '05:40' } },
-  { name: '양배추', emoji: '🥬', category: '채소', tip: '심지 부분을 칼로 도려낸 후 물에 젖은 키친타월을 채워 넣고 랩이나 비닐로 단단히 감싸 냉장 보관하세요.', video: { title: '양배추 칼로 심지 파내고 물 솜 채워 보관하기', channelName: '쿡 스타일', videoId: 'W8tY-q8r5tE', duration: '07:33' } },
-  { name: '고구마', emoji: '🍠', category: '채소', tip: '추위에 약해 냉장고에 넣으면 냉해를 입어 쉽게 썩습니다. 신문지에 펼쳐 수분을 날린 후 실온 보관하세요.', video: { title: '고구마 냉해 방지와 겨울철 박스 실온 보관법', channelName: '고구마 아재', videoId: 'I6tY-e9r5tQ', duration: '05:15' } },
-  { name: '아보카도', emoji: '🥑', category: '과일', tip: '덜 익은 것은 실온에 두어 후숙하고, 다 익은 아보카도는 껍질째 랩으로 밀봉하여 냉장 보관하세요.', video: { title: '아보카도 상하기 전 완벽한 후숙과 밀봉 냉장법', channelName: '브런치 테이블', videoId: 'O8tY-q8u5tE', duration: '06:22' } },
-  { name: '식빵', emoji: '🍞', category: '기타', tip: '실온에서는 쉽게 상하므로 1회 분량씩 랩으로 꼼꼼히 싸서 지퍼백에 담아 냉동한 후 바로 토스팅해 드세요.', video: { title: '남은 식빵 냉동 보관 가이드 및 토스팅법', channelName: '빵순이 살림', videoId: 'P8tY-q8w5tE', duration: '04:10' } },
-  { name: '우유', emoji: '🥛', category: '유제품', tip: '온도 변화에 매우 취약하므로 냉장고 문 쪽 대신 온도가 고르고 시원한 냉장실 내부 깊숙한 곳에 보관하세요.', video: { title: '우유 유통기한 늘리는 냉장실 보관 명당 위치', channelName: '밀크 로드', videoId: 'Q8tY-q8r5tE', duration: '05:02' } },
-  { name: '조개류', emoji: '🐚', category: '육류/수산', tip: '소금물에 넣어 해감한 뒤 깨끗이 씻어 한 번 조리할 만큼 소분하여 지퍼백에 밀봉해 냉동 보관하세요.', video: { title: '조개 모래 해감 및 소분 냉동 보존 정석', channelName: '어부의 밥상', videoId: 'S8tY-q8u5tE', duration: '07:50' } }
-];
 
 interface RefrigeratorVisualProps {
   mode?: 'home' | 'ingredients' | 'fridge';
@@ -299,84 +259,7 @@ export default function RefrigeratorVisual({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'expired' | 'imminent' | 'safe'>('all');
 
-  // 보관 팁 모달 상태
-  const [guideModalVisible, setGuideModalVisible] = useState(false);
-  const [guideSearchQuery, setGuideSearchQuery] = useState('');
-  const [guideSelectedCategory, setGuideSelectedCategory] = useState<string>('all');
 
-  // AI 안내 팝업 상태
-  const [showGuideNotice, setShowGuideNotice] = useState(false);
-  const [isGuideNoticeChecked, setIsGuideNoticeChecked] = useState(false);
-
-  // DB에서 저장된 전체 가이드 리스트 가져오기
-  const [dbGuides, setDbGuides] = useState<StorageTip[]>([]);
-
-  // 실시간 AI 하이브리드 캐싱을 위한 추가 상태
-  const [apiGuides, setApiGuides] = useState<StorageTip[]>([]);
-  const [isGuideLoading, setIsGuideLoading] = useState(false);
-  const [guideError, setGuideError] = useState<string | null>(null);
-  const typingTimeoutRef = useRef<any>(null);
-
-  useEffect(() => {
-    if (guideModalVisible) {
-      // 1. 일주일 동안 보지 않기 기간 체크
-      const checkNoticePreference = async () => {
-        try {
-          const hideUntilStr = await AsyncStorage.getItem('@hide_guide_notice_until');
-          if (hideUntilStr) {
-            const hideUntil = parseInt(hideUntilStr, 10);
-            if (Date.now() < hideUntil) {
-              setShowGuideNotice(false);
-              return;
-            }
-          }
-          setShowGuideNotice(true);
-          setIsGuideNoticeChecked(false);
-        } catch (e) {
-          console.error("Failed to read notice preference", e);
-          setShowGuideNotice(true);
-        }
-      };
-      checkNoticePreference();
-
-      if (isLoggedIn) {
-        const fetchDbGuides = async () => {
-          try {
-            const results = await getAllStorageGuides();
-            const mapped: StorageTip[] = results.map(item => ({
-              name: item.name,
-              emoji: item.emoji || '💡',
-              category: item.category,
-              tip: item.tip,
-              youtubeQuery: item.youtubeQuery,
-              video: item.video
-            }));
-            setDbGuides(mapped);
-          } catch (err) {
-            console.error("Failed to load all DB guides:", err);
-          }
-        };
-        fetchDbGuides();
-      }
-    }
-  }, [guideModalVisible, isLoggedIn]);
-
-  // 로컬 가이드 데이터와 DB 가이드 데이터 병합 (이름 중복 제거)
-  const mergedDefaultTips = useMemo(() => {
-    const merged = [...STORAGE_TIPS];
-    dbGuides.forEach(dbTip => {
-      const exists = merged.some(localTip => localTip.name.toLowerCase() === dbTip.name.toLowerCase());
-      if (!exists) {
-        merged.push(dbTip);
-      }
-    });
-    return merged;
-  }, [dbGuides]);
-
-  // 보관 팁용 필터링 로직 (검색어가 없으면 로컬 및 DB 병합 데이터셋, 검색어가 있으면 실시간 검색 결과 매핑)
-  const filteredTips = !guideSearchQuery.trim()
-    ? mergedDefaultTips.filter(tip => guideSelectedCategory === 'all' || tip.category === guideSelectedCategory)
-    : apiGuides.filter(tip => guideSelectedCategory === 'all' || tip.category === guideSelectedCategory);
 
   // 위치 권한 및 실시간 날씨 기반 식중독 지수 상태
   const [locationPermission, setLocationPermission] = useState<'granted' | 'denied' | 'undetermined'>('undetermined');
@@ -823,137 +706,7 @@ export default function RefrigeratorVisual({
     }
   };
 
-  // AI 안내 팝업 닫기 및 일주일 보지 않기 설정 저장
-  const handleCloseGuideNotice = async () => {
-    if (isGuideNoticeChecked) {
-      try {
-        const oneWeekLater = Date.now() + 7 * 24 * 60 * 60 * 1000;
-        await AsyncStorage.setItem('@hide_guide_notice_until', oneWeekLater.toString());
-      } catch (e) {
-        console.error("Failed to save notice preference", e);
-      }
-    }
-    setShowGuideNotice(false);
-  };
 
-  // AI 하이브리드 보관 팁 실시간 검색 처리
-  const handleSearchGuide = async () => {
-    const cleanQuery = guideSearchQuery.trim();
-    if (!cleanQuery) {
-      setApiGuides([]);
-      setGuideError(null);
-      return;
-    }
-
-    setGuideError(null);
-
-    // 1단계: 로컬 23종 데이터셋에서 1차 매칭 시도
-    const queryLower = cleanQuery.toLowerCase();
-    const localMatches = STORAGE_TIPS.filter(tip => 
-      tip.name.toLowerCase().includes(queryLower) || 
-      tip.tip.toLowerCase().includes(queryLower)
-    );
-
-    if (localMatches.length > 0) {
-      setApiGuides(localMatches);
-      return;
-    }
-
-    // 2단계: 로컬 매칭 실패 시 백엔드 API 호출
-    if (!isLoggedIn) {
-      setGuideError('로그인 후 이용하시면 AI가 실시간으로 새로운 식재료 보관 꿀팁을 분석해 드립니다! 💡');
-      setApiGuides([]);
-      return;
-    }
-
-    setIsGuideLoading(true);
-    try {
-      const results = await searchStorageGuides(cleanQuery);
-      const mapped: StorageTip[] = results.map(item => ({
-        name: item.name,
-        emoji: item.emoji || '💡',
-        category: item.category,
-        tip: item.tip,
-        youtubeQuery: item.youtubeQuery,
-        video: item.video
-      }));
-      setApiGuides(mapped);
-
-      // 새로 로드/생성된 가이드를 dbGuides 캐시 목록에도 추가하여 실시간 동기화
-      setDbGuides(prev => {
-        const updated = [...prev];
-        mapped.forEach(newTip => {
-          const exists = updated.some(tip => tip.name.toLowerCase() === newTip.name.toLowerCase());
-          if (!exists) {
-            updated.push(newTip);
-          }
-        });
-        return updated;
-      });
-    } catch (err: any) {
-      console.error("Failed to fetch storage guide from AI backend:", err);
-      const errMsg = err.response?.data?.message || '식재료 보관법 정보를 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.';
-      setGuideError(errMsg);
-      setApiGuides([]);
-      Alert.alert("안내 ⚠️", errMsg);
-    } finally {
-      setIsGuideLoading(false);
-    }
-  };
-
-  // 타이핑 중 실시간 DB 캐시 매칭 처리 (AI 호출 생략)
-  const handleTypingSearch = async (query: string) => {
-    const cleanQuery = query.trim();
-    if (!cleanQuery) {
-      setApiGuides([]);
-      setGuideError(null);
-      return;
-    }
-
-    // 1단계: 로컬 23종 데이터셋 1차 매칭
-    const queryLower = cleanQuery.toLowerCase();
-    const localMatches = STORAGE_TIPS.filter(tip => 
-      tip.name.toLowerCase().includes(queryLower) || 
-      tip.tip.toLowerCase().includes(queryLower)
-    );
-
-    if (localMatches.length > 0) {
-      setApiGuides(localMatches);
-      setGuideError(null);
-      return;
-    }
-
-    // 2단계: 백엔드 DB 캐시 검색 호출 (autoGenerate = false)
-    if (!isLoggedIn) return;
-
-    try {
-      const results = await searchStorageGuides(cleanQuery, false);
-      const mapped: StorageTip[] = results.map(item => ({
-        name: item.name,
-        emoji: item.emoji || '💡',
-        category: item.category,
-        tip: item.tip,
-        youtubeQuery: item.youtubeQuery,
-        video: item.video
-      }));
-      setApiGuides(mapped);
-      setGuideError(null);
-
-      // 타이핑 결과로 나온 가이드를 dbGuides 캐시 목록에도 추가하여 실시간 동기화
-      setDbGuides(prev => {
-        const updated = [...prev];
-        mapped.forEach(newTip => {
-          const exists = updated.some(tip => tip.name.toLowerCase() === newTip.name.toLowerCase());
-          if (!exists) {
-            updated.push(newTip);
-          }
-        });
-        return updated;
-      });
-    } catch (err) {
-      console.error("Failed to query DB cache during typing:", err);
-    }
-  };
 
   // 기기 GPS 위치 권한 요청 및 실시간 날씨 연동 식중독 지수 조회
   const requestLocationAndFetchWeather = async () => {
@@ -1584,36 +1337,7 @@ export default function RefrigeratorVisual({
       {mode === 'ingredients' && (
         <View style={{ flex: 1 }}>
           <Text style={[styles.pageTitle, { color: theme.textPrimary, paddingTop: 16 }]}>식재료 목록</Text>
-          {/* 보관 팁 퀵 배너 */}
-          <TouchableOpacity
-            style={[
-              styles.guideBannerCompact, 
-              { 
-                backgroundColor: theme.surfaceSecondary, 
-                borderColor: theme.borderLight,
-                shadowColor: theme.shadow,
-                marginBottom: 12,
-              }
-            ]}
-            activeOpacity={0.8}
-            onPress={() => {
-              setGuideSearchQuery('');
-              setGuideSelectedCategory('all');
-              setGuideModalVisible(true);
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <Text style={{ fontSize: 24 }}>💡</Text>
-              <View>
-                <Text style={[styles.guideBannerTitleCompact, { color: theme.textPrimary }]}>식재료 보관 팁</Text>
-                <Text style={{ fontSize: 11, color: theme.textTertiary, marginTop: 1 }}>최적의 보관법을 검색해 보세요!</Text>
-              </View>
-            </View>
-            <View style={[styles.guideBannerButtonCompact, { backgroundColor: theme.primary }]}>
-              <Text style={{ color: theme.primaryOnPrimary, fontSize: 11, fontWeight: 'bold' }}>보관 팁 보기</Text>
-              <Ionicons name="chevron-forward" size={12} color={theme.primaryOnPrimary} />
-            </View>
-          </TouchableOpacity>
+
           {isLoggedIn ? (
             <>
               {/* 검색 바 */}
@@ -1801,32 +1525,16 @@ export default function RefrigeratorVisual({
                 </View>
 
                 <View style={styles.loginPromptFooter}>
-                  <Text style={[styles.loginPromptFooterText, { color: theme.textTertiary }]}>⚡ 간편로그인으로 30초 만에 시작</Text>
+                  <Text style={[styles.loginPromptFooterText, { color: theme.textTertiary }]}>⚡ 안전한 로컬 저장 및 익명 세션 연동</Text>
                 </View>
 
                 <View style={styles.socialLoginButtonsContainer}>
                   <TouchableOpacity
-                    style={[styles.socialButton, styles.kakaoButton]}
+                    style={[styles.socialButton, styles.backupManageButton, { backgroundColor: theme.primary }]}
                     activeOpacity={0.8}
                     onPress={() => router.push('/login')}
                   >
-                    <Text style={styles.kakaoButtonText}>카카오 로그인</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.socialButton, styles.naverButton]}
-                    activeOpacity={0.8}
-                    onPress={() => router.push('/login')}
-                  >
-                    <Text style={styles.naverButtonText}>네이버 로그인</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.socialButton, styles.googleButton, { borderColor: theme.borderLight }]}
-                    activeOpacity={0.8}
-                    onPress={() => router.push('/login')}
-                  >
-                    <Text style={[styles.googleButtonText, { color: theme.textPrimary }]}>Google 로그인</Text>
+                    <Text style={styles.backupManageButtonText}>백업 및 데이터 복구 관리</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1834,290 +1542,6 @@ export default function RefrigeratorVisual({
           )}
         </View>
       )}
-
-      {/* 보관 팁 모달 */}
-      <Modal
-        visible={guideModalVisible}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => {
-          setGuideModalVisible(false);
-        }}
-      >
-        <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.background }]}>
-          {/* 모달 헤더 */}
-          <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
-            <View style={styles.modalHeaderTitleRow}>
-              <Text style={{ fontSize: 20 }}>💡</Text>
-              <Text style={[styles.modalHeaderTitle, { color: theme.textPrimary }]}>식재료 보관 팁</Text>
-            </View>
-            <TouchableOpacity
-              style={[styles.modalCloseButton, { backgroundColor: theme.surfaceSecondary }]}
-              onPress={() => {
-                setGuideModalVisible(false);
-              }}
-            >
-              <Ionicons name="close" size={20} color={theme.textPrimary} />
-            </TouchableOpacity>
-          </View>
-
-          {/* 모달 바디 */}
-          <View style={{ flex: 1 }}>
-            {/* 보관 팁용 검색창 */}
-            <View style={[styles.searchContainer, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderLight, marginTop: 16 }]}>
-              <Ionicons name="search" size={18} color={theme.textTertiary} />
-              <TextInput
-                style={[styles.searchInput, { color: theme.textPrimary }]}
-                value={guideSearchQuery}
-                onChangeText={(text) => {
-                  setGuideSearchQuery(text);
-                  if (typingTimeoutRef.current) {
-                    clearTimeout(typingTimeoutRef.current);
-                  }
-                  if (!text.trim()) {
-                    setApiGuides([]);
-                    setGuideError(null);
-                  } else {
-                    typingTimeoutRef.current = setTimeout(() => {
-                      handleTypingSearch(text);
-                    }, 300);
-                  }
-                }}
-                onSubmitEditing={handleSearchGuide}
-                returnKeyType="search"
-                placeholder="어떤 식재료 보관법을 찾으시나요?"
-                placeholderTextColor={theme.textMuted}
-              />
-              {guideSearchQuery.length > 0 && (
-                <TouchableOpacity onPress={() => {
-                  setGuideSearchQuery('');
-                  setApiGuides([]);
-                  setGuideError(null);
-                }}>
-                  <Ionicons name="close-circle" size={18} color={theme.textMuted} style={{ marginRight: 4 }} />
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity onPress={handleSearchGuide} style={{ paddingHorizontal: 8 }}>
-                <Text style={{ color: theme.primary, fontWeight: 'bold', fontSize: 13 }}>검색</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* 보관 팁용 카테고리 필터 칩 */}
-            <View style={[styles.filterContainer, { height: 38 }]}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
-                {['all', '채소', '과일', '육류/수산', '유제품', '기타'].map((cat) => {
-                  const label = cat === 'all' ? '전체' : cat;
-                  const isActive = guideSelectedCategory === cat;
-                  return (
-                    <TouchableOpacity
-                      key={cat}
-                      style={[
-                        styles.filterChip,
-                        { 
-                          backgroundColor: theme.surfaceTertiary,
-                          borderWidth: 1,
-                          borderColor: theme.borderLight
-                        },
-                        isActive && [
-                          styles.filterChipActive, 
-                          { backgroundColor: theme.primary, borderColor: theme.primary }
-                        ]
-                      ]}
-                      onPress={() => setGuideSelectedCategory(cat)}
-                    >
-                      <Text style={[styles.filterChipText, { color: theme.textSecondary }, isActive && { color: theme.primaryOnPrimary }]}>
-                        {label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
-
-            {/* 에러 및 로딩 상태 오버레이 */}
-            {isGuideLoading && (
-              <View style={{ paddingVertical: 40, justifyContent: 'center', alignItems: 'center', gap: 10 }}>
-                <ActivityIndicator size="large" color={theme.primary} />
-                <Text style={{ color: theme.textSecondary, fontSize: 13 }}>AI가 신선 보관 꿀팁을 분석하고 있습니다... 🔍</Text>
-              </View>
-            )}
-
-            {guideError && !isGuideLoading && (
-              <View style={{ padding: 16, marginHorizontal: 20, marginBottom: 12, backgroundColor: theme.surfaceSecondary, borderWidth: 1, borderColor: theme.borderLight, borderRadius: 16, alignItems: 'center', gap: 8 }}>
-                <Ionicons name="alert-circle-outline" size={28} color={theme.ddayImminent} />
-                <Text style={{ color: theme.textSecondary, fontSize: 12, textAlign: 'center', lineHeight: 18 }}>
-                  {guideError}
-                </Text>
-              </View>
-            )}
-
-            {/* 보관 팁 리스트 */}
-            {!isGuideLoading && (
-              filteredTips.length > 0 ? (
-                <FlatList
-                  data={filteredTips}
-                  keyExtractor={(item) => item.name}
-                  numColumns={1}
-                  contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40, gap: 12 }}
-                  showsVerticalScrollIndicator={false}
-                  renderItem={({ item }) => {
-                    return (
-                      <View
-                        style={[
-                          styles.guideTipCard,
-                          {
-                            backgroundColor: theme.surface,
-                            borderColor: theme.borderLight,
-                          }
-                        ]}
-                      >
-                        {/* 1. 상단 정보 헤더 행 */}
-                        <View style={styles.guideCardHeader}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <Text style={{ fontSize: 18 }}>{item.emoji}</Text>
-                            <Text style={[styles.guideCardName, { color: theme.textPrimary }]}>
-                              {item.name}
-                            </Text>
-                            <View style={[styles.categoryBadge, { backgroundColor: theme.surfaceTertiary }]}>
-                              <Text style={[styles.categoryBadgeText, { color: theme.textMuted }]}>
-                                {item.category}
-                              </Text>
-                            </View>
-                          </View>
-                        </View>
-
-                        {/* 2. 중앙 보관 꿀팁 내용 본문 */}
-                        <View style={styles.guideCardBody}>
-                          <Text style={[styles.guideCardTipText, { color: theme.textSecondary }]}>
-                            {item.tip}
-                          </Text>
-                        </View>
-
-                        {/* 3. 하단 유튜브 보관법 외부 앱 검색 버튼 */}
-                        <TouchableOpacity
-                          style={[
-                            styles.guideYoutubeButton,
-                            { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderLight }
-                          ]}
-                          activeOpacity={0.8}
-                          onPress={() => handleOpenYoutube(item.youtubeQuery || item.name, item.name)}
-                        >
-                          <Ionicons name="logo-youtube" size={15} color="#FF0000" />
-                          <Text style={[styles.guideYoutubeText, { color: theme.textPrimary }]} numberOfLines={1}>
-                            {`YouTube에서 "${item.name} 보관법" 검색`}
-                          </Text>
-                          <Ionicons name="chevron-forward" size={13} color={theme.textMuted} style={{ marginLeft: 'auto' }} />
-                        </TouchableOpacity>
-                      </View>
-                    );
-                  }}
-                />
-              ) : (
-                <View style={styles.emptyStateContainer}>
-                  <Ionicons name="search-outline" size={48} color={theme.textMuted} style={{ marginBottom: 12 }} />
-                  <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>
-                    일치하는 식재료 꿀팁이 없습니다.
-                  </Text>
-                  <Text style={{ color: theme.textMuted, fontSize: 12, marginTop: 4 }}>
-                    다른 이름이나 유사한 단어로 검색해 보세요! 🔍
-                  </Text>
-                </View>
-              )
-            )}
-          </View>
-
-          {/* AI 안내 팝업 오버레이 */}
-          {showGuideNotice && (
-            <View style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.4)',
-              justifyContent: 'center',
-              alignItems: 'center',
-              zIndex: 9999,
-              padding: 24
-            }}>
-              <View style={{
-                width: '100%',
-                backgroundColor: theme.surface,
-                borderRadius: 20,
-                padding: 20,
-                borderWidth: 1,
-                borderColor: theme.borderLight,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.15,
-                shadowRadius: 10,
-                elevation: 5,
-                gap: 16
-              }}>
-                {/* 팝업 헤더 */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={{ fontSize: 20 }}>💡</Text>
-                  <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.textPrimary }}>
-                    AI 보관 팁 안내
-                  </Text>
-                </View>
-
-                {/* 팝업 내용 */}
-                <Text style={{
-                  fontSize: 14,
-                  color: theme.textSecondary,
-                  lineHeight: 22
-                }}>
-                  식재료 보관 팁은 AI 분석을 통해 제공되는 정보이며, 실제 식품 상태와 보관 환경에 따라 정확하지 않을 수 있으니 참고용으로만 사용해 주세요.
-                </Text>
-
-                {/* 팝업 하단 바 */}
-                <View style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginTop: 8,
-                  borderTopWidth: 1,
-                  borderTopColor: theme.borderLight,
-                  paddingTop: 16
-                }}>
-                  {/* 왼쪽: 일주일 동안 보지 않기 */}
-                  <TouchableOpacity
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
-                    activeOpacity={0.7}
-                    onPress={() => setIsGuideNoticeChecked(prev => !prev)}
-                  >
-                    <Ionicons
-                      name={isGuideNoticeChecked ? "checkbox" : "square-outline"}
-                      size={20}
-                      color={isGuideNoticeChecked ? theme.primary : theme.textTertiary}
-                    />
-                    <Text style={{ fontSize: 13, color: theme.textSecondary }}>
-                      일주일 동안 보지 않기
-                    </Text>
-                  </TouchableOpacity>
-
-                  {/* 오른쪽: 확인 버튼 */}
-                  <TouchableOpacity
-                    style={{
-                      backgroundColor: theme.primary,
-                      paddingVertical: 8,
-                      paddingHorizontal: 16,
-                      borderRadius: 10
-                    }}
-                    activeOpacity={0.8}
-                    onPress={handleCloseGuideNotice}
-                  >
-                    <Text style={{ color: theme.primaryOnPrimary, fontWeight: 'bold', fontSize: 13 }}>
-                      확인
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          )}
-        </SafeAreaView>
-      </Modal>
 
       {/* 냉장고 관리 설정 모달 */}
       <Modal
@@ -3179,28 +2603,11 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 1,
   },
-  kakaoButton: {
-    backgroundColor: '#FEE500',
+  backupManageButton: {
+    shadowColor: '#000',
   },
-  kakaoButtonText: {
-    color: '#191919',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  naverButton: {
-    backgroundColor: '#03C75A',
-  },
-  naverButtonText: {
+  backupManageButtonText: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  googleButton: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-  },
-  googleButtonText: {
-    color: '#1F2937',
     fontSize: 14,
     fontWeight: 'bold',
   },
