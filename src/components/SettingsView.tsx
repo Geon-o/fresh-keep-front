@@ -38,20 +38,18 @@ export default function SettingsView({
       contentContainerStyle={styles.contentContainer} 
       showsVerticalScrollIndicator={false}
     >
-      <Text style={[styles.headerTitle, { color: titleColor }]}>설정</Text>
-
-      {/* 1. 프로필 영역 (provider 노출 제거, 단순 닉네임만 표시) */}
-      <View style={[styles.profileCard, { backgroundColor: cardColor, borderColor }]}>
-        <View style={styles.profileWrapper}>
-          <View style={[styles.avatarCircle, { backgroundColor: isDark ? '#2C2C2E' : '#E5E7EB' }]}>
-            <Ionicons name="person" size={22} color={isDark ? '#D1D5DB' : '#4B5563'} />
-          </View>
-          <View style={styles.profileInfo}>
-            <Text style={[styles.profileName, { color: titleColor }]}>
-              {isLoggedIn && user ? user.name : '익명 사용자'}
-            </Text>
-          </View>
-        </View>
+      <View style={styles.headerContainer}>
+        <Text style={[styles.headerTitle, { color: titleColor }]}>설정</Text>
+        <TouchableOpacity 
+          activeOpacity={0.7} 
+          onPress={() => router.push('/settings/nickname')}
+          style={styles.nicknamePressable}
+        >
+          <Text style={[styles.nicknameText, { color: titleColor }]}>
+            {isLoggedIn && user ? user.name : '익명 사용자'}님
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color={descColor} style={{ marginLeft: 4 }} />
+        </TouchableOpacity>
       </View>
 
       {/* 2. 보안 및 복구 카드 */}
@@ -131,38 +129,22 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 80,
   },
+  headerContainer: {
+    marginBottom: 24,
+    paddingHorizontal: 4,
+  },
   headerTitle: {
     fontSize: 24,
     fontWeight: '800',
     letterSpacing: -0.5,
-    marginBottom: 16,
-    paddingHorizontal: 4,
   },
-  // 토스 스타일 프로필 카드
-  profileCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 16,
-    marginBottom: 12,
-  },
-  profileWrapper: {
+  nicknamePressable: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    marginTop: 24,
   },
-  avatarCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  profileInfo: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  profileName: {
-    fontSize: 16,
+  nicknameText: {
+    fontSize: 20,
     fontWeight: '700',
     letterSpacing: -0.3,
   },

@@ -21,6 +21,7 @@ interface AuthContextType {
   getBackupKey: () => Promise<string | null>;
   restoreBackup: (backupKey: string) => Promise<boolean>;
   logout: () => Promise<void>;
+  updateNickname: (name: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -197,6 +198,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateNickname = async (name: string): Promise<boolean> => {
+    try {
+      const response = await client.patch<UserProfile>('/api/users/me', { name });
+      if (response.data && typeof response.data === 'object') {
+        setUser(response.data);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.error('Failed to update nickname', e);
+      return false;
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -207,6 +222,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         getBackupKey,
         restoreBackup,
         logout,
+        updateNickname,
       }}
     >
       {children}
