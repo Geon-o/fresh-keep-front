@@ -1025,60 +1025,90 @@ export default function RefrigeratorVisual({
           {/* 식재료 신선도 요약 대시보드 */}
           {(() => {
             const totalCount = totalExpired + totalImminent + totalSafe;
-            const expiredPercent = totalCount > 0 ? (totalExpired / totalCount) * 100 : 0;
-            const imminentPercent = totalCount > 0 ? (totalImminent / totalCount) * 100 : 0;
-            const safePercent = totalCount > 0 ? (totalSafe / totalCount) * 100 : 100;
+            const freshnessScore = totalCount > 0 ? Math.round((totalSafe / totalCount) * 100) : 0;
+            const ringColor = totalCount === 0
+              ? theme.textTertiary
+              : totalExpired > 0 
+                ? theme.ddayExpired 
+                : totalImminent > 0 
+                  ? theme.ddayImminent 
+                  : theme.ddaySafe;
+
+            const friendlyTitle = totalCount === 0
+              ? `보관 중인 식재료가 없어요\n첫 식재료를 등록해 볼까요? 🍎`
+              : totalExpired > 0 
+                ? `만료된 식재료\n${totalExpired}개를 먼저 드세요 🚨` 
+                : totalImminent > 0 
+                  ? `소비 임박 식재료가\n${totalImminent}개 기다리고 있어요 ⚠️` 
+                  : `모든 식재료가\n신선하게 보관 중이에요 🍃`;
 
             return (
               <View style={[styles.mainDashboardCard, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
-                {/* 타이틀 및 상태 메시지 */}
-                <View style={styles.dashboardHeader}>
-                  <Text style={[styles.dashboardTitle, { color: theme.textPrimary }]}>식재료 보관 현황</Text>
-                  <Text style={[styles.dashboardSubtitle, { color: theme.textTertiary }]}>
-                    {totalExpired > 0 
-                      ? `만료된 식재료가 ${totalExpired}개 있어요! 🚨` 
-                      : totalImminent > 0 
-                        ? `임박한 식재료가 ${totalImminent}개 있어요. ⚠️` 
-                        : '모든 식재료가 신선하게 보관 중입니다. 🍃'}
-                  </Text>
-                </View>
+                <View style={styles.dashboardBodyRow}>
+                  {/* 좌측: 타이틀 및 필터 칩 */}
+                  <View style={styles.dashboardLeftCol}>
+                    <Text style={[styles.tossFriendlyTitle, { color: theme.textPrimary }]}>
+                      {friendlyTitle}
+                    </Text>
+                    
+                    <View style={styles.statusChipRow}>
+                      {/* 만료 칩 */}
+                      <TouchableOpacity 
+                        style={[styles.statusChip, { 
+                          borderColor: theme.ddayExpired + '30',
+                          backgroundColor: selectedFilter === 'expired' ? theme.ddayExpired + '15' : theme.surfaceTertiary 
+                        }]}
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          setSelectedFilter(selectedFilter === 'expired' ? 'all' : 'expired');
+                        }}
+                      >
+                        <Text style={[styles.statusChipText, { color: theme.ddayExpired }]}>
+                          만료 {totalExpired}
+                        </Text>
+                      </TouchableOpacity>
 
-                {/* 신선도 비율 차트 바 (스토리지 바 형태) */}
-                <View style={[styles.gaugeContainer, { backgroundColor: theme.surfaceTertiary }]}>
-                  {totalCount > 0 ? (
-                    <>
-                      {totalExpired > 0 && <View style={[styles.gaugeSegment, { width: `${expiredPercent}%`, backgroundColor: theme.ddayExpired }]} />}
-                      {totalImminent > 0 && <View style={[styles.gaugeSegment, { width: `${imminentPercent}%`, backgroundColor: theme.ddayImminent }]} />}
-                      {totalSafe > 0 && <View style={[styles.gaugeSegment, { width: `${safePercent}%`, backgroundColor: theme.ddaySafe }]} />}
-                    </>
-                  ) : (
-                    <View style={[styles.gaugeSegment, { width: '100%', backgroundColor: theme.textMuted + '30' }]} />
-                  )}
-                </View>
+                      {/* 임박 칩 */}
+                      <TouchableOpacity 
+                        style={[styles.statusChip, { 
+                          borderColor: theme.ddayImminent + '40',
+                          backgroundColor: selectedFilter === 'imminent' ? theme.ddayImminent + '15' : theme.surfaceTertiary 
+                        }]}
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          setSelectedFilter(selectedFilter === 'imminent' ? 'all' : 'imminent');
+                        }}
+                      >
+                        <Text style={[styles.statusChipText, { color: theme.ddayImminent === '#EAB308' ? '#CA8A04' : theme.ddayImminent }]}>
+                          임박 {totalImminent}
+                        </Text>
+                      </TouchableOpacity>
 
-                {/* 하단 스탯 3분할 정보 */}
-                <View style={[styles.dashboardStatsRow, { borderTopColor: theme.borderLight }]}>
-                  {/* 만료 */}
-                  <View style={styles.dashboardStatCol}>
-                    <View style={[styles.statDot, { backgroundColor: theme.ddayExpired }]} />
-                    <Text style={[styles.statLabel, { color: theme.textSecondary }]}>만료</Text>
-                    <Text style={[styles.statValue, { color: theme.textPrimary }]}>{totalExpired}</Text>
+                      {/* 안전 칩 */}
+                      <TouchableOpacity 
+                        style={[styles.statusChip, { 
+                          borderColor: theme.ddaySafe + '30',
+                          backgroundColor: selectedFilter === 'safe' ? theme.ddaySafe + '15' : theme.surfaceTertiary 
+                        }]}
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          setSelectedFilter(selectedFilter === 'safe' ? 'all' : 'safe');
+                        }}
+                      >
+                        <Text style={[styles.statusChipText, { color: theme.ddaySafe }]}>
+                          안전 {totalSafe}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                  <View style={[styles.statDivider, { backgroundColor: theme.borderLight }]} />
 
-                  {/* 임박 */}
-                  <View style={styles.dashboardStatCol}>
-                    <View style={[styles.statDot, { backgroundColor: theme.ddayImminent }]} />
-                    <Text style={[styles.statLabel, { color: theme.textSecondary }]}>임박</Text>
-                    <Text style={[styles.statValue, { color: theme.textPrimary }]}>{totalImminent}</Text>
-                  </View>
-                  <View style={[styles.statDivider, { backgroundColor: theme.borderLight }]} />
-
-                  {/* 안전 */}
-                  <View style={styles.dashboardStatCol}>
-                    <View style={[styles.statDot, { backgroundColor: theme.ddaySafe }]} />
-                    <Text style={[styles.statLabel, { color: theme.textSecondary }]}>안전</Text>
-                    <Text style={[styles.statValue, { color: theme.textPrimary }]}>{totalSafe}</Text>
+                  {/* 우측: 미니 도넛 게이지 차트 */}
+                  <View style={styles.donutChartContainer}>
+                    <View style={[styles.donutBaseCircle, { borderColor: theme.borderLight }]} />
+                    <View style={[styles.donutBaseCircle, { borderColor: ringColor, borderTopColor: 'transparent', borderLeftColor: 'transparent', transform: [{ rotate: '45deg' }] }]} />
+                    <Text style={[styles.donutCenterText, { color: ringColor }]}>
+                      {freshnessScore}%
+                    </Text>
                   </View>
                 </View>
               </View>
@@ -2724,66 +2754,67 @@ const styles = StyleSheet.create({
   mainDashboardCard: {
     marginHorizontal: 20,
     borderRadius: 24,
-    borderWidth: 1.5,
+    borderWidth: 1,
     padding: 20,
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.05,
-    shadowRadius: 20,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    elevation: 2,
   },
   dashboardHeader: {
-    marginBottom: 16,
-  },
-  dashboardTitle: {
-    fontSize: 16,
-    fontWeight: '800',
     marginBottom: 4,
   },
-  dashboardSubtitle: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  gaugeContainer: {
-    height: 12,
-    borderRadius: 6,
+  dashboardBodyRow: {
     flexDirection: 'row',
-    overflow: 'hidden',
-    marginBottom: 20,
-  },
-  gaugeSegment: {
-    height: '100%',
-  },
-  dashboardStatsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 12,
-    borderTopWidth: 1.5,
+    alignItems: 'center',
+    marginTop: 4,
   },
-  dashboardStatCol: {
+  dashboardLeftCol: {
     flex: 1,
+    paddingRight: 12,
+  },
+  tossFriendlyTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    lineHeight: 25,
+    letterSpacing: -0.5,
+  },
+  statusChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 16,
+  },
+  statusChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5.5,
+    borderRadius: 20,
+    borderWidth: 1,
   },
-  statDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  statLabel: {
+  statusChipText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
-  statValue: {
-    fontSize: 14,
+  donutChartContainer: {
+    width: 72,
+    height: 72,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  donutBaseCircle: {
+    position: 'absolute',
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    borderWidth: 6,
+  },
+  donutCenterText: {
+    fontSize: 12,
     fontWeight: '800',
-  },
-  statDivider: {
-    width: 1.5,
-    height: 16,
   },
   loginPromptCard: {
     borderRadius: 24,
