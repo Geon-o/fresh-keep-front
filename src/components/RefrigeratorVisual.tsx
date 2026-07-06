@@ -2259,13 +2259,14 @@ const styles = StyleSheet.create({
   },
   cardMainRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginVertical: 2,
   },
   cardLargeIndex: {
-    fontSize: 38,
+    fontSize: 48,
     fontWeight: '900',
-    lineHeight: 38,
+    lineHeight: 48,
   },
   cardMainTitle: {
     fontSize: 16,
