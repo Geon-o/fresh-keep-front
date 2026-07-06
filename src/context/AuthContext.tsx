@@ -69,7 +69,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Axios client에서 401 재인증 실패 시 강제 재인증(익명) 처리할 콜백 등록
     registerUnauthorizedCallback(async () => {
       await clearAuthTokens();
-      await AsyncStorage.removeItem('@backup_key');
       setIsLoggedIn(false);
       setUser(null);
       await loginAnonymously();
@@ -181,6 +180,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     setIsLoading(true);
     try {
+      try {
+        await client.delete('/api/users/me');
+      } catch (apiErr) {
+        console.warn('Backend user delete API request failed or not implemented:', apiErr);
+      }
+
       await clearAuthTokens();
       await AsyncStorage.removeItem('@backup_key');
       await AsyncStorage.removeItem('@device_uuid');
@@ -190,7 +195,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       queryClient.clear();
       await loginAnonymously();
-      Alert.alert('초기화 완료', '세션이 안전하게 초기화되었습니다.');
+      Alert.alert('초기화 완료', '계정이 완전히 삭제되고 안전하게 초기화되었습니다.');
     } catch (e) {
       console.error('Logout / Reset error', e);
     } finally {
