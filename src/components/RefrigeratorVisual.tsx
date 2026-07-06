@@ -257,6 +257,24 @@ export default function RefrigeratorVisual({
   const { theme, isDark } = useTheme();
   const [fridgeSettingsVisible, setFridgeSettingsVisible] = useState(false);
 
+  const [fridgeCardWidth, setFridgeCardWidth] = useState(0);
+  const [currentFridgeSwipeIndex, setCurrentFridgeSwipeIndex] = useState(0);
+
+  const onFridgeCardLayout = (event: any) => {
+    const { width } = event.nativeEvent.layout;
+    // paddingHorizontal이 12이므로 실가용 너비는 width - 24
+    setFridgeCardWidth(width - 24);
+  };
+
+  const handleFridgeScroll = (event: any) => {
+    const contentOffset = event.nativeEvent.contentOffset.x;
+    const layoutWidth = event.nativeEvent.layoutMeasurement.width;
+    if (layoutWidth > 0) {
+      const pageIndex = Math.round(contentOffset / layoutWidth);
+      setCurrentFridgeSwipeIndex(pageIndex);
+    }
+  };
+
   // 식재료 목록 탭용 상태
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'expired' | 'imminent' | 'safe'>('all');
@@ -1192,36 +1210,81 @@ export default function RefrigeratorVisual({
             )}
 
             {/* 우측: 내 냉장고 바로가기 */}
-            <TouchableOpacity 
+            <View 
               style={[styles.fridgeColumnCard, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}
-              activeOpacity={0.8}
-              onPress={() => onChangeTab?.('fridge')}
+              onLayout={onFridgeCardLayout}
             >
               <View style={styles.cardHeaderRow}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <Ionicons name="cube-outline" size={14} color={theme.primary} />
                   <Text style={[styles.columnCardTitle, { color: theme.textPrimary }]}>나의 냉장고</Text>
                 </View>
-                <View style={[styles.fridgeCountBadge, { backgroundColor: theme.primary }]}>
-                  <Text style={styles.fridgeCountBadgeText}>{refrigerators.length}대</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  {refrigerators.length > 1 && (
+                    <Text style={{ fontSize: 9, fontWeight: 'bold', color: theme.textTertiary }}>
+                      {currentFridgeSwipeIndex + 1}/{refrigerators.length}
+                    </Text>
+                  )}
+                  <View style={[styles.fridgeCountBadge, { backgroundColor: theme.primary }]}>
+                    <Text style={styles.fridgeCountBadgeText}>{refrigerators.length}대</Text>
+                  </View>
                 </View>
               </View>
 
-              <View style={styles.cardMainRow}>
-                {refrigerators.length > 0 ? (
-                  <Text style={[styles.cardMainTitle, { color: theme.textPrimary }]} numberOfLines={1}>
-                    {refrigerators[activeIndex]?.name || refrigerators[0].name}
-                  </Text>
+              <View style={{ height: 60, justifyContent: 'center' }}>
+                {fridgeCardWidth > 0 && refrigerators.length > 0 ? (
+                  <ScrollView
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    onScroll={handleFridgeScroll}
+                    scrollEventThrottle={16}
+                    contentContainerStyle={{ alignItems: 'center' }}
+                  >
+                    {refrigerators.map((fridge) => {
+                      const count = ingredients.filter(item => item.fridgeId === fridge.id).length;
+                      return (
+                        <View 
+                          key={fridge.id} 
+                          style={{ 
+                            width: fridgeCardWidth, 
+                            justifyContent: 'center', 
+                            paddingVertical: 2 
+                          }}
+                        >
+                          <Text style={{ fontSize: 11, color: theme.textSecondary, fontWeight: '600' }} numberOfLines={1}>
+                            {fridge.name}
+                          </Text>
+                          <Text style={[styles.cardMainTitle, { color: theme.textPrimary, marginTop: 2 }]} numberOfLines={1}>
+                            식재료 {count}개 보관 중
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </ScrollView>
+                ) : refrigerators.length > 0 ? (
+                  <View>
+                    <Text style={{ fontSize: 11, color: theme.textSecondary, fontWeight: '600' }} numberOfLines={1}>
+                      {refrigerators[activeIndex]?.name || refrigerators[0].name}
+                    </Text>
+                    <Text style={[styles.cardMainTitle, { color: theme.textPrimary, marginTop: 2 }]} numberOfLines={1}>
+                      식재료 집계 중...
+                    </Text>
+                  </View>
                 ) : (
                   <Text style={[styles.cardMainTitle, { color: theme.textSecondary }]}>냉장고 없음</Text>
                 )}
               </View>
 
-              <View style={styles.cardFooterRow}>
+              <TouchableOpacity 
+                style={styles.cardFooterRow}
+                activeOpacity={0.7}
+                onPress={() => onChangeTab?.('fridge')}
+              >
                 <Text style={[styles.cardSubText, { color: theme.textTertiary }]}>냉장고 바로가기</Text>
                 <Ionicons name="chevron-forward" size={12} color={theme.textTertiary} />
-              </View>
-            </TouchableOpacity>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* 제철 식재료 추천 */}
@@ -2171,7 +2234,7 @@ const styles = StyleSheet.create({
   },
   foodSafetyColumnCard: {
     width: '45%',
-    height: 125,
+    height: 140,
     borderRadius: 16,
     borderWidth: 1,
     padding: 10,
@@ -2179,7 +2242,7 @@ const styles = StyleSheet.create({
   },
   fridgeColumnCard: {
     width: '51%',
-    height: 125,
+    height: 140,
     borderRadius: 16,
     borderWidth: 1,
     padding: 12,
@@ -2200,9 +2263,9 @@ const styles = StyleSheet.create({
     marginVertical: 2,
   },
   cardLargeIndex: {
-    fontSize: 34,
+    fontSize: 38,
     fontWeight: '900',
-    lineHeight: 34,
+    lineHeight: 38,
   },
   cardMainTitle: {
     fontSize: 16,
