@@ -233,6 +233,7 @@ interface RefrigeratorVisualProps {
   onDeleteFridge: () => void;
   onShareFridge?: (fridgeName: string, fridgeUuid: string) => void;
   onScanQr?: () => void;
+  onChangeTab?: (tab: 'home' | 'ingredients' | 'fridge' | 'settings') => void;
 }
 
 export default function RefrigeratorVisual({
@@ -246,7 +247,8 @@ export default function RefrigeratorVisual({
   onEditFridgeType,
   onDeleteFridge,
   onShareFridge,
-  onScanQr
+  onScanQr,
+  onChangeTab
 }: RefrigeratorVisualProps) {
   const { width: screenWidth } = useWindowDimensions();
   const { isLoggedIn } = useAuth();
@@ -1002,62 +1004,6 @@ export default function RefrigeratorVisual({
           contentContainerStyle={styles.dashboardContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* 오늘의 식중독 지수 */}
-          <View style={styles.sectionContainer}>
-            {weatherInfo.loading ? (
-              <View style={[styles.foodSafetyCard, { backgroundColor: theme.surface, borderColor: theme.borderLight, justifyContent: 'center', alignItems: 'center', paddingVertical: 24 }]}>
-                <ActivityIndicator size="small" color={theme.primary} />
-              </View>
-            ) : locationPermission === 'denied' ? (
-              <View style={[styles.foodSafetyCard, { backgroundColor: theme.dangerLight, borderColor: theme.danger + '25' }]}>
-                <View style={styles.foodSafetyHeader}>
-                  <View style={styles.foodSafetyTitleRow}>
-                    <Ionicons name="location-outline" size={16} color={theme.danger} />
-                    <Text style={[styles.foodSafetyTitle, { color: theme.textPrimary }]}>식중독 지수 조회 불가</Text>
-                  </View>
-                  <View style={[styles.foodSafetyBadge, { backgroundColor: theme.danger }]}>
-                    <Text style={styles.foodSafetyBadgeText}>권한 필요</Text>
-                  </View>
-                </View>
-                <Text style={[styles.foodSafetyDesc, { color: theme.textSecondary, lineHeight: 18 }]}>
-                  실시간 위치 기준 식중독 지수를 조회하려면 위치 권한 허용이 필요합니다. 아래 버튼을 눌러 권한을 허용해 주세요.
-                </Text>
-                <TouchableOpacity 
-                  style={[styles.permissionButton, { backgroundColor: theme.danger }]}
-                  activeOpacity={0.8}
-                  onPress={requestLocationAndFetchWeather}
-                >
-                  <Text style={[styles.permissionButtonText, { color: '#FFFFFF' }]}>위치 권한 허용하기</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={[styles.foodSafetyCard, { backgroundColor: weatherInfo.bgColor, borderColor: weatherInfo.color + '25' }]}>
-                <View style={styles.foodSafetyHeader}>
-                  <View style={styles.foodSafetyTitleRow}>
-                    <Ionicons name="shield-checkmark" size={16} color={weatherInfo.color} />
-                    <Text style={[styles.foodSafetyTitle, { color: theme.textPrimary }]}>
-                      오늘의 식중독 지수{weatherInfo.city ? ` (${weatherInfo.city})` : ''}
-                    </Text>
-                  </View>
-                  <View style={[styles.foodSafetyBadge, { backgroundColor: weatherInfo.color }]}>
-                    <Text style={styles.foodSafetyBadgeText}>{weatherInfo.level} {weatherInfo.index}</Text>
-                  </View>
-                </View>
-                <Text style={[styles.foodSafetyDesc, { color: theme.textSecondary }]}>
-                  {weatherInfo.description}
-                </Text>
-                {weatherInfo.temp !== null && weatherInfo.humidity !== null && (
-                  <Text style={[styles.weatherConditionText, { color: theme.textTertiary }]}>
-                    현재 기온: {weatherInfo.temp}°C{weatherInfo.isFallback ? ' (평균)' : ''} | 습도: {weatherInfo.humidity}%{weatherInfo.isFallback ? ' (평균)' : ''}
-                  </Text>
-                )}
-                <View style={[styles.progressBarBg, { backgroundColor: theme.borderLight }]}>
-                  <View style={[styles.progressBarFill, { width: `${weatherInfo.index}%`, backgroundColor: weatherInfo.color }]} />
-                </View>
-              </View>
-            )}
-          </View>
-
           {/* 식재료 신선도 요약 대시보드 */}
           {(() => {
             const totalCount = totalExpired + totalImminent + totalSafe;
@@ -1191,6 +1137,93 @@ export default function RefrigeratorVisual({
             )}
           </View>
 
+          {/* 식중독 지수 & 내 냉장고 1:1 병렬 배치 */}
+          <View style={styles.twoColumnRow}>
+            {/* 좌측: 식중독 지수 */}
+            {weatherInfo.loading ? (
+              <View style={[styles.foodSafetyColumnCard, { backgroundColor: theme.surface, borderColor: theme.borderLight, justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="small" color={theme.primary} />
+              </View>
+            ) : locationPermission === 'denied' ? (
+              <TouchableOpacity 
+                style={[styles.foodSafetyColumnCard, { backgroundColor: theme.dangerLight, borderColor: theme.danger + '25' }]}
+                activeOpacity={0.8}
+                onPress={requestLocationAndFetchWeather}
+              >
+                <View style={styles.cardHeaderRow}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Ionicons name="location-outline" size={14} color={theme.danger} />
+                    <Text style={[styles.columnCardTitle, { color: theme.danger }]}>위치 권한 필요</Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 10, color: theme.textSecondary, lineHeight: 14, marginTop: 4 }}>
+                  식중독 지수 조회를 위해 이 카드를 눌러 권한을 허용해 주세요.
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={[styles.foodSafetyColumnCard, { backgroundColor: weatherInfo.bgColor, borderColor: weatherInfo.color + '25' }]}>
+                <View style={styles.cardHeaderRow}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Ionicons name="shield-checkmark" size={14} color={weatherInfo.color} />
+                    <Text style={[styles.columnCardTitle, { color: theme.textPrimary }]}>식중독 지수</Text>
+                  </View>
+                  <View style={[styles.foodSafetyBadge, { backgroundColor: weatherInfo.color, paddingHorizontal: 5, paddingVertical: 1 }]}>
+                    <Text style={styles.foodSafetyBadgeText}>{weatherInfo.level}</Text>
+                  </View>
+                </View>
+                
+                <View style={styles.cardMainRow}>
+                  <Text style={[styles.cardLargeIndex, { color: weatherInfo.color }]}>
+                    {weatherInfo.index}
+                  </Text>
+                </View>
+
+                <View style={{ gap: 4 }}>
+                  {weatherInfo.temp !== null && weatherInfo.humidity !== null && (
+                    <Text style={[styles.cardSubText, { color: theme.textTertiary }]} numberOfLines={1}>
+                      {weatherInfo.city ? `${weatherInfo.city} | ` : ''}{weatherInfo.temp}°C | {weatherInfo.humidity}%
+                    </Text>
+                  )}
+                  <View style={[styles.progressBarBg, { backgroundColor: theme.borderLight }]}>
+                    <View style={[styles.progressBarFill, { width: `${weatherInfo.index}%`, backgroundColor: weatherInfo.color }]} />
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* 우측: 내 냉장고 바로가기 */}
+            <TouchableOpacity 
+              style={[styles.fridgeColumnCard, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}
+              activeOpacity={0.8}
+              onPress={() => onChangeTab?.('fridge')}
+            >
+              <View style={styles.cardHeaderRow}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Ionicons name="cube-outline" size={14} color={theme.primary} />
+                  <Text style={[styles.columnCardTitle, { color: theme.textPrimary }]}>나의 냉장고</Text>
+                </View>
+                <View style={[styles.fridgeCountBadge, { backgroundColor: theme.primary }]}>
+                  <Text style={styles.fridgeCountBadgeText}>{refrigerators.length}대</Text>
+                </View>
+              </View>
+
+              <View style={styles.cardMainRow}>
+                {refrigerators.length > 0 ? (
+                  <Text style={[styles.cardMainTitle, { color: theme.textPrimary }]} numberOfLines={1}>
+                    {refrigerators[activeIndex]?.name || refrigerators[0].name}
+                  </Text>
+                ) : (
+                  <Text style={[styles.cardMainTitle, { color: theme.textSecondary }]}>냉장고 없음</Text>
+                )}
+              </View>
+
+              <View style={styles.cardFooterRow}>
+                <Text style={[styles.cardSubText, { color: theme.textTertiary }]}>냉장고 바로가기</Text>
+                <Ionicons name="chevron-forward" size={12} color={theme.textTertiary} />
+              </View>
+            </TouchableOpacity>
+          </View>
+
           {/* 제철 식재료 추천 */}
           <View style={styles.sectionContainer}>
             <View style={styles.sectionHeaderRow}>
@@ -1199,40 +1232,47 @@ export default function RefrigeratorVisual({
               </Text>
             </View>
 
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.urgentScrollContainer}
-            >
-              {seasonalIngredients.map((item, idx) => (
-                <TouchableOpacity
-                  key={`seasonal_${idx}`}
-                  style={[
-                    styles.seasonalCard,
-                    {
-                      backgroundColor: theme.surface,
-                      borderColor: theme.borderLight,
-                    }
-                  ]}
-                  activeOpacity={0.8}
-                  onPress={() => handleOpenYoutube(item.searchQuery, item.name)}
-                >
-                  <View style={[styles.urgentEmojiBadge, { backgroundColor: theme.surfaceTertiary, width: 44, height: 44, borderRadius: 15, marginBottom: 8 }]}>
-                    <Text style={{ fontSize: 24 }}>{item.emoji}</Text>
-                  </View>
-                  <Text style={[styles.seasonalTitle, { color: theme.textPrimary }]} numberOfLines={1}>
-                    {item.name}
-                  </Text>
-                  <Text style={[styles.seasonalRecommend, { color: theme.textSecondary }]} numberOfLines={2}>
-                    추천: {item.recommendDish}
-                  </Text>
-                  <View style={[styles.youtubeLinkButton, { backgroundColor: '#FF0000' }]}>
-                    <Ionicons name="logo-youtube" size={12} color="#FFFFFF" />
-                    <Text style={styles.youtubeLinkText}>영상 보기</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            <View style={styles.seasonalListContainer}>
+              <ScrollView
+                nestedScrollEnabled={true}
+                showsVerticalScrollIndicator={true}
+                contentContainerStyle={{ gap: 8 }}
+              >
+                {seasonalIngredients.map((item, idx) => (
+                  <TouchableOpacity
+                    key={`seasonal_${idx}`}
+                    style={[
+                      styles.seasonalRowItem,
+                      {
+                        backgroundColor: theme.surface,
+                        borderColor: theme.borderLight,
+                        shadowColor: theme.shadow,
+                      }
+                    ]}
+                    activeOpacity={0.8}
+                    onPress={() => handleOpenYoutube(item.searchQuery, item.name)}
+                  >
+                    <View style={styles.seasonalRowLeft}>
+                      <View style={[styles.seasonalRowEmojiBg, { backgroundColor: theme.surfaceTertiary }]}>
+                        <Text style={styles.seasonalRowEmoji}>{item.emoji}</Text>
+                      </View>
+                      <View style={styles.seasonalRowInfo}>
+                        <Text style={[styles.seasonalRowName, { color: theme.textPrimary }]} numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                        <Text style={[styles.seasonalRowRecommend, { color: theme.textSecondary }]} numberOfLines={1}>
+                          추천: {item.recommendDish}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={[styles.youtubeRowButton, { backgroundColor: '#FF0000' }]}>
+                      <Ionicons name="logo-youtube" size={12} color="#FFFFFF" />
+                      <Text style={styles.youtubeRowText}>영상 보기</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
           </View>
 
         </ScrollView>
@@ -1711,7 +1751,7 @@ const styles = StyleSheet.create({
   },
   dashboardContent: {
     paddingTop: 20,
-    paddingBottom: 110, // 충분히 여유를 둬서 하단 탭바에 안가려지게 함
+    paddingBottom: 60, // 하단 탭바 높이에 맞춰 최소한의 여백만 부여
   },
   sectionContainer: {
     marginVertical: 14,
@@ -2116,15 +2156,85 @@ const styles = StyleSheet.create({
   },
   foodSafetyCard: {
     marginHorizontal: 20,
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  twoColumnRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginHorizontal: 20,
+    marginVertical: 14,
     gap: 12,
+  },
+  foodSafetyColumnCard: {
+    width: '45%',
+    height: 125,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 10,
+    justifyContent: 'space-between',
+  },
+  fridgeColumnCard: {
+    width: '51%',
+    height: 125,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 12,
+    justifyContent: 'space-between',
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  columnCardTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  cardMainRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    marginVertical: 2,
+  },
+  cardLargeIndex: {
+    fontSize: 34,
+    fontWeight: '900',
+    lineHeight: 34,
+  },
+  cardMainTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  cardFooterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  cardSubText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  fridgeCountBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 6,
+  },
+  fridgeCountBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: 'bold',
   },
   foodSafetyHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  foodSafetyTitleCol: {
+    flexDirection: 'column',
+    gap: 2,
   },
   foodSafetyTitleRow: {
     flexDirection: 'row',
@@ -2135,10 +2245,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
   },
+  foodSafetyMainRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginTop: 2,
+  },
+  foodSafetyValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+  },
+  foodSafetyLargeIndex: {
+    fontSize: 44,
+    fontWeight: '900',
+    lineHeight: 44,
+  },
   foodSafetyBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
   foodSafetyBadgeText: {
     color: '#FFFFFF',
@@ -2151,14 +2276,14 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   progressBarBg: {
-    height: 6,
-    borderRadius: 3,
+    height: 4,
+    borderRadius: 2,
     width: '100%',
     overflow: 'hidden',
   },
   progressBarFill: {
     height: '100%',
-    borderRadius: 3,
+    borderRadius: 2,
   },
   permissionButton: {
     paddingVertical: 8,
@@ -2174,7 +2299,7 @@ const styles = StyleSheet.create({
   weatherConditionText: {
     fontSize: 11,
     fontWeight: '600',
-    marginTop: -4,
+    marginTop: 2,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -2278,6 +2403,61 @@ const styles = StyleSheet.create({
     padding: 12,
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  seasonalListContainer: {
+    paddingHorizontal: 20,
+    maxHeight: 220,
+  },
+  seasonalRowItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 12,
+  },
+  seasonalRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  seasonalRowEmojiBg: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  seasonalRowEmoji: {
+    fontSize: 22,
+  },
+  seasonalRowInfo: {
+    flexDirection: 'column',
+    gap: 2,
+    flex: 1,
+    marginRight: 10,
+  },
+  seasonalRowName: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  seasonalRowRecommend: {
+    fontSize: 11,
+    lineHeight: 14,
+  },
+  youtubeRowButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  youtubeRowText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: 'bold',
   },
   seasonalTitle: {
     fontSize: 13,

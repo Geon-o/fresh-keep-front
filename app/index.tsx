@@ -712,6 +712,7 @@ export default function Index() {
                   setQrShareVisible(true);
                 }}
                 onScanQr={() => router.push('/qr-scan')}
+                onChangeTab={setActiveTab}
               />
             ) : (
               <SettingsView
