@@ -17,7 +17,7 @@ export default function BackupRestoreScreen() {
   const handleRestore = async () => {
     const trimmedKey = backupKeyInput.trim();
     if (!trimmedKey) {
-      Alert.alert('알림', '복구 키를 입력해 주세요.');
+      Alert.alert('알림', '연동 코드를 입력해 주세요.');
       return;
     }
 
@@ -58,18 +58,18 @@ export default function BackupRestoreScreen() {
         >
           <Ionicons name="chevron-back" size={24} color={titleColor} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: titleColor }]}>데이터 복구</Text>
+        <Text style={[styles.headerTitle, { color: titleColor }]}>데이터 불러오기</Text>
         <View style={styles.headerRightSpacer} />
       </View>
 
       <ScrollView contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
         <Text style={[styles.sectionDesc, { color: descColor }]}>
-          보관 중인 복구용 백업 키를 입력해 이전 기기의 냉장고 데이터를 안전하게 이관 및 복구합니다.
+          보관 중인 연동 코드를 입력해 이전 기기의 냉장고 데이터를 안전하게 이어받습니다.
         </Text>
 
-        {/* 백업 키 입력 카드 */}
+        {/* 연동 코드 입력 카드 */}
         <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
-          <Text style={[styles.cardLabel, { color: titleColor }]}>복구 키 입력</Text>
+          <Text style={[styles.cardLabel, { color: titleColor }]}>연동 코드 입력</Text>
           <TextInput
             style={[
               styles.textInput, 
@@ -128,7 +128,7 @@ export default function BackupRestoreScreen() {
             <Text style={[styles.warningTitle, { color: isDark ? '#60A5FA' : '#2563EB' }]}>데이터 복구 시 주의사항</Text>
           </View>
           <Text style={[styles.warningBodyText, { color: descColor }]}>
-            {`1. 복구를 완료하면 현재 기기에 로컬 세션으로 저장되어 있던 기존 냉장고 구성 및 재료 목록은 지워집니다.\n\n2. 입력하신 백업 키와 연동된 이전 클라우드 데이터베이스의 정보로 완벽하게 대체 및 갱신됩니다.\n\n3. 복구가 성공적으로 끝나면 안전한 데이터 동기화를 위해 메인 화면이 다시 로드됩니다.`}
+            {`1. 불러오기를 완료하면 현재 기기에 로컬 세션으로 저장되어 있던 기존 냉장고 구성 및 재료 목록은 지워집니다.\n\n2. 입력하신 연동 코드에 연결된 이전 클라우드 데이터베이스의 정보로 완벽하게 대체 및 갱신됩니다.\n\n3. 불러오기가 성공적으로 끝나면 안전한 데이터 동기화를 위해 메인 화면이 다시 로드됩니다.`}
           </Text>
         </View>
       </ScrollView>

@@ -7,7 +7,6 @@ import { useTheme } from '../context/ThemeContext';
 interface SettingsViewProps {
   isLoggedIn: boolean;
   user: { id: number; name: string; provider: string } | null;
-  onLogout: () => void;
   onLogin: () => void;
 }
 
@@ -62,17 +61,17 @@ export default function SettingsView({
       <View style={styles.sectionWrapper}>
         <Text style={[styles.cardSectionTitle, { color: descColor }]}>서비스 이용</Text>
         <View style={[styles.cardSection, { backgroundColor: cardColor, borderColor }]}>
-          {/* 복구 키 확인 및 백업 */}
-          <TouchableOpacity 
-            style={styles.listRow} 
-            activeOpacity={0.7} 
+          {/* 기기 연동 (연동 코드) */}
+          <TouchableOpacity
+            style={styles.listRow}
+            activeOpacity={0.7}
             onPress={() => router.push('/settings/backup')}
           >
             <View style={styles.listRowLeft}>
               <View style={[styles.iconWrapper, { backgroundColor: isDark ? '#2A2A2D' : '#F3F4F6' }]}>
                 <Ionicons name="key-outline" size={18} color={iconColor} />
               </View>
-              <Text style={[styles.listRowText, { color: titleColor }]}>복구 키 확인 및 백업</Text>
+              <Text style={[styles.listRowText, { color: titleColor }]}>기기 연동 · 연동 코드</Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color={descColor} />
           </TouchableOpacity>

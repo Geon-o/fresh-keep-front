@@ -63,18 +63,18 @@ export default function BackupViewScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.7}>
           <Ionicons name="chevron-back" size={24} color={titleColor} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: titleColor }]}>복구 키 확인</Text>
+        <Text style={[styles.headerTitle, { color: titleColor }]}>연동 코드 확인</Text>
         <View style={styles.headerRightSpacer} />
       </View>
 
       <ScrollView contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
         <Text style={[styles.sectionDesc, { color: descColor }]}>
-          기기를 변경하거나 앱을 재설치할 때 데이터를 안전하게 복구할 수 있도록 고유 백업 키를 보관하세요.
+          기기를 변경하거나 앱을 재설치할 때 데이터를 이어갈 수 있도록 연동 코드를 안전하게 보관하세요.
         </Text>
 
-        {/* 백업 키 확인 카드 */}
+        {/* 연동 코드 확인 카드 */}
         <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
-          <Text style={[styles.cardLabel, { color: titleColor }]}>데이터 복구용 백업 키</Text>
+          <Text style={[styles.cardLabel, { color: titleColor }]}>내 연동 코드</Text>
           
           {isLoading ? (
             <View style={styles.loadingWrapper}>
@@ -112,14 +112,14 @@ export default function BackupViewScreen() {
                   styles.copyFullButtonText, 
                   { color: copied ? '#FFFFFF' : (isDark ? '#E5E7EB' : '#4B5563') }
                 ]}>
-                  {copied ? '복사 완료' : '백업 키 복사하기'}
+                  {copied ? '복사 완료' : '연동 코드 복사하기'}
                 </Text>
               </TouchableOpacity>
             </>
           ) : (
             <View style={styles.noKeyWrapper}>
               <Ionicons name="alert-circle-outline" size={20} color="#EF4444" />
-              <Text style={[styles.noKeyText, { color: '#EF4444' }]}>저장된 백업 키가 없습니다.</Text>
+              <Text style={[styles.noKeyText, { color: '#EF4444' }]}>연동 코드를 불러오지 못했습니다.</Text>
             </View>
           )}
         </View>
@@ -129,14 +129,14 @@ export default function BackupViewScreen() {
           <View style={styles.warningHeader}>
             <Ionicons name="warning" size={16} color="#EF4444" />
             <Text style={[styles.warningTitle, { color: '#EF4444' }]}>
-              {backupKey ? '보안 및 분실 주의' : '백업 키 누락 경고'}
+              {backupKey ? '보안 및 분실 주의' : '연동 코드를 불러오지 못함'}
             </Text>
           </View>
           <Text style={[styles.warningBodyText, { color: descColor }]}>
             {backupKey ? (
-              `1. 기기 변경, 앱 삭제 또는 초기화 시 이 복구 키가 없으면 기존의 냉장고 데이터를 불러올 수 없으니 분실하지 않도록 주의해 주세요.\n\n2. 복구 키가 타인에게 노출되지 않도록 안전한 개인 메모장 등에 별도로 기록하여 보관하시는 것을 권장합니다.`
+              `1. 기기 변경, 앱 삭제 시 이 연동 코드가 없으면 기존의 냉장고 데이터를 이어받을 수 없으니 분실하지 않도록 주의해 주세요.\n\n2. 연동 코드가 타인에게 노출되지 않도록 안전한 개인 메모장 등에 별도로 기록하여 보관하시는 것을 권장합니다.`
             ) : (
-              `현재 기기에서 안전하게 보관된 복구 키를 확인할 수 없습니다.\n\n기기의 저장 공간이 초기화되었거나 만료되었을 때 발생할 수 있는 현상입니다.\n\n이후에 안전하게 데이터를 복구하고 타 기기로 이관하려면, 설정 화면의 '초기화' 메뉴를 통해 현재 세션을 초기화하신 후 새로운 복구 키를 발급받아 사용해 주시는 것이 좋습니다.`
+              `연동 코드를 불러오지 못했습니다.\n\n네트워크 연결을 확인한 뒤 화면을 다시 열면 새 연동 코드가 자동으로 발급됩니다. 재발급되어도 기존 냉장고 데이터는 그대로 유지되며, 데이터를 지우려면 이 화면이 아니라 설정의 '초기화' 메뉴를 이용해야 합니다.`
             )}
           </Text>
         </View>

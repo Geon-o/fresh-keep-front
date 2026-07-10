@@ -134,7 +134,7 @@ export default function LoginScreen() {
               <View style={styles.buttonContainer}>
                 <Text style={[styles.infoText, { color: theme.textSecondary }]}>
                   FreshKeep은 기기별 안전한 로컬 저장과 백엔드 익명 세션을 기반으로 별도의 가입 없이 즉시 작동합니다.{"\n\n"}
-                  이전 기기의 백업 키를 가지고 계신가요?
+                  이전 기기의 연동 코드를 가지고 계신가요?
                 </Text>
                 
                 <TouchableOpacity
@@ -143,7 +143,7 @@ export default function LoginScreen() {
                   onPress={() => router.push('/settings/backup-restore')}
                 >
                   <Text style={styles.restoreIcon}>📥</Text>
-                  <Text style={styles.restoreButtonText}>기존 데이터 복구하기</Text>
+                  <Text style={styles.restoreButtonText}>기존 데이터 불러오기</Text>
                 </TouchableOpacity>
               </View>
             )}

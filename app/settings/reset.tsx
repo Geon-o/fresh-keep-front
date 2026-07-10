@@ -9,13 +9,13 @@ import { useAuth } from '../../src/context/AuthContext';
 export default function ResetSettingScreen() {
   const router = useRouter();
   const { theme, isDark } = useTheme();
-  const { logout } = useAuth();
+  const { deleteAccount } = useAuth();
 
   const [isResetChecked, setIsResetChecked] = useState(false);
 
   const handleReset = () => {
     if (!isResetChecked) return;
-    logout();
+    deleteAccount();
     router.replace('/');
   };
 
@@ -47,7 +47,8 @@ export default function ResetSettingScreen() {
 
           <Text style={[styles.alertBody, { color: descColor }]}>
             초기화를 진행하면 현재 기기에 등록된 모든 냉장고 구획 정보와 보관 중인 식재료 기록 데이터가 데이터베이스 및 로컬 저장소에서 영구히 삭제됩니다.{"\n\n"}
-            본 작업은 복구 키를 소유하고 있더라도 되돌릴 수 없는 완전한 삭제 작업입니다. 신중하게 선택해 주시기 바랍니다.
+            이 작업은 다른 기기로 데이터를 옮기는 기능이 아니라 계정을 완전히 삭제하는 회원탈퇴에 해당합니다. 기기 변경·재설치로 데이터를 이어가려는 경우에는 초기화 대신 '연동 코드'를 사용해 주세요.{"\n\n"}
+            본 작업은 연동 코드를 가지고 있더라도 되돌릴 수 없는 완전한 삭제 작업입니다. 신중하게 선택해 주시기 바랍니다.
           </Text>
 
           <TouchableOpacity 

@@ -20,7 +20,7 @@ import { updateIngredient } from '../src/api/ingredientService';
 import { useTheme } from '../src/context/ThemeContext';
 
 export default function Index() {
-  const { isLoggedIn, user, logout } = useAuth();
+  const { isLoggedIn, user } = useAuth();
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
@@ -718,7 +718,6 @@ export default function Index() {
               <SettingsView
                 isLoggedIn={isLoggedIn}
                 user={user}
-                onLogout={logout}
                 onLogin={() => router.push('/login')}
               />
             )}

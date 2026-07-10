@@ -24,41 +24,41 @@ export default function BackupHubScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.7}>
           <Ionicons name="chevron-back" size={24} color={titleColor} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: titleColor }]}>보안 및 복구</Text>
+        <Text style={[styles.headerTitle, { color: titleColor }]}>기기 연동</Text>
         <View style={styles.headerRightSpacer} />
       </View>
 
       <ScrollView contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
         <Text style={[styles.sectionDesc, { color: descColor }]}>
-          데이터를 안전하게 보관하거나, 기존 백업 키를 사용해 냉장고 데이터를 복구할 수 있습니다.
+          내 연동 코드를 확인하거나, 연동 코드를 입력해 다른 기기의 냉장고 데이터를 이어받을 수 있습니다.
         </Text>
 
         {/* 메뉴 선택 카드 */}
         <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
-          {/* 메뉴 1: 복구 키 확인 */}
+          {/* 메뉴 1: 연동 코드 확인 */}
           <TouchableOpacity
             style={styles.menuItem}
             activeOpacity={0.7}
             onPress={() => router.push('/settings/backup-view')}
           >
             <View style={styles.menuItemLeft}>
-              <Text style={[styles.menuItemLabel, { color: titleColor }]}>복구 키 확인 및 백업</Text>
-              <Text style={[styles.menuItemSubText, { color: descColor }]}>고유 키 조회 및 기기 외부 백업용 복사</Text>
+              <Text style={[styles.menuItemLabel, { color: titleColor }]}>연동 코드 확인·복사</Text>
+              <Text style={[styles.menuItemSubText, { color: descColor }]}>내 연동 코드 조회 및 안전한 보관용 복사</Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color={descColor} />
           </TouchableOpacity>
 
           <View style={[styles.divider, { backgroundColor: dividerColor }]} />
 
-          {/* 메뉴 2: 복구 키로 데이터 복구 */}
+          {/* 메뉴 2: 연동 코드로 데이터 불러오기 */}
           <TouchableOpacity
             style={styles.menuItem}
             activeOpacity={0.7}
             onPress={() => router.push('/settings/backup-restore')}
           >
             <View style={styles.menuItemLeft}>
-              <Text style={[styles.menuItemLabel, { color: titleColor }]}>백업 키로 데이터 복구</Text>
-              <Text style={[styles.menuItemSubText, { color: descColor }]}>기기 교체/앱 재설치 시 데이터 이관</Text>
+              <Text style={[styles.menuItemLabel, { color: titleColor }]}>연동 코드로 데이터 불러오기</Text>
+              <Text style={[styles.menuItemSubText, { color: descColor }]}>기기 교체/앱 재설치 시 데이터 이어가기</Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color={descColor} />
           </TouchableOpacity>

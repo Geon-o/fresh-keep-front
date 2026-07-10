@@ -20,7 +20,7 @@ interface AuthContextType {
   loginAnonymously: () => Promise<boolean>;
   getBackupKey: () => Promise<string | null>;
   restoreBackup: (backupKey: string) => Promise<boolean>;
-  logout: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   updateNickname: (name: string) => Promise<boolean>;
 }
 
@@ -129,12 +129,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // 백업 키 조회 (로컬 저장소에서 직접 조회하도록 하이브리드 적용)
+  // 연동 코드 조회: 우선 로컬(@backup_key)에서 읽고, 없으면 서버에서 비파괴적으로 재발급받는다.
+  // (데이터는 그대로 유지되며, 재발급 시 이전 코드는 무효화된다. '초기화(완전 삭제)'와는 무관하다.)
   const getBackupKey = async (): Promise<string | null> => {
     try {
-      return await AsyncStorage.getItem('@backup_key');
+      const local = await AsyncStorage.getItem('@backup_key');
+      if (local) return local;
+
+      // 로컬에 연동 코드가 없으면 서버에서 새 코드를 발급받아 저장 후 반환한다.
+      const response = await client.post<{ backupKey?: string }>('/api/auth/backup-key/reissue');
+      const reissued = response.data?.backupKey ?? null;
+      if (reissued) {
+        await AsyncStorage.setItem('@backup_key', reissued);
+      }
+      return reissued;
     } catch (e) {
-      console.error('Failed to get backup key from storage', e);
+      console.error('Failed to get/reissue link code', e);
       return null;
     }
   };
@@ -162,22 +172,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         await fetchUserProfile();
         queryClient.invalidateQueries({ queryKey: ['fridges'] });
-        Alert.alert('복구 성공 🎉', '이전 기기의 데이터가 정상적으로 복구되었습니다.');
+        Alert.alert('불러오기 성공 🎉', '이전 기기의 데이터를 정상적으로 불러왔습니다.');
         return true;
       }
       return false;
     } catch (e: any) {
       console.error('Restore failed', e);
-      const errMsg = e.response?.data?.message || '유효하지 않은 백업 키이거나 네트워크 오류입니다.';
-      Alert.alert('복구 실패 ❌', errMsg);
+      const errMsg = e.response?.data?.message || '유효하지 않은 연동 코드이거나 네트워크 오류입니다.';
+      Alert.alert('불러오기 실패 ❌', errMsg);
       return false;
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 로그아웃 (기존 토큰 및 캐시 정리 후 신규 익명 세션 발급)
-  const logout = async () => {
+  // 계정 완전 삭제(초기화): 서버 계정/데이터를 삭제하고 로컬을 비운 뒤 새 익명 세션을 발급한다.
+  // '로그아웃'이 아니라 회원탈퇴에 해당하는 파괴적 작업이다. 기기 이전이 목적이라면 restoreBackup을 사용한다.
+  const deleteAccount = async () => {
     setIsLoading(true);
     try {
       try {
@@ -197,7 +208,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await loginAnonymously();
       Alert.alert('초기화 완료', '계정이 완전히 삭제되고 안전하게 초기화되었습니다.');
     } catch (e) {
-      console.error('Logout / Reset error', e);
+      console.error('Account delete / reset error', e);
     } finally {
       setIsLoading(false);
     }
@@ -221,7 +232,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loginAnonymously,
         getBackupKey,
         restoreBackup,
-        logout,
+        deleteAccount,
         updateNickname,
       }}
     >
