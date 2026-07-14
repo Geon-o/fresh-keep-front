@@ -7,6 +7,7 @@ export interface AddIngredientRequest {
   quantity: number;
   unit: string;
   expirationDate: string; // YYYY-MM-DD
+  expirationType: 'SELL_BY' | 'USE_BY';
   memo?: string;
 }
 
@@ -16,6 +17,7 @@ export interface UpdateIngredientRequest {
   quantity?: number;
   unit?: string;
   expirationDate?: string;
+  expirationType?: 'SELL_BY' | 'USE_BY';
   memo?: string;
 }
 

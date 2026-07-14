@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, ScrollView, Platform, Alert, TextInput, Modal, ActivityIndicator, PanResponder, Dimensions, Animated } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, Text, ScrollView, Platform, Alert, TextInput, Modal, ActivityIndicator, PanResponder, Dimensions, Animated, Easing } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
-import { Ingredient, IngredientCategory } from '../types';
+import { Ingredient, IngredientCategory, ExpiryType } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { getFridgeLayout, updateCompartmentShelves } from '../api/fridgeService';
 import { addIngredient, updateIngredient, deleteIngredient } from '../api/ingredientService';
+import { getCustomUnits, addCustomUnit } from '../api/unitService';
 import { serializeMemo, deserializeMemo } from '../utils/memoSerializer';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../theme';
@@ -96,6 +97,13 @@ const CATEGORIES: { key: IngredientCategory; label: string; emoji: string }[] = 
   { key: 'sauce', label: '소스/조미료', emoji: '🍯' },
   { key: 'etc', label: '기타', emoji: '' },
 ];
+
+const DEFAULT_UNITS = ['개', '팩', 'g', 'ml', '봉지'];
+
+const EXPIRY_TYPE_LABELS: Record<ExpiryType, string> = {
+  SELL_BY: '유통기한',
+  USE_BY: '소비기한',
+};
 
 const DEFAULT_INSIDE_SHELVES = [
   { id: 'shelf_1', label: '선반 1단' },
@@ -350,8 +358,8 @@ export default function CompartmentDetail({
 }: CompartmentDetailProps) {
   const { isLoggedIn } = useAuth();
   const [serverCompartmentId, setServerCompartmentId] = useState<number | null>(null);
-  const { theme } = useTheme();
-  const styles = React.useMemo(() => createStyles(theme), [theme]);
+  const { theme, isDark } = useTheme();
+  const styles = React.useMemo(() => createStyles(theme, isDark), [theme, isDark]);
 
   // 부모의 비동기 리렌더링 props 딜레이를 우회하기 위한 로컬 compartmentId 동기 레퍼런스
   const currentCompartmentIdRef = useRef(compartmentId);
@@ -377,6 +385,7 @@ export default function CompartmentDetail({
   const shelfLayouts = useRef<Record<string, { x: number; y: number; width: number; height: number }>>({});
   const lastSwappedTime = useRef<number>(0);
   const screenWidth = Dimensions.get('window').width;
+  const screenHeight = Dimensions.get('window').height;
 
   // 사이드 버튼을 통한 이동 처리 핸들러
   const handleNavigateSide = (targetId: string, targetLabel: string, direction: 'left' | 'right' | 'up' | 'down') => {
@@ -625,10 +634,11 @@ export default function CompartmentDetail({
   // 안쪽 보관실 선반 아코디언 펼침 상태 (여러 선반 동시 펼침 가능)
   const [expandedShelfIds, setExpandedShelfIds] = useState<Set<string>>(new Set());
 
-  // 문쪽 보관실 사이드 드로어 상태
+  // 문쪽 보관실 하단 탭 + 위로 펼쳐지는 드로어 상태
   const [doorDrawerOpen, setDoorDrawerOpen] = useState(false);
   const doorDrawerAnim = useRef(new Animated.Value(0)).current; // 0: 닫힘, 1: 열림
-  const DOOR_DRAWER_WIDTH = Math.min(screenWidth * 0.8, 340);
+  const DOOR_BOTTOM_TAB_HEIGHT = 38;
+  const DOOR_DRAWER_HEIGHT = Math.min(screenHeight * 0.6, 480);
 
   // 식재료 폼 상태
   const [formName, setFormName] = useState('');
@@ -636,9 +646,83 @@ export default function CompartmentDetail({
   const [formQuantity, setFormQuantity] = useState(1);
   const [formUnit, setFormUnit] = useState('개');
   const [formExpiryDate, setFormExpiryDate] = useState('');
+  const [formExpiryType, setFormExpiryType] = useState<ExpiryType>('SELL_BY');
   const [formMemo, setFormMemo] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const isSavingRef = useRef(false);
+
+  // 카테고리/단위/기한 종류 콤보박스 상태
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
+  const [unitDropdownOpen, setUnitDropdownOpen] = useState(false);
+  const [unitCustomInputOpen, setUnitCustomInputOpen] = useState(false);
+  const [unitCustomInputValue, setUnitCustomInputValue] = useState('');
+  const [customUnits, setCustomUnits] = useState<string[]>([]);
+  const [expiryTypeDropdownOpen, setExpiryTypeDropdownOpen] = useState(false);
+  const unitOptions = Array.from(new Set([...DEFAULT_UNITS, ...customUnits]));
+
+  // 로그인 여부에 따라 커스텀 단위 목록을 서버/로컬에서 불러옴
+  useEffect(() => {
+    const loadUnits = async () => {
+      try {
+        if (isLoggedIn) {
+          const units = await getCustomUnits();
+          setCustomUnits(units);
+        } else {
+          const stored = await AsyncStorage.getItem('@custom_units');
+          setCustomUnits(stored ? JSON.parse(stored) : []);
+        }
+      } catch (e) {
+        console.error('Failed to load custom units', e);
+      }
+    };
+    loadUnits();
+  }, [isLoggedIn]);
+
+  const toggleCategoryDropdown = () => {
+    setUnitDropdownOpen(false);
+    setUnitCustomInputOpen(false);
+    setExpiryTypeDropdownOpen(false);
+    setCategoryDropdownOpen(prev => !prev);
+  };
+
+  const toggleUnitDropdown = () => {
+    setCategoryDropdownOpen(false);
+    setExpiryTypeDropdownOpen(false);
+    setUnitDropdownOpen(prev => !prev);
+  };
+
+  const toggleExpiryTypeDropdown = () => {
+    setCategoryDropdownOpen(false);
+    setUnitDropdownOpen(false);
+    setUnitCustomInputOpen(false);
+    setExpiryTypeDropdownOpen(prev => !prev);
+  };
+
+  // 사용자가 직접 입력한 단위를 목록에 추가하고 선택 상태로 반영
+  const handleAddCustomUnit = async () => {
+    const trimmed = unitCustomInputValue.trim();
+    if (!trimmed) return;
+
+    try {
+      if (isLoggedIn) {
+        const units = await addCustomUnit(trimmed);
+        setCustomUnits(units);
+      } else {
+        setCustomUnits(prev => {
+          const next = prev.includes(trimmed) ? prev : [...prev, trimmed];
+          AsyncStorage.setItem('@custom_units', JSON.stringify(next));
+          return next;
+        });
+      }
+    } catch (e) {
+      console.error('Failed to add custom unit', e);
+    }
+
+    setFormUnit(trimmed);
+    setUnitCustomInputValue('');
+    setUnitCustomInputOpen(false);
+    setUnitDropdownOpen(false);
+  };
 
   // 선반 구성 및 식재료 불러오기 (서버 vs 로컬 분기)
   const loadData = async (targetId: string = compartmentId) => {
@@ -725,6 +809,7 @@ export default function CompartmentDetail({
               subLocation: deserialized.subLocation as any,
               category: deserialized.category,
               expiryDate: ing.expirationDate,
+              expiryType: ing.expirationType || 'SELL_BY',
               quantity: ing.quantity,
               unit: ing.unit,
               memo: deserialized.memo || undefined,
@@ -843,6 +928,10 @@ export default function CompartmentDetail({
   // 추가/수정 모달 닫기
   const handleCloseAddEditModal = () => {
     setModalVisible(false);
+    setCategoryDropdownOpen(false);
+    setUnitDropdownOpen(false);
+    setUnitCustomInputOpen(false);
+    setExpiryTypeDropdownOpen(false);
   };
 
   // 선반 아코디언 펼침/접힘 토글 (여러 선반 동시 펼침 가능)
@@ -863,7 +952,8 @@ export default function CompartmentDetail({
     setDoorDrawerOpen(true);
     Animated.timing(doorDrawerAnim, {
       toValue: 1,
-      duration: 250,
+      duration: 320,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start(() => {
       measureShelves();
@@ -873,7 +963,8 @@ export default function CompartmentDetail({
   const closeDoorDrawer = () => {
     Animated.timing(doorDrawerAnim, {
       toValue: 0,
-      duration: 220,
+      duration: 260,
+      easing: Easing.in(Easing.cubic),
       useNativeDriver: true,
     }).start(() => {
       setDoorDrawerOpen(false);
@@ -912,8 +1003,14 @@ export default function CompartmentDetail({
     setFormQuantity(1);
     setFormUnit('개');
     setFormExpiryDate(getTodayString());
+    setFormExpiryType('SELL_BY');
     setFormMemo('');
-    
+    setCategoryDropdownOpen(false);
+    setUnitDropdownOpen(false);
+    setUnitCustomInputOpen(false);
+    setUnitCustomInputValue('');
+    setExpiryTypeDropdownOpen(false);
+
     setModalVisible(true);
   };
 
@@ -922,15 +1019,21 @@ export default function CompartmentDetail({
     setModalMode('edit');
     setSelectedShelfId(item.subLocation || '');
     setSelectedIngredientId(item.id);
-    
+
     // 폼 값 세팅
     setFormName(item.name);
     setFormCategory(item.category);
     setFormQuantity(item.quantity);
     setFormUnit(item.unit);
     setFormExpiryDate(item.expiryDate);
+    setFormExpiryType(item.expiryType || 'SELL_BY');
     setFormMemo(item.memo || '');
-    
+    setCategoryDropdownOpen(false);
+    setUnitDropdownOpen(false);
+    setUnitCustomInputOpen(false);
+    setUnitCustomInputValue('');
+    setExpiryTypeDropdownOpen(false);
+
     setModalVisible(true);
   };
 
@@ -951,9 +1054,9 @@ export default function CompartmentDetail({
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!dateRegex.test(formExpiryDate)) {
       if (Platform.OS === 'web') {
-        window.alert('유통기한 형식을 올바르게 입력해주세요 (YYYY-MM-DD).');
+        window.alert('날짜 형식을 올바르게 입력해주세요 (YYYY-MM-DD).');
       } else {
-        Alert.alert('알림 ⚠️', '유통기한 형식을 올바르게 입력해주세요 (YYYY-MM-DD).');
+        Alert.alert('알림 ⚠️', '날짜 형식을 올바르게 입력해주세요 (YYYY-MM-DD).');
       }
       return;
     }
@@ -975,9 +1078,10 @@ export default function CompartmentDetail({
             quantity: Number(formQuantity),
             unit: formUnit,
             expirationDate: formExpiryDate,
+            expirationType: formExpiryType,
             memo: memoContent,
           });
-          
+
           const newIngredient: Ingredient = {
             id: String(savedIng.id),
             name: savedIng.name,
@@ -985,6 +1089,7 @@ export default function CompartmentDetail({
             subLocation: selectedShelfId as any,
             category: formCategory,
             expiryDate: savedIng.expirationDate,
+            expiryType: savedIng.expirationType || formExpiryType,
             quantity: savedIng.quantity,
             unit: savedIng.unit,
             memo: formMemo.trim() || undefined,
@@ -998,6 +1103,7 @@ export default function CompartmentDetail({
             quantity: Number(formQuantity),
             unit: formUnit,
             expirationDate: formExpiryDate,
+            expirationType: formExpiryType,
             memo: memoContent,
           });
 
@@ -1008,6 +1114,7 @@ export default function CompartmentDetail({
                   name: updatedIng.name,
                   category: formCategory,
                   expiryDate: updatedIng.expirationDate,
+                  expiryType: updatedIng.expirationType || formExpiryType,
                   quantity: updatedIng.quantity,
                   unit: updatedIng.unit,
                   memo: formMemo.trim() || undefined,
@@ -1031,6 +1138,7 @@ export default function CompartmentDetail({
           subLocation: selectedShelfId as any,
           category: formCategory,
           expiryDate: formExpiryDate,
+          expiryType: formExpiryType,
           quantity: formQuantity,
           unit: formUnit,
           memo: formMemo.trim() || undefined,
@@ -1046,6 +1154,7 @@ export default function CompartmentDetail({
                 name: formName.trim(),
                 category: formCategory,
                 expiryDate: formExpiryDate,
+                expiryType: formExpiryType,
                 quantity: formQuantity,
                 unit: formUnit,
                 memo: formMemo.trim() || undefined,
@@ -1106,18 +1215,20 @@ export default function CompartmentDetail({
     return ingredients.filter(item => item.subLocation === sub);
   };
 
+  // 선반 배열의 label을 순서(index)에 맞춰 "선반 N단"으로 재정렬
+  const relabelShelves = (shelves: { id: string; label: string }[]) =>
+    shelves.map((s, i) => ({ ...s, label: `선반 ${i + 1}단` }));
+
   // 선반 추가 기능
   const handleAddShelf = (section: 'inside' | 'door') => {
     if (section === 'inside') {
-      const nextNum = insideShelves.length + 1;
       const newId = `shelf_${Date.now()}`;
-      const updated = [...insideShelves, { id: newId, label: `선반 ${nextNum}단` }];
+      const updated = relabelShelves([...insideShelves, { id: newId, label: '' }]);
       setInsideShelves(updated);
       saveShelfConfig(updated, doorShelves, hasDoorStorage);
     } else {
-      const nextNum = doorShelves.length + 1;
       const newId = `pocket_${Date.now()}`;
-      const updated = [...doorShelves, { id: newId, label: `선반 ${nextNum}단` }];
+      const updated = relabelShelves([...doorShelves, { id: newId, label: '' }]);
       setDoorShelves(updated);
       saveShelfConfig(insideShelves, updated, hasDoorStorage);
     }
@@ -1132,10 +1243,10 @@ export default function CompartmentDetail({
       let updatedDoor = doorShelves;
 
       if (section === 'inside') {
-        updatedInside = insideShelves.filter(s => s.id !== shelfId);
+        updatedInside = relabelShelves(insideShelves.filter(s => s.id !== shelfId));
         setInsideShelves(updatedInside);
       } else {
-        updatedDoor = doorShelves.filter(s => s.id !== shelfId);
+        updatedDoor = relabelShelves(doorShelves.filter(s => s.id !== shelfId));
         setDoorShelves(updatedDoor);
       }
       saveShelfConfig(updatedInside, updatedDoor, hasDoorStorage);
@@ -1288,9 +1399,6 @@ export default function CompartmentDetail({
               scrollEnabled={scrollEnabled}
               nestedScrollEnabled
             >
-              {items.length === 0 && (
-                <Text style={styles.emptyText}>비어 있음</Text>
-              )}
               {items.map(item => (
                 <DraggableBadge
                   key={item.id}
@@ -1377,7 +1485,13 @@ export default function CompartmentDetail({
 
           <Animated.View style={[styles.body, { opacity: contentOpacity, transform: [{ translateX: contentTranslateX }] }]}>
             {/* 안쪽 보관실: 전체 폭 아코디언 리스트 */}
-            <ScrollView style={styles.insideScroll} contentContainerStyle={styles.insideScrollContent}>
+            <ScrollView
+              style={styles.insideScroll}
+              contentContainerStyle={[
+                styles.insideScrollContent,
+                hasDoorStorage && { paddingBottom: 32 + DOOR_BOTTOM_TAB_HEIGHT },
+              ]}
+            >
               {insideShelves.map((shelf) => renderShelfCard(shelf, 'inside'))}
 
               <TouchableOpacity
@@ -1390,7 +1504,7 @@ export default function CompartmentDetail({
             </ScrollView>
           </Animated.View>
 
-          {/* 문쪽 보관실: 오른쪽 사이드 탭 + 슬라이드 드로어 */}
+          {/* 문쪽 보관실: 하단 탭 + 위로 펼쳐지는 드로어 */}
           {hasDoorStorage && (
             <>
               {doorDrawerOpen && (
@@ -1401,49 +1515,57 @@ export default function CompartmentDetail({
                 />
               )}
 
-              {!doorDrawerOpen && (
-                <TouchableOpacity
-                  style={styles.doorSideTab}
-                  activeOpacity={0.8}
-                  onPress={openDoorDrawer}
-                >
-                  <Text style={styles.doorSideTabText}>문쪽{'\n'}보관실</Text>
-                </TouchableOpacity>
-              )}
-
               <Animated.View
                 style={[
                   styles.doorDrawerPanel,
                   {
-                    width: DOOR_DRAWER_WIDTH,
+                    height: DOOR_DRAWER_HEIGHT,
+                    bottom: DOOR_BOTTOM_TAB_HEIGHT,
+                    opacity: doorDrawerAnim,
                     transform: [{
-                      translateX: doorDrawerAnim.interpolate({
+                      translateY: doorDrawerAnim.interpolate({
                         inputRange: [0, 1],
-                        outputRange: [DOOR_DRAWER_WIDTH, 0],
+                        outputRange: [DOOR_DRAWER_HEIGHT, 0],
                       }),
                     }],
                   },
                 ]}
                 pointerEvents={doorDrawerOpen ? 'auto' : 'none'}
               >
-                <View style={styles.doorDrawerHeader}>
-                  <Text style={styles.sectionTitle}>문쪽 보관실</Text>
-                  <TouchableOpacity style={styles.modalCloseButton} onPress={closeDoorDrawer}>
-                    <Text style={styles.modalCloseText}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-                <ScrollView contentContainerStyle={styles.insideScrollContent}>
-                  {doorShelves.map((shelf) => renderShelfCard(shelf, 'door'))}
+                <View style={styles.doorDrawerPanelInner}>
+                  <View style={styles.doorDrawerHeader}>
+                    <Text style={styles.sectionTitle}>문쪽 보관실</Text>
+                    <TouchableOpacity style={styles.modalCloseButton} onPress={closeDoorDrawer}>
+                      <Text style={styles.modalCloseText}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <ScrollView style={styles.doorDrawerScroll} contentContainerStyle={styles.insideScrollContent}>
+                    {doorShelves.map((shelf) => renderShelfCard(shelf, 'door'))}
 
-                  <TouchableOpacity
-                    style={styles.addShelfButton}
-                    activeOpacity={0.7}
-                    onPress={() => handleAddShelf('door')}
-                  >
-                    <Text style={styles.addShelfButtonText}>+ 선반 추가</Text>
-                  </TouchableOpacity>
-                </ScrollView>
+                    <TouchableOpacity
+                      style={styles.addShelfButton}
+                      activeOpacity={0.7}
+                      onPress={() => handleAddShelf('door')}
+                    >
+                      <Text style={styles.addShelfButtonText}>+ 선반 추가</Text>
+                    </TouchableOpacity>
+                  </ScrollView>
+                </View>
               </Animated.View>
+
+              <TouchableOpacity
+                style={[
+                  styles.doorBottomTab,
+                  { height: DOOR_BOTTOM_TAB_HEIGHT },
+                  doorDrawerOpen && styles.doorBottomTabFlush,
+                ]}
+                activeOpacity={0.8}
+                onPress={() => (doorDrawerOpen ? closeDoorDrawer() : openDoorDrawer())}
+              >
+                <Text style={styles.doorBottomTabText}>
+                  {doorDrawerOpen ? '▾  문쪽 보관실 닫기' : '▴  문쪽 보관실'}
+                </Text>
+              </TouchableOpacity>
             </>
           )}
         </>
@@ -1493,23 +1615,38 @@ export default function CompartmentDetail({
                 />
               </View>
 
-              {/* 카테고리 */}
+              {/* 카테고리 (콤보박스) */}
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>카테고리</Text>
-                <View style={styles.categoryGrid}>
-                  {CATEGORIES.map(cat => (
-                    <TouchableOpacity
-                      key={cat.key}
-                      style={{ ...styles.categoryButton, ...(formCategory === cat.key ? styles.categoryButtonActive : {}) }}
-                      onPress={() => setFormCategory(cat.key)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={{ ...styles.categoryButtonText, ...(formCategory === cat.key ? styles.categoryButtonTextActive : {}) }}>
-                        {cat.emoji ? `${cat.emoji} ` : ''}{cat.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                <TouchableOpacity
+                  style={styles.comboTrigger}
+                  activeOpacity={0.7}
+                  onPress={toggleCategoryDropdown}
+                >
+                  <Text style={styles.comboTriggerText}>
+                    {(() => {
+                      const selected = CATEGORIES.find(c => c.key === formCategory);
+                      return selected ? `${selected.emoji ? selected.emoji + ' ' : ''}${selected.label}` : '선택';
+                    })()}
+                  </Text>
+                  <Text style={styles.comboArrow}>{categoryDropdownOpen ? '▴' : '▾'}</Text>
+                </TouchableOpacity>
+                {categoryDropdownOpen && (
+                  <View style={styles.comboDropdown}>
+                    {CATEGORIES.map(cat => (
+                      <TouchableOpacity
+                        key={cat.key}
+                        style={[styles.comboOption, formCategory === cat.key && styles.comboOptionActive]}
+                        onPress={() => { setFormCategory(cat.key); setCategoryDropdownOpen(false); }}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.comboOptionText, formCategory === cat.key && styles.comboOptionTextActive]}>
+                          {cat.emoji ? `${cat.emoji} ` : ''}{cat.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
               </View>
 
               {/* 수량 및 단위 */}
@@ -1533,35 +1670,91 @@ export default function CompartmentDetail({
                     </TouchableOpacity>
                   </View>
 
-                  {/* 단위 선택 */}
-                  <View style={styles.unitSelector}>
-                    {['개', '팩', 'g', 'ml', '봉지'].map(u => (
+                  {/* 단위 선택 (콤보박스) */}
+                  <TouchableOpacity
+                    style={[styles.comboTrigger, { flex: 1 }]}
+                    activeOpacity={0.7}
+                    onPress={toggleUnitDropdown}
+                  >
+                    <Text style={styles.comboTriggerText}>{formUnit || '선택'}</Text>
+                    <Text style={styles.comboArrow}>{unitDropdownOpen ? '▴' : '▾'}</Text>
+                  </TouchableOpacity>
+                </View>
+                {unitDropdownOpen && (
+                  <View style={styles.comboDropdown}>
+                    {unitOptions.map(u => (
                       <TouchableOpacity
                         key={u}
-                        style={{ ...styles.unitPill, ...(formUnit === u ? styles.unitPillActive : {}) }}
-                        onPress={() => setFormUnit(u)}
+                        style={[styles.comboOption, formUnit === u && styles.comboOptionActive]}
+                        onPress={() => { setFormUnit(u); setUnitDropdownOpen(false); setUnitCustomInputOpen(false); }}
                         activeOpacity={0.7}
                       >
-                        <Text style={formUnit === u ? styles.unitPillTextActive : styles.unitPillText}>
-                          {u}
+                        <Text style={[styles.comboOptionText, formUnit === u && styles.comboOptionTextActive]}>{u}</Text>
+                      </TouchableOpacity>
+                    ))}
+                    {!unitCustomInputOpen ? (
+                      <TouchableOpacity
+                        style={styles.comboAddNewRow}
+                        activeOpacity={0.7}
+                        onPress={() => setUnitCustomInputOpen(true)}
+                      >
+                        <Text style={styles.comboAddNewRowText}>+ 직접 입력</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={styles.comboCustomRow}>
+                        <TextInput
+                          style={styles.comboCustomInput}
+                          value={unitCustomInputValue}
+                          onChangeText={setUnitCustomInputValue}
+                          placeholder="새 단위 입력"
+                          placeholderTextColor="#90A4AE"
+                          autoFocus
+                          onSubmitEditing={handleAddCustomUnit}
+                        />
+                        <TouchableOpacity
+                          style={styles.comboCustomAddButton}
+                          activeOpacity={0.7}
+                          onPress={handleAddCustomUnit}
+                        >
+                          <Text style={styles.comboCustomAddButtonText}>추가</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                )}
+              </View>
+
+              {/* 기한 종류 (테두리 없는 콤보박스) */}
+              <View style={styles.formGroup}>
+                <TouchableOpacity
+                  style={styles.comboTriggerBorderless}
+                  activeOpacity={0.7}
+                  onPress={toggleExpiryTypeDropdown}
+                >
+                  <Text style={styles.comboTriggerBorderlessText}>{EXPIRY_TYPE_LABELS[formExpiryType]}</Text>
+                  <Text style={styles.comboArrow}>{expiryTypeDropdownOpen ? '▴' : '▾'}</Text>
+                </TouchableOpacity>
+                {expiryTypeDropdownOpen && (
+                  <View style={styles.comboDropdown}>
+                    {(Object.keys(EXPIRY_TYPE_LABELS) as ExpiryType[]).map(type => (
+                      <TouchableOpacity
+                        key={type}
+                        style={[styles.comboOption, formExpiryType === type && styles.comboOptionActive]}
+                        onPress={() => { setFormExpiryType(type); setExpiryTypeDropdownOpen(false); }}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.comboOptionText, formExpiryType === type && styles.comboOptionTextActive]}>
+                          {EXPIRY_TYPE_LABELS[type]}
                         </Text>
                       </TouchableOpacity>
                     ))}
-                    {/* 직접 입력 */}
-                    <TextInput
-                      style={styles.unitInput}
-                      value={formUnit}
-                      onChangeText={setFormUnit}
-                      placeholder="직접"
-                      placeholderTextColor="#90A4AE"
-                    />
                   </View>
-                </View>
+                )}
               </View>
 
-              {/* 유통기한 */}
+              {/* 날짜 */}
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>유통기한 (YYYY-MM-DD)</Text>
+                <Text style={styles.formLabel}>날짜</Text>
                 <TextInput
                   style={styles.input}
                   value={formExpiryDate}
@@ -1691,7 +1884,7 @@ export default function CompartmentDetail({
   );
 }
 
-function createStyles(theme: ThemeColors) {
+function createStyles(theme: ThemeColors, isDark: boolean) {
   return StyleSheet.create({
     container: {
       flex: 1,
@@ -1791,16 +1984,16 @@ function createStyles(theme: ThemeColors) {
     shelfCard: {
       backgroundColor: theme.surface,
       borderRadius: 12,
-      borderWidth: 1,
-      borderColor: theme.glassBorder,
+      borderWidth: isDark ? 1.5 : 1,
+      borderColor: isDark ? 'rgba(255,255,255,0.16)' : theme.glassBorder,
       borderBottomWidth: 5,
       borderBottomColor: theme.metallicTrim,
       padding: 10,
-      shadowColor: '#000000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.05,
-      shadowRadius: 8,
-      elevation: 2,
+      shadowColor: isDark ? '#FFFFFF' : '#000000',
+      shadowOffset: { width: 0, height: isDark ? 0 : 4 },
+      shadowOpacity: isDark ? 0.1 : 0.05,
+      shadowRadius: isDark ? 4 : 8,
+      elevation: isDark ? 0 : 2,
     },
     shelfCardHeader: {
       flexDirection: 'row',
@@ -1838,30 +2031,39 @@ function createStyles(theme: ThemeColors) {
       color: theme.textMuted,
       fontWeight: 'bold',
     },
-    doorSideTab: {
+    doorBottomTab: {
       position: 'absolute',
+      left: 0,
       right: 0,
-      top: '42%',
+      bottom: 0,
       backgroundColor: theme.primary,
-      paddingVertical: 14,
-      paddingHorizontal: 8,
-      borderTopLeftRadius: 12,
-      borderBottomLeftRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
-      shadowColor: '#000000',
-      shadowOffset: { width: -2, height: 2 },
-      shadowOpacity: 0.15,
+      borderTopWidth: 1,
+      borderTopColor: isDark ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.06)',
+      borderTopLeftRadius: 14,
+      borderTopRightRadius: 14,
+      shadowColor: isDark ? '#FFFFFF' : '#000000',
+      shadowOffset: { width: 0, height: -2 },
+      shadowOpacity: isDark ? 0.1 : 0.12,
       shadowRadius: 6,
-      elevation: 6,
-      zIndex: 20,
+      elevation: 8,
+      zIndex: 25,
     },
-    doorSideTabText: {
-      fontSize: 12,
+    // 드로어가 열려 패널과 맞닿아 있을 때는 각진 모서리로 이어 붙여
+    // 둥근 모서리 틈으로 그림자가 비치는 현상을 없앰
+    doorBottomTabFlush: {
+      borderTopLeftRadius: 0,
+      borderTopRightRadius: 0,
+      borderTopWidth: 0,
+      shadowOpacity: 0,
+      elevation: 0,
+    },
+    doorBottomTabText: {
+      fontSize: 13,
       fontWeight: 'bold',
       color: theme.primaryOnPrimary,
       textAlign: 'center',
-      lineHeight: 16,
     },
     doorDrawerBackdrop: {
       position: 'absolute',
@@ -1872,20 +2074,32 @@ function createStyles(theme: ThemeColors) {
       backgroundColor: theme.modalOverlay,
       zIndex: 15,
     },
+    // 애니메이션(transform)이 걸리는 바깥 컨테이너: 그림자만 담당하고
+    // overflow/borderRadius를 함께 두지 않아 프레임마다 클립 마스크를 다시
+    // 계산하지 않도록 분리 (안 그러면 위로 올라오는 모션이 끊겨 보임)
     doorDrawerPanel: {
       position: 'absolute',
-      top: 0,
+      left: 0,
       right: 0,
-      bottom: 0,
-      backgroundColor: theme.surface,
-      borderLeftWidth: 1,
-      borderLeftColor: theme.borderLight,
-      shadowColor: '#000000',
-      shadowOffset: { width: -4, height: 0 },
-      shadowOpacity: 0.15,
+      shadowColor: isDark ? '#FFFFFF' : '#000000',
+      shadowOffset: { width: 0, height: -4 },
+      shadowOpacity: isDark ? 0.1 : 0.15,
       shadowRadius: 10,
       elevation: 10,
       zIndex: 20,
+    },
+    // 실제 배경/모서리 둥글림/스크롤 클리핑은 애니메이션되지 않는 내부 뷰가 담당
+    doorDrawerPanelInner: {
+      flex: 1,
+      backgroundColor: theme.surface,
+      borderTopWidth: isDark ? 1.5 : 1,
+      borderTopColor: isDark ? 'rgba(255,255,255,0.16)' : theme.borderLight,
+      borderTopLeftRadius: 16,
+      borderTopRightRadius: 16,
+      overflow: 'hidden',
+    },
+    doorDrawerScroll: {
+      flex: 1,
     },
     doorDrawerHeader: {
       flexDirection: 'row',
@@ -1926,13 +2140,6 @@ function createStyles(theme: ThemeColors) {
       fontSize: 11,
       fontWeight: '600',
       color: theme.textSecondary,
-    },
-    emptyText: {
-      fontSize: 12,
-      color: theme.textMuted,
-      textAlign: 'center',
-      width: '100%',
-      marginTop: 10,
     },
     addShelfButton: {
       backgroundColor: theme.surface,
@@ -1981,7 +2188,7 @@ function createStyles(theme: ThemeColors) {
     addIngredientBadgeText: {
       fontSize: 12,
       fontWeight: 'bold',
-      color: theme.primary,
+      color: isDark ? '#FFFFFF' : '#000000',
     },
     modalOverlay: {
       flex: 1,
@@ -2047,34 +2254,100 @@ function createStyles(theme: ThemeColors) {
       color: theme.textPrimary,
       backgroundColor: theme.surfaceSecondary,
     },
-    categoryGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'space-between',
-      rowGap: 8,
-    },
-    categoryButton: {
+    comboTrigger: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: theme.surfaceTertiary,
+      justifyContent: 'space-between',
       borderWidth: 1.5,
       borderColor: theme.borderLight,
-      borderRadius: 12,
+      borderRadius: 10,
       paddingVertical: 10,
-      width: '48.5%', // 2 columns (perfectly symmetrical for 10 items)
-      justifyContent: 'center',
-      gap: 6,
+      paddingHorizontal: 12,
+      backgroundColor: theme.surfaceSecondary,
     },
-    categoryButtonActive: {
-      backgroundColor: theme.primary,
-      borderColor: theme.primary,
+    comboTriggerBorderless: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      paddingVertical: 4,
+      paddingHorizontal: 2,
     },
-    categoryButtonText: {
-      fontSize: 11,
+    comboTriggerBorderlessText: {
+      fontSize: 14,
       fontWeight: 'bold',
-      color: theme.textSecondary,
+      color: theme.primaryText,
     },
-    categoryButtonTextActive: {
+    comboTriggerText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.textPrimary,
+    },
+    comboArrow: {
+      fontSize: 12,
+      color: theme.textTertiary,
+      marginLeft: 8,
+    },
+    comboDropdown: {
+      marginTop: 6,
+      borderWidth: 1.5,
+      borderColor: theme.borderLight,
+      borderRadius: 10,
+      backgroundColor: theme.surface,
+      overflow: 'hidden',
+    },
+    comboOption: {
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.divider,
+    },
+    comboOptionActive: {
+      backgroundColor: theme.primaryLight,
+    },
+    comboOptionText: {
+      fontSize: 13,
+      color: theme.textSecondary,
+      fontWeight: '600',
+    },
+    comboOptionTextActive: {
+      color: theme.primaryText,
+      fontWeight: 'bold',
+    },
+    comboAddNewRow: {
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+    },
+    comboAddNewRowText: {
+      fontSize: 13,
+      color: theme.primary,
+      fontWeight: 'bold',
+    },
+    comboCustomRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      padding: 10,
+    },
+    comboCustomInput: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: theme.borderLight,
+      borderRadius: 8,
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+      fontSize: 13,
+      color: theme.textPrimary,
+      backgroundColor: theme.surfaceSecondary,
+    },
+    comboCustomAddButton: {
+      backgroundColor: theme.primary,
+      borderRadius: 8,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+    },
+    comboCustomAddButtonText: {
+      fontSize: 12,
+      fontWeight: 'bold',
       color: theme.primaryOnPrimary,
     },
     quantityUnitRow: {
@@ -2107,44 +2380,6 @@ function createStyles(theme: ThemeColors) {
       color: theme.textPrimary,
       paddingHorizontal: 16,
       minWidth: 40,
-      textAlign: 'center',
-    },
-    unitSelector: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 6,
-      flex: 1,
-    },
-    unitPill: {
-      backgroundColor: theme.surfaceTertiary,
-      borderWidth: 1,
-      borderColor: theme.borderLight,
-      borderRadius: 10,
-      paddingVertical: 6,
-      paddingHorizontal: 10,
-    },
-    unitPillActive: {
-      backgroundColor: theme.primary,
-      borderColor: theme.primary,
-    },
-    unitPillText: {
-      fontSize: 11,
-      color: theme.textSecondary,
-      fontWeight: 'bold',
-    },
-    unitPillTextActive: {
-      color: theme.primaryOnPrimary,
-    },
-    unitInput: {
-      borderWidth: 1,
-      borderColor: theme.borderLight,
-      borderRadius: 8,
-      paddingVertical: 4,
-      paddingHorizontal: 8,
-      fontSize: 11,
-      width: 60,
-      color: theme.textPrimary,
-      backgroundColor: theme.surfaceSecondary,
       textAlign: 'center',
     },
     presetRow: {

@@ -14,6 +14,9 @@ export type IngredientCategory =
   | 'frozen'
   | 'etc';
 
+// 유통기한(SELL_BY) vs 소비기한(USE_BY) 구분
+export type ExpiryType = 'SELL_BY' | 'USE_BY';
+
 export interface Ingredient {
   id: string;
   name: string;
@@ -21,6 +24,7 @@ export interface Ingredient {
   subLocation?: 'shelf_1' | 'shelf_2' | 'shelf_3' | 'pocket_1' | 'pocket_2';
   category: IngredientCategory;
   expiryDate: string; // YYYY-MM-DD
+  expiryType?: ExpiryType; // 미지정 시 기존 데이터와의 호환을 위해 SELL_BY(유통기한)로 취급
   quantity: number;
   unit: string;
   memo?: string;

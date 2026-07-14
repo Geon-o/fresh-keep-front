@@ -15,6 +15,7 @@ export interface ServerIngredient {
   quantity: number;
   unit: string;
   expirationDate: string;
+  expirationType?: 'SELL_BY' | 'USE_BY';
   dday: number;
   memo?: string;
 }
