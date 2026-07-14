@@ -111,7 +111,6 @@ const DEFAULT_DOOR_SHELVES = [
 interface DraggableBadgeProps {
   item: Ingredient;
   shelfId: string;
-  shelfLabel: string;
   draggingItem: Ingredient | null;
   setDraggingItem: (item: Ingredient | null) => void;
   dragPosition: Animated.ValueXY;
@@ -120,7 +119,7 @@ interface DraggableBadgeProps {
   setActiveHoverShelfId: (id: string | null) => void;
   compartmentId: string;
   onNavigateCompartment?: (newId: string, newLabel: string) => void;
-  handleOpenShelfDetailModal: (shelfId: string, label: string) => void;
+  onPressItem: (item: Ingredient) => void;
   measureShelves: () => void;
   shelfLayouts: React.MutableRefObject<Record<string, { x: number; y: number; width: number; height: number }>>;
   lastSwappedTime: React.MutableRefObject<number>;
@@ -135,7 +134,6 @@ interface DraggableBadgeProps {
 const DraggableBadge = ({
   item,
   shelfId,
-  shelfLabel,
   draggingItem,
   setDraggingItem,
   dragPosition,
@@ -144,7 +142,7 @@ const DraggableBadge = ({
   setActiveHoverShelfId,
   compartmentId,
   onNavigateCompartment,
-  handleOpenShelfDetailModal,
+  onPressItem,
   measureShelves,
   shelfLayouts,
   lastSwappedTime,
@@ -167,7 +165,6 @@ const DraggableBadge = ({
   const latestProps = useRef({
     item,
     shelfId,
-    shelfLabel,
     draggingItem,
     setDraggingItem,
     dragPosition,
@@ -176,7 +173,7 @@ const DraggableBadge = ({
     setActiveHoverShelfId,
     compartmentId,
     onNavigateCompartment,
-    handleOpenShelfDetailModal,
+    onPressItem,
     measureShelves,
     shelfLayouts,
     lastSwappedTime,
@@ -189,7 +186,6 @@ const DraggableBadge = ({
     latestProps.current = {
       item,
       shelfId,
-      shelfLabel,
       draggingItem,
       setDraggingItem,
       dragPosition,
@@ -198,7 +194,7 @@ const DraggableBadge = ({
       setActiveHoverShelfId,
       compartmentId,
       onNavigateCompartment,
-      handleOpenShelfDetailModal,
+      onPressItem,
       measureShelves,
       shelfLayouts,
       lastSwappedTime,
@@ -299,9 +295,9 @@ const DraggableBadge = ({
         const props = latestProps.current;
         
         if (!isDraggingActive.current) {
-          // 타이머 만료 전 손 뗌 -> 단순 탭
+          // 타이머 만료 전 손 뗌 -> 단순 탭 (수정 모달 바로 오픈)
           props.setScrollEnabled(true);
-          props.handleOpenShelfDetailModal(props.shelfId, props.shelfLabel);
+          props.onPressItem(props.item);
         }
         isDraggingActive.current = false;
       },
@@ -332,9 +328,14 @@ const DraggableBadge = ({
       <Text style={styles.itemText} numberOfLines={1}>
         {emoji ? `${emoji} ` : ''}{item.name}
       </Text>
-      <Text style={[styles.itemDDay, { color: dDay.color }]}>
-        {dDay.text}
+      <Text style={styles.itemQuantity} numberOfLines={1}>
+        {item.quantity}{item.unit}
       </Text>
+      <View style={[styles.dDayBadge, { backgroundColor: dDay.color + '15', borderColor: dDay.color }]}>
+        <Text style={[styles.dDayBadgeText, { color: dDay.color }]}>
+          {dDay.text}
+        </Text>
+      </View>
     </View>
   );
 };
@@ -621,9 +622,13 @@ export default function CompartmentDetail({
   const [selectedShelfId, setSelectedShelfId] = useState<string>('');
   const [selectedIngredientId, setSelectedIngredientId] = useState<string | null>(null);
 
-  // 선반 상세 보기 모달 제어 관련 상태
-  const [shelfDetailModalVisible, setShelfDetailModalVisible] = useState(false);
-  const [selectedShelfForDetail, setSelectedShelfForDetail] = useState<{ id: string; label: string } | null>(null);
+  // 안쪽 보관실 선반 아코디언 펼침 상태 (여러 선반 동시 펼침 가능)
+  const [expandedShelfIds, setExpandedShelfIds] = useState<Set<string>>(new Set());
+
+  // 문쪽 보관실 사이드 드로어 상태
+  const [doorDrawerOpen, setDoorDrawerOpen] = useState(false);
+  const doorDrawerAnim = useRef(new Animated.Value(0)).current; // 0: 닫힘, 1: 열림
+  const DOOR_DRAWER_WIDTH = Math.min(screenWidth * 0.8, 340);
 
   // 식재료 폼 상태
   const [formName, setFormName] = useState('');
@@ -835,20 +840,45 @@ export default function CompartmentDetail({
     }
   };
 
-  // 추가/수정 모달 닫기 (상세 모달 다시 열기 포함)
+  // 추가/수정 모달 닫기
   const handleCloseAddEditModal = () => {
     setModalVisible(false);
-    if (selectedShelfForDetail) {
-      setTimeout(() => {
-        setShelfDetailModalVisible(true);
-      }, 100);
-    }
   };
 
-  // 선반 상세 모달 닫기
-  const handleCloseShelfDetailModal = () => {
-    setShelfDetailModalVisible(false);
-    setSelectedShelfForDetail(null);
+  // 선반 아코디언 펼침/접힘 토글 (여러 선반 동시 펼침 가능)
+  const toggleShelfExpanded = (shelfId: string) => {
+    setExpandedShelfIds(prev => {
+      const next = new Set(prev);
+      if (next.has(shelfId)) {
+        next.delete(shelfId);
+      } else {
+        next.add(shelfId);
+      }
+      return next;
+    });
+  };
+
+  // 문쪽 보관실 드로어 열기/닫기 (애니메이션 완료 후 드래그앤드롭용 좌표 재측정)
+  const openDoorDrawer = () => {
+    setDoorDrawerOpen(true);
+    Animated.timing(doorDrawerAnim, {
+      toValue: 1,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
+      measureShelves();
+    });
+  };
+
+  const closeDoorDrawer = () => {
+    Animated.timing(doorDrawerAnim, {
+      toValue: 0,
+      duration: 220,
+      useNativeDriver: true,
+    }).start(() => {
+      setDoorDrawerOpen(false);
+      measureShelves();
+    });
   };
 
   // 오늘 날짜 구하는 YYYY-MM-DD 헬퍼
@@ -902,12 +932,6 @@ export default function CompartmentDetail({
     setFormMemo(item.memo || '');
     
     setModalVisible(true);
-  };
-
-  // 선반 상세 보기 모달 열기
-  const handleOpenShelfDetailModal = (shelfId: string, label: string) => {
-    setSelectedShelfForDetail({ id: shelfId, label });
-    setShelfDetailModalVisible(true);
   };
 
   // 식재료 저장 (추가/수정 공용)
@@ -1035,62 +1059,13 @@ export default function CompartmentDetail({
     }
 
       setModalVisible(false);
-      
-      if (selectedShelfForDetail) {
-        setTimeout(() => {
-          setShelfDetailModalVisible(true);
-        }, 100);
-      }
     } finally {
       isSavingRef.current = false;
       setIsSaving(false);
     }
   };
 
-  // 식재료 개별 삭제
-  const handleRemoveIngredient = (id: string) => {
-    const performRemove = async () => {
-      if (isLoggedIn) {
-        try {
-          await deleteIngredient(Number(id));
-          const updated = ingredients.filter(item => item.id !== id);
-          setIngredients(updated);
-        } catch (e) {
-          console.error('Failed to delete ingredient from server', e);
-          Alert.alert('오류 ⚠️', '식재료 삭제에 실패했습니다.');
-          return;
-        }
-      } else {
-        const updated = ingredients.filter(item => item.id !== id);
-        setIngredients(updated);
-        saveIngredients(updated);
-      }
-
-      setModalVisible(false);
-      
-      if (selectedShelfForDetail) {
-        setTimeout(() => {
-          setShelfDetailModalVisible(true);
-        }, 100);
-      }
-    };
-
-    if (Platform.OS === 'web') {
-      const check = window.confirm('이 식재료를 삭제하시겠습니까?');
-      if (check) performRemove();
-    } else {
-      Alert.alert(
-        '식재료 삭제 🗑️',
-        '이 식재료를 보관실에서 삭제하시겠습니까?',
-        [
-          { text: '취소', style: 'cancel' },
-          { text: '삭제', style: 'destructive', onPress: performRemove }
-        ]
-      );
-    }
-  };
-
-  // 식재료 직접 삭제 (상세 페이지에서 ✕ 버튼 클릭 시 안내 후 삭제)
+  // 식재료 직접 삭제 (수정 모달에서 삭제 버튼 클릭 시 안내 후 삭제)
   const handleConfirmRemoveIngredientDirect = (id: string, name: string) => {
     const performRemove = async () => {
       if (isLoggedIn) {
@@ -1108,6 +1083,7 @@ export default function CompartmentDetail({
         setIngredients(updated);
         saveIngredients(updated);
       }
+      setModalVisible(false);
     };
 
     if (Platform.OS === 'web') {
@@ -1210,6 +1186,8 @@ export default function CompartmentDetail({
       const performDisable = async () => {
         setHasDoorStorage(false);
         setDoorShelves([]);
+        setDoorDrawerOpen(false);
+        doorDrawerAnim.setValue(0);
         saveShelfConfig(insideShelves, [], false);
 
         const itemsToDelete = ingredients.filter(item => item.subLocation && doorShelvesIds.includes(item.subLocation));
@@ -1273,25 +1251,82 @@ export default function CompartmentDetail({
     return { text: `D-${days}`, color: theme.ddaySafe };
   };
 
-  // 개별 식재료 뱃지 렌더러 (상세 모달용 - 클릭 시 수정)
-  const renderItemBadge = (item: Ingredient) => {
-    const dDay = getDDayInfo(item.expiryDate);
-    const emoji = CATEGORY_EMOJI[item.category] || '';
-    
+  // 선반 아코디언 카드 렌더러 (안쪽/문쪽 공용)
+  const renderShelfCard = (shelf: { id: string; label: string }, section: 'inside' | 'door') => {
+    const items = getItemsBySubLocation(shelf.id);
+    const isExpanded = expandedShelfIds.has(shelf.id);
+
     return (
-      <TouchableOpacity
-        key={item.id}
-        style={[styles.itemBadge, { borderLeftWidth: 3.5, borderLeftColor: dDay.color, paddingLeft: 8 }]}
-        activeOpacity={0.7}
-        onPress={() => handleOpenEditModal(item)}
+      <View
+        key={shelf.id}
+        ref={el => { shelfRefs.current[shelf.id] = el; }}
+        style={[styles.shelfCard, activeHoverShelfId === shelf.id && styles.shelfHovered]}
       >
-        <Text style={styles.itemText} numberOfLines={1}>
-          {emoji ? `${emoji} ` : ''}{item.name}
-        </Text>
-        <Text style={[styles.itemDDay, { color: dDay.color }]}>
-          {dDay.text}
-        </Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.shelfCardHeader}
+          activeOpacity={0.7}
+          onPress={() => toggleShelfExpanded(shelf.id)}
+        >
+          <Text style={styles.shelfLabel} numberOfLines={1}>{shelf.label}</Text>
+          <View style={styles.shelfCountBadge}>
+            <Text style={styles.shelfCountBadgeText}>{items.length}개</Text>
+          </View>
+          <Text style={styles.shelfExpandIcon}>{isExpanded ? '▾' : '▸'}</Text>
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={() => handleDeleteShelf(shelf.id, shelf.label, section)}
+          >
+            <Text style={styles.deleteButtonText}>✕</Text>
+          </TouchableOpacity>
+        </TouchableOpacity>
+
+        {isExpanded && (
+          <View style={styles.shelfExpandedContent}>
+            <ScrollView
+              showsVerticalScrollIndicator={true}
+              contentContainerStyle={styles.shelfItemsScroll}
+              scrollEnabled={scrollEnabled}
+              nestedScrollEnabled
+            >
+              {items.length === 0 && (
+                <Text style={styles.emptyText}>비어 있음</Text>
+              )}
+              {items.map(item => (
+                <DraggableBadge
+                  key={item.id}
+                  item={item}
+                  shelfId={shelf.id}
+                  draggingItem={draggingItem}
+                  setDraggingItem={setDraggingItem}
+                  dragPosition={dragPosition}
+                  setDragCurrentCoords={setDragCurrentCoords}
+                  setScrollEnabled={setScrollEnabled}
+                  setActiveHoverShelfId={setActiveHoverShelfId}
+                  compartmentId={compartmentId}
+                  onNavigateCompartment={onNavigateCompartment}
+                  onPressItem={handleOpenEditModal}
+                  measureShelves={measureShelves}
+                  shelfLayouts={shelfLayouts}
+                  lastSwappedTime={lastSwappedTime}
+                  screenWidth={screenWidth}
+                  theme={theme}
+                  styles={styles}
+                  handleDropIngredient={handleDropIngredient}
+                  getFourDoorSwitchTarget={getFourDoorSwitchTarget}
+                  getDDayInfo={getDDayInfo}
+                />
+              ))}
+              <TouchableOpacity
+                style={styles.addIngredientBadge}
+                activeOpacity={0.7}
+                onPress={() => handleOpenAddModal(shelf.id)}
+              >
+                <Text style={styles.addIngredientBadgeText}>+ 식재료 추가하기</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        )}
+      </View>
     );
   };
 
@@ -1341,163 +1376,65 @@ export default function CompartmentDetail({
           </View>
 
           <Animated.View style={[styles.body, { opacity: contentOpacity, transform: [{ translateX: contentTranslateX }] }]}>
-            {/* 좌측: 안쪽 보관실 (선반) */}
-            <View style={[styles.sectionInside, hasDoorStorage ? { marginRight: 8 } : { marginRight: 0, flex: 1 }]}>
-              <View style={styles.sectionHeaderInside}>
-                <Text style={styles.sectionTitle}>안쪽 보관실</Text>
-              </View>
-              
-              <View style={styles.shelfContainer}>
-                <View style={styles.shelfScrollContent}>
-                  {insideShelves.map((shelf) => (
-                    <View 
-                      key={shelf.id} 
-                      ref={el => { shelfRefs.current[shelf.id] = el; }} 
-                      style={[styles.shelf, activeHoverShelfId === shelf.id && styles.shelfHovered]}
-                    >
-                      <View style={styles.shelfHeaderRow}>
-                        <TouchableOpacity
-                          onPress={() => handleOpenShelfDetailModal(shelf.id, shelf.label)}
-                          activeOpacity={0.7}
-                          style={{ flex: 1 }}
-                        >
-                          <Text style={styles.shelfLabel}>{shelf.label} 〉</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.deleteButton}
-                          onPress={() => handleDeleteShelf(shelf.id, shelf.label, 'inside')}
-                        >
-                          <Text style={styles.deleteButtonText}>✕</Text>
-                        </TouchableOpacity>
-                      </View>
-                      <View style={styles.shelfItemsContainer}>
-                        <ScrollView
-                          showsVerticalScrollIndicator={true}
-                          contentContainerStyle={styles.shelfItemsScroll}
-                          scrollEnabled={scrollEnabled}
-                        >
-                          {getItemsBySubLocation(shelf.id).map(item => (
-                            <DraggableBadge
-                              key={item.id}
-                              item={item}
-                              shelfId={shelf.id}
-                              shelfLabel={shelf.label}
-                              draggingItem={draggingItem}
-                              setDraggingItem={setDraggingItem}
-                              dragPosition={dragPosition}
-                              setDragCurrentCoords={setDragCurrentCoords}
-                              setScrollEnabled={setScrollEnabled}
-                              setActiveHoverShelfId={setActiveHoverShelfId}
-                              compartmentId={compartmentId}
-                              onNavigateCompartment={onNavigateCompartment}
-                              handleOpenShelfDetailModal={handleOpenShelfDetailModal}
-                              measureShelves={measureShelves}
-                              shelfLayouts={shelfLayouts}
-                              lastSwappedTime={lastSwappedTime}
-                              screenWidth={screenWidth}
-                              theme={theme}
-                              styles={styles}
-                              handleDropIngredient={handleDropIngredient}
-                              getFourDoorSwitchTarget={getFourDoorSwitchTarget}
-                              getDDayInfo={getDDayInfo}
-                            />
-                          ))}
-                          {getItemsBySubLocation(shelf.id).length === 0 && (
-                            <TouchableOpacity onPress={() => handleOpenShelfDetailModal(shelf.id, shelf.label)}>
-                              <Text style={styles.emptyText}>비어 있음</Text>
-                            </TouchableOpacity>
-                          )}
-                        </ScrollView>
-                      </View>
-                    </View>
-                  ))}
-                </View>
+            {/* 안쪽 보관실: 전체 폭 아코디언 리스트 */}
+            <ScrollView style={styles.insideScroll} contentContainerStyle={styles.insideScrollContent}>
+              {insideShelves.map((shelf) => renderShelfCard(shelf, 'inside'))}
 
-                {/* 선반 추가 버튼 */}
+              <TouchableOpacity
+                style={styles.addShelfButton}
+                activeOpacity={0.7}
+                onPress={() => handleAddShelf('inside')}
+              >
+                <Text style={styles.addShelfButtonText}>+ 선반 추가</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </Animated.View>
+
+          {/* 문쪽 보관실: 오른쪽 사이드 탭 + 슬라이드 드로어 */}
+          {hasDoorStorage && (
+            <>
+              {doorDrawerOpen && (
                 <TouchableOpacity
-                  style={styles.addShelfButton}
-                  activeOpacity={0.7}
-                  onPress={() => handleAddShelf('inside')}
+                  style={styles.doorDrawerBackdrop}
+                  activeOpacity={1}
+                  onPress={closeDoorDrawer}
+                />
+              )}
+
+              {!doorDrawerOpen && (
+                <TouchableOpacity
+                  style={styles.doorSideTab}
+                  activeOpacity={0.8}
+                  onPress={openDoorDrawer}
                 >
-                  <Text style={styles.addShelfButtonText}>+ 선반 추가</Text>
+                  <Text style={styles.doorSideTabText}>문쪽{'\n'}보관실</Text>
                 </TouchableOpacity>
-              </View>
-            </View>
+              )}
 
-            {/* 우측: 문쪽 보관실 (선반) */}
-            {hasDoorStorage && (
-              <View style={styles.sectionDoor}>
-                <View style={styles.sectionHeaderDoor}>
+              <Animated.View
+                style={[
+                  styles.doorDrawerPanel,
+                  {
+                    width: DOOR_DRAWER_WIDTH,
+                    transform: [{
+                      translateX: doorDrawerAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [DOOR_DRAWER_WIDTH, 0],
+                      }),
+                    }],
+                  },
+                ]}
+                pointerEvents={doorDrawerOpen ? 'auto' : 'none'}
+              >
+                <View style={styles.doorDrawerHeader}>
                   <Text style={styles.sectionTitle}>문쪽 보관실</Text>
+                  <TouchableOpacity style={styles.modalCloseButton} onPress={closeDoorDrawer}>
+                    <Text style={styles.modalCloseText}>✕</Text>
+                  </TouchableOpacity>
                 </View>
+                <ScrollView contentContainerStyle={styles.insideScrollContent}>
+                  {doorShelves.map((shelf) => renderShelfCard(shelf, 'door'))}
 
-                <View style={styles.pocketContainer}>
-                  <View style={styles.pocketScrollContent}>
-                    {doorShelves.map((shelf) => (
-                      <View 
-                        key={shelf.id} 
-                        ref={el => { shelfRefs.current[shelf.id] = el; }} 
-                        style={[styles.pocket, activeHoverShelfId === shelf.id && styles.shelfHovered]}
-                      >
-                        <View style={styles.shelfHeaderRow}>
-                          <TouchableOpacity
-                            onPress={() => handleOpenShelfDetailModal(shelf.id, shelf.label)}
-                            activeOpacity={0.7}
-                            style={{ flex: 1 }}
-                          >
-                            <Text style={styles.pocketLabel}>{shelf.label} 〉</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={styles.deleteButton}
-                            onPress={() => handleDeleteShelf(shelf.id, shelf.label, 'door')}
-                          >
-                            <Text style={styles.deleteButtonText}>✕</Text>
-                          </TouchableOpacity>
-                        </View>
-                        <View style={styles.shelfItemsContainer}>
-                          <ScrollView
-                            showsVerticalScrollIndicator={true}
-                            contentContainerStyle={styles.shelfItemsScroll}
-                            scrollEnabled={scrollEnabled}
-                          >
-                            {getItemsBySubLocation(shelf.id).map(item => (
-                              <DraggableBadge
-                                key={item.id}
-                                item={item}
-                                shelfId={shelf.id}
-                                shelfLabel={shelf.label}
-                                draggingItem={draggingItem}
-                                setDraggingItem={setDraggingItem}
-                                dragPosition={dragPosition}
-                                setDragCurrentCoords={setDragCurrentCoords}
-                                setScrollEnabled={setScrollEnabled}
-                                setActiveHoverShelfId={setActiveHoverShelfId}
-                                compartmentId={compartmentId}
-                                onNavigateCompartment={onNavigateCompartment}
-                                handleOpenShelfDetailModal={handleOpenShelfDetailModal}
-                                measureShelves={measureShelves}
-                                shelfLayouts={shelfLayouts}
-                                lastSwappedTime={lastSwappedTime}
-                                screenWidth={screenWidth}
-                                theme={theme}
-                                styles={styles}
-                                handleDropIngredient={handleDropIngredient}
-                                getFourDoorSwitchTarget={getFourDoorSwitchTarget}
-                                getDDayInfo={getDDayInfo}
-                              />
-                            ))}
-                            {getItemsBySubLocation(shelf.id).length === 0 && (
-                              <TouchableOpacity onPress={() => handleOpenShelfDetailModal(shelf.id, shelf.label)}>
-                                <Text style={styles.emptyText}>비어 있음</Text>
-                              </TouchableOpacity>
-                            )}
-                          </ScrollView>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-
-                  {/* 선반 추가 버튼 */}
                   <TouchableOpacity
                     style={styles.addShelfButton}
                     activeOpacity={0.7}
@@ -1505,10 +1442,10 @@ export default function CompartmentDetail({
                   >
                     <Text style={styles.addShelfButtonText}>+ 선반 추가</Text>
                   </TouchableOpacity>
-                </View>
-              </View>
-            )}
-          </Animated.View>
+                </ScrollView>
+              </Animated.View>
+            </>
+          )}
         </>
       )}
 
@@ -1680,6 +1617,16 @@ export default function CompartmentDetail({
 
             {/* 하단 푸터 버튼 */}
             <View style={styles.modalFooter}>
+              {modalMode === 'edit' && selectedIngredientId && (
+                <TouchableOpacity
+                  style={[styles.footerButton, styles.buttonDelete, isSaving && { opacity: 0.5 }]}
+                  onPress={() => handleConfirmRemoveIngredientDirect(selectedIngredientId, formName)}
+                  activeOpacity={0.7}
+                  disabled={isSaving}
+                >
+                  <Text style={styles.buttonTextDelete}>삭제</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={[styles.footerButton, styles.buttonCancel, isSaving && { opacity: 0.5 }]}
                 onPress={handleCloseAddEditModal}
@@ -1706,114 +1653,6 @@ export default function CompartmentDetail({
                     {modalMode === 'add' ? '등록' : '수정 완료'}
                   </Text>
                 )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* 선반 상세 보기 모달 */}
-      <Modal
-        visible={shelfDetailModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={handleCloseShelfDetailModal}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            {/* 헤더 */}
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {selectedShelfForDetail ? `${selectedShelfForDetail.label} 상세 보기` : '선반 상세 보기'}
-              </Text>
-              <TouchableOpacity
-                style={styles.modalCloseButton}
-                onPress={handleCloseShelfDetailModal}
-              >
-                <Text style={styles.modalCloseText}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.formScroll} showsVerticalScrollIndicator={false}>
-              {selectedShelfForDetail && getItemsBySubLocation(selectedShelfForDetail.id).length === 0 && (
-                <Text style={styles.emptyText}>이 선반은 비어 있습니다.</Text>
-              )}
-              {selectedShelfForDetail && getItemsBySubLocation(selectedShelfForDetail.id).map(item => {
-                const dDay = getDDayInfo(item.expiryDate);
-                return (
-                  <View key={item.id} style={styles.shelfDetailRow}>
-                    {/* 상단 라인: 식재료명, D-Day 배지 및 수정 버튼 */}
-                    <View style={styles.shelfDetailTopRow}>
-                      <View style={styles.shelfDetailNameSection}>
-                        <View style={styles.shelfDetailNameContainer}>
-                          <View style={styles.shelfDetailNameRow}>
-                            <Text style={styles.shelfDetailName} numberOfLines={1}>{item.name}</Text>
-                            <View style={[styles.dDayBadge, { backgroundColor: dDay.color + '15', borderColor: dDay.color }]}>
-                              <Text style={[styles.dDayBadgeText, { color: dDay.color }]}>{dDay.text}</Text>
-                            </View>
-                          </View>
-                          {item.memo ? (
-                            <Text style={styles.shelfDetailMemo} numberOfLines={1}>{item.memo}</Text>
-                          ) : null}
-                        </View>
-                      </View>
-                      <View style={styles.shelfDetailActions}>
-                        <TouchableOpacity
-                          style={styles.shelfDetailEditBtn}
-                          onPress={() => {
-                            setShelfDetailModalVisible(false);
-                            handleOpenEditModal(item);
-                          }}
-                        >
-                          <Text style={styles.shelfDetailEditBtnText}>수정</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.shelfDetailDeleteBtn}
-                          onPress={() => handleConfirmRemoveIngredientDirect(item.id, item.name)}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={styles.shelfDetailDeleteBtnText}>✕</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-
-                    {/* 하단 라인: 수량 및 유통기한 정보 */}
-                    <View style={styles.shelfDetailBottomRow}>
-                      <View style={styles.shelfDetailInfoBadge}>
-                        <Text style={styles.shelfDetailInfoLabel}>수량</Text>
-                        <Text style={styles.shelfDetailQuantity}>{item.quantity}{item.unit}</Text>
-                      </View>
-                      
-                      <View style={[styles.shelfDetailInfoBadge, styles.expiryHighlightedBadge]}>
-                        <Text style={styles.shelfDetailInfoLabel}>유통기한</Text>
-                        <Text style={styles.shelfDetailExpiryDateHighlighted}>{item.expiryDate}</Text>
-                      </View>
-                    </View>
-                  </View>
-                );
-              })}
-            </ScrollView>
-
-            {/* 하단 버튼 */}
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={[styles.footerButton, styles.buttonSave, { flex: 1 }]}
-                onPress={() => {
-                  if (selectedShelfForDetail) {
-                    setShelfDetailModalVisible(false);
-                    handleOpenAddModal(selectedShelfForDetail.id);
-                  }
-                }}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.buttonTextSave}>+ 새 식재료 추가</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.footerButton, styles.buttonCancel]}
-                onPress={handleCloseShelfDetailModal}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.buttonTextCancel}>닫기</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1933,48 +1772,15 @@ function createStyles(theme: ThemeColors) {
     },
     body: {
       flex: 1,
-      flexDirection: 'row',
+    },
+    insideScroll: {
+      flex: 1,
+      backgroundColor: theme.surfaceSecondary,
+    },
+    insideScrollContent: {
       padding: 16,
-    },
-    sectionInside: {
-      flex: 5.8,
-      backgroundColor: theme.surface,
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: theme.borderLight,
-      overflow: 'hidden',
-      shadowColor: theme.shadow,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.03,
-      shadowRadius: 8,
-      elevation: 2,
-    },
-    sectionDoor: {
-      flex: 4.2,
-      backgroundColor: theme.surface,
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: theme.borderLight,
-      overflow: 'hidden',
-      shadowColor: theme.shadow,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.03,
-      shadowRadius: 8,
-      elevation: 2,
-    },
-    sectionHeaderInside: {
-      paddingVertical: 12,
-      paddingHorizontal: 14,
-      backgroundColor: theme.fridgeDoor,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.fridgeDoorBorder,
-    },
-    sectionHeaderDoor: {
-      paddingVertical: 12,
-      paddingHorizontal: 14,
-      backgroundColor: theme.freezerDoor,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.freezerDoorBorder,
+      gap: 12,
+      paddingBottom: 32,
     },
     sectionTitle: {
       fontSize: 14,
@@ -1982,17 +1788,7 @@ function createStyles(theme: ThemeColors) {
       color: theme.textPrimary,
       textAlign: 'center',
     },
-    shelfContainer: {
-      flex: 1,
-      backgroundColor: theme.surfaceSecondary,
-      padding: 8,
-    },
-    shelfScrollContent: {
-      flex: 1,
-      gap: 12,
-      paddingBottom: 16,
-    },
-    shelf: {
+    shelfCard: {
       backgroundColor: theme.surface,
       borderRadius: 12,
       borderWidth: 1,
@@ -2000,20 +1796,37 @@ function createStyles(theme: ThemeColors) {
       borderBottomWidth: 5,
       borderBottomColor: theme.metallicTrim,
       padding: 10,
-      height: 170,
       shadowColor: '#000000',
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.05,
       shadowRadius: 8,
       elevation: 2,
     },
-    shelfHeaderRow: {
+    shelfCardHeader: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
       alignItems: 'center',
+      gap: 8,
+      paddingVertical: 4,
     },
     shelfLabel: {
+      flex: 1,
+      fontSize: 13,
+      fontWeight: 'bold',
+      color: theme.textTertiary,
+    },
+    shelfCountBadge: {
+      backgroundColor: theme.surfaceTertiary,
+      borderRadius: 10,
+      paddingVertical: 3,
+      paddingHorizontal: 8,
+    },
+    shelfCountBadgeText: {
       fontSize: 11,
+      fontWeight: 'bold',
+      color: theme.textSecondary,
+    },
+    shelfExpandIcon: {
+      fontSize: 14,
       fontWeight: 'bold',
       color: theme.textTertiary,
     },
@@ -2025,40 +1838,69 @@ function createStyles(theme: ThemeColors) {
       color: theme.textMuted,
       fontWeight: 'bold',
     },
-    pocketContainer: {
-      flex: 1,
-      backgroundColor: theme.surfaceSecondary,
-      padding: 8,
-    },
-    pocketScrollContent: {
-      flex: 1,
-      gap: 12,
-      paddingBottom: 16,
-    },
-    pocket: {
-      backgroundColor: theme.surface,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: theme.glassBorder,
-      borderBottomWidth: 5,
-      borderBottomColor: theme.metallicTrim,
-      padding: 10,
-      height: 170,
+    doorSideTab: {
+      position: 'absolute',
+      right: 0,
+      top: '42%',
+      backgroundColor: theme.primary,
+      paddingVertical: 14,
+      paddingHorizontal: 8,
+      borderTopLeftRadius: 12,
+      borderBottomLeftRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
       shadowColor: '#000000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.05,
-      shadowRadius: 8,
-      elevation: 2,
+      shadowOffset: { width: -2, height: 2 },
+      shadowOpacity: 0.15,
+      shadowRadius: 6,
+      elevation: 6,
+      zIndex: 20,
     },
-    pocketLabel: {
-      fontSize: 11,
+    doorSideTabText: {
+      fontSize: 12,
       fontWeight: 'bold',
-      color: theme.textTertiary,
+      color: theme.primaryOnPrimary,
+      textAlign: 'center',
+      lineHeight: 16,
     },
-    itemBadge: {
+    doorDrawerBackdrop: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: theme.modalOverlay,
+      zIndex: 15,
+    },
+    doorDrawerPanel: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: theme.surface,
+      borderLeftWidth: 1,
+      borderLeftColor: theme.borderLight,
+      shadowColor: '#000000',
+      shadowOffset: { width: -4, height: 0 },
+      shadowOpacity: 0.15,
+      shadowRadius: 10,
+      elevation: 10,
+      zIndex: 20,
+    },
+    doorDrawerHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      backgroundColor: theme.freezerDoor,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.freezerDoorBorder,
+    },
+    itemBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
       backgroundColor: theme.surface, // 깔끔한 화이트/슬레이트 카드
       borderWidth: 1,
       borderColor: theme.borderLight,
@@ -2066,7 +1908,7 @@ function createStyles(theme: ThemeColors) {
       paddingVertical: 8,
       paddingHorizontal: 10,
       width: '100%',
-      height: 40,
+      minHeight: 40,
       marginBottom: 8,
       shadowColor: '#000000',
       shadowOffset: { width: 0, height: 2 },
@@ -2075,14 +1917,15 @@ function createStyles(theme: ThemeColors) {
       elevation: 1.5,
     },
     itemText: {
+      flex: 1,
       fontSize: 12,
       fontWeight: 'bold',
       color: theme.textPrimary,
-      maxWidth: '65%',
     },
-    itemDDay: {
+    itemQuantity: {
       fontSize: 11,
-      fontWeight: 'bold',
+      fontWeight: '600',
+      color: theme.textSecondary,
     },
     emptyText: {
       fontSize: 12,
@@ -2107,9 +1950,13 @@ function createStyles(theme: ThemeColors) {
       fontWeight: 'bold',
       color: theme.textTertiary,
     },
-    shelfItemsContainer: {
-      flex: 1,
-      marginTop: 6,
+    shelfExpandedContent: {
+      maxHeight: 260,
+      marginTop: 8,
+      paddingTop: 8,
+      borderTopWidth: 1,
+      borderTopColor: theme.borderLight,
+      overflow: 'hidden',
     },
     shelfItemsScroll: {
       flexDirection: 'column',
@@ -2363,43 +2210,6 @@ function createStyles(theme: ThemeColors) {
       fontWeight: 'bold',
       color: theme.primaryOnPrimary,
     },
-    shelfDetailRow: {
-      flexDirection: 'column',
-      backgroundColor: theme.surfaceSecondary,
-      borderWidth: 1.5,
-      borderColor: theme.borderLight,
-      borderRadius: 12,
-      padding: 12,
-      marginBottom: 8,
-      gap: 10,
-    },
-    shelfDetailTopRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      width: '100%',
-    },
-    shelfDetailNameSection: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-      flex: 1,
-      marginRight: 8,
-    },
-    shelfDetailNameContainer: {
-      flex: 1,
-    },
-    shelfDetailNameRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-      flexWrap: 'wrap',
-    },
-    shelfDetailName: {
-      fontSize: 15,
-      fontWeight: 'bold',
-      color: theme.textPrimary,
-    },
     dDayBadge: {
       borderWidth: 1,
       borderRadius: 6,
@@ -2409,87 +2219,6 @@ function createStyles(theme: ThemeColors) {
     dDayBadgeText: {
       fontSize: 10,
       fontWeight: 'bold',
-    },
-    shelfDetailMemo: {
-      fontSize: 12,
-      color: theme.textTertiary,
-      marginTop: 2,
-    },
-    shelfDetailEditBtn: {
-      backgroundColor: theme.primaryLight,
-      borderRadius: 8,
-      paddingVertical: 6,
-      paddingHorizontal: 12,
-    },
-    shelfDetailEditBtnText: {
-      fontSize: 11,
-      fontWeight: 'bold',
-      color: theme.primaryText,
-    },
-    shelfDetailBottomRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingTop: 8,
-      borderTopWidth: 1,
-      borderTopColor: theme.borderLight,
-    },
-    shelfDetailInfoBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      backgroundColor: theme.surface,
-      paddingVertical: 4,
-      paddingHorizontal: 8,
-      borderRadius: 6,
-      borderWidth: 1,
-      borderColor: theme.borderLight,
-    },
-    expiryHighlightedBadge: {
-      borderColor: theme.primaryBorder,
-      backgroundColor: theme.primaryLight,
-    },
-    shelfDetailInfoLabel: {
-      fontSize: 11,
-      fontWeight: '600',
-      color: theme.textMuted,
-    },
-    shelfDetailQuantity: {
-      fontSize: 12,
-      fontWeight: 'bold',
-      color: theme.textSecondary,
-    },
-    shelfDetailExpiryDate: {
-      fontSize: 11,
-      color: theme.textTertiary,
-    },
-    shelfDetailExpiryDateHighlighted: {
-      fontSize: 14,
-      fontWeight: 'bold',
-      color: theme.primaryText,
-    },
-    shelfDetailDDay: {
-      fontSize: 11,
-      fontWeight: 'bold',
-      marginLeft: 2,
-    },
-    shelfDetailActions: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-    },
-    shelfDetailDeleteBtn: {
-      backgroundColor: theme.dangerLight,
-      borderRadius: 8,
-      paddingVertical: 6,
-      paddingHorizontal: 10,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    shelfDetailDeleteBtnText: {
-      fontSize: 12,
-      fontWeight: 'bold',
-      color: theme.danger,
     },
     floatingDragBadge: {
       position: 'absolute',
