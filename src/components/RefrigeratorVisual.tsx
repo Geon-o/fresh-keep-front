@@ -11,6 +11,7 @@ import { SAMPLE_INGREDIENTS, CATEGORY_EMOJI } from './CompartmentDetail';
 import { useAuth } from '../context/AuthContext';
 import { getFridgeLayout } from '../api/fridgeService';
 import { deserializeMemo, convertServerLocationToLocal } from '../utils/memoSerializer';
+import { rebuildAllNotifications } from '../utils/ingredientNotifications';
 import { useTheme } from '../context/ThemeContext';
 // 영문 행정구역명 한글 변환 매핑 딕셔너리
 const TRANSLATE_TO_KOREAN: { [key: string]: string } = {
@@ -258,6 +259,7 @@ export default function RefrigeratorVisual({
   const { isLoggedIn, user } = useAuth();
   const router = useRouter();
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [ingredientsLoaded, setIngredientsLoaded] = useState(false);
   const { theme, isDark } = useTheme();
   const [fridgeSettingsVisible, setFridgeSettingsVisible] = useState(false);
 
@@ -343,11 +345,14 @@ export default function RefrigeratorVisual({
             });
           });
           setIngredients(allIngredients);
+          rebuildAllNotifications(allIngredients);
         } else {
           // 로컬 로드
           const ingredientsStr = await AsyncStorage.getItem('@ingredients');
           if (ingredientsStr) {
-            setIngredients(JSON.parse(ingredientsStr));
+            const localIngredients: Ingredient[] = JSON.parse(ingredientsStr);
+            setIngredients(localIngredients);
+            rebuildAllNotifications(localIngredients);
           } else {
             // 로컬 저장소에 데이터 없음 → 빈 상태로 시작
             setIngredients([]);
@@ -355,6 +360,8 @@ export default function RefrigeratorVisual({
         }
       } catch (e) {
         console.error('Failed to load ingredients for visual', e);
+      } finally {
+        setIngredientsLoaded(true);
       }
     };
     loadIngredients();
@@ -1004,8 +1011,13 @@ export default function RefrigeratorVisual({
 
   // 개인화 멘트: 냉장고 상태(만료/임박)에 따라 다른 멘트 후보 중 하나를 골라
   // 전역 캐시에 저장해두고, 앱을 재시작하기 전까지는 탭을 오가도 그대로 유지한다.
-  const [greeting] = useState(() => {
-    if (greetingCache) return greetingCache;
+  // 식재료 목록은 비동기로 로드되므로(마운트 시점엔 아직 빈 배열) 로드가 끝난 뒤에 골라야
+  // 만료/임박 개수를 정확히 반영할 수 있다.
+  const [greeting, setGreeting] = useState(() => greetingCache || '');
+
+  useEffect(() => {
+    if (greetingCache) return;
+    if (!ingredientsLoaded) return;
 
     let candidates: string[];
 
@@ -1033,9 +1045,10 @@ export default function RefrigeratorVisual({
       `냉장고 속 재료들을 한 번 둘러보세요`,
     );
 
-    greetingCache = candidates[Math.floor(Math.random() * candidates.length)];
-    return greetingCache;
-  });
+    const picked = candidates[Math.floor(Math.random() * candidates.length)];
+    greetingCache = picked;
+    setGreeting(picked);
+  }, [ingredientsLoaded]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>

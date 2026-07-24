@@ -9,6 +9,7 @@ import { getFridgeLayout, updateCompartmentShelves } from '../api/fridgeService'
 import { addIngredient, updateIngredient, deleteIngredient } from '../api/ingredientService';
 import { getCustomUnits, addCustomUnit } from '../api/unitService';
 import { serializeMemo, deserializeMemo } from '../utils/memoSerializer';
+import { rebuildAllNotifications } from '../utils/ingredientNotifications';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../theme';
 
@@ -920,6 +921,7 @@ export default function CompartmentDetail({
       allIngredients = [...allIngredients, ...currentIngredients];
       
       await AsyncStorage.setItem('@ingredients', JSON.stringify(allIngredients));
+      rebuildAllNotifications(allIngredients);
     } catch (e) {
       console.error('Failed to save ingredients', e);
     }
