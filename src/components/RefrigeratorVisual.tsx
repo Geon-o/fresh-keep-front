@@ -136,6 +136,10 @@ const formatKoreanRegion = (text: string): string => {
   return cleaned;
 };
 
+// 전역 홈 인사말 캐시 (설정 탭 등으로 이동해 컴포넌트가 언마운트/재마운트돼도
+// 앱을 완전히 재시작하기 전까지는 멘트가 바뀌지 않도록 세션 동안 고정한다)
+let greetingCache: string | null = null;
+
 // 전역 날씨 캐시
 let weatherCache: {
   weatherInfo: {
@@ -999,8 +1003,10 @@ export default function RefrigeratorVisual({
   const greetingName = isLoggedIn && user?.name ? user.name : '익명 사용자';
 
   // 개인화 멘트: 냉장고 상태(만료/임박)에 따라 다른 멘트 후보 중 하나를 골라
-  // 컴포넌트가 새로 마운트될 때(=앱 진입 시)만 한 번 정하고 세션 내내 유지한다.
+  // 전역 캐시에 저장해두고, 앱을 재시작하기 전까지는 탭을 오가도 그대로 유지한다.
   const [greeting] = useState(() => {
+    if (greetingCache) return greetingCache;
+
     let candidates: string[];
 
     if (totalExpired > 0) {
@@ -1027,7 +1033,8 @@ export default function RefrigeratorVisual({
       `냉장고 속 재료들을 한 번 둘러보세요`,
     );
 
-    return candidates[Math.floor(Math.random() * candidates.length)];
+    greetingCache = candidates[Math.floor(Math.random() * candidates.length)];
+    return greetingCache;
   });
 
   return (
