@@ -251,7 +251,7 @@ export default function RefrigeratorVisual({
   onChangeTab
 }: RefrigeratorVisualProps) {
   const { width: screenWidth } = useWindowDimensions();
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, user } = useAuth();
   const router = useRouter();
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const { theme, isDark } = useTheme();
@@ -995,15 +995,56 @@ export default function RefrigeratorVisual({
     requestLocationAndFetchWeather();
   }, [theme]);
 
+  // 인사말에 항상 표시할 닉네임 (미로그인 시 설정 화면과 동일하게 '익명 사용자'로 표기)
+  const greetingName = isLoggedIn && user?.name ? user.name : '익명 사용자';
+
+  // 개인화 멘트: 냉장고 상태(만료/임박)에 따라 다른 멘트 후보 중 하나를 골라
+  // 컴포넌트가 새로 마운트될 때(=앱 진입 시)만 한 번 정하고 세션 내내 유지한다.
+  const [greeting] = useState(() => {
+    let candidates: string[];
+
+    if (totalExpired > 0) {
+      candidates = [
+        `만료된 식재료가 ${totalExpired}개 있어요, 확인해보세요`,
+        `유통기한이 지난 식재료 ${totalExpired}개를 정리해볼까요?`,
+      ];
+    } else if (totalImminent > 0) {
+      candidates = [
+        `곧 소비기한이 다가오는 식재료가 ${totalImminent}개 있어요`,
+        `식재료 ${totalImminent}개가 곧 만료돼요, 오늘 먼저 드셔보세요`,
+      ];
+    } else {
+      candidates = [
+        `냉장고가 아주 깔끔하게 관리되고 있어요`,
+        `모든 식재료가 신선하게 잘 보관되고 있어요`,
+        `완벽해요, 지금처럼만 유지해봐요`,
+      ];
+    }
+
+    candidates.push(
+      `오늘도 신선하게 관리해볼까요?`,
+      `오늘 뭐 먹을지 냉장고에서 찾아볼까요?`,
+      `냉장고 속 재료들을 한 번 둘러보세요`,
+    );
+
+    return candidates[Math.floor(Math.random() * candidates.length)];
+  });
+
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* 1. 상단 얇고 구분선 없는 브랜드 헤더바 */}
       {mode === 'home' && (
         <View style={[styles.slimHeader, { backgroundColor: theme.background }]}>
           <View style={styles.headerLeft}>
-            <Text style={styles.headerLogoText}>
-              <Text style={{ color: theme.textPrimary }}>냉장고</Text>
-              <Text style={{ color: theme.primaryText }}>집사</Text>
+            <Text style={[styles.headerGreetingName, { color: theme.textSecondary }]} numberOfLines={1}>
+              {greetingName}님,
+            </Text>
+            <Text
+              style={[styles.headerGreetingMessage, { color: theme.textPrimary }]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {greeting}
             </Text>
           </View>
           <View style={styles.headerRight}>
@@ -1116,7 +1157,7 @@ export default function RefrigeratorVisual({
           })()}
 
           {/* 유통기한 임박 식재료 (세로 스크롤 리스트) */}
-          <View style={styles.sectionContainer}>
+          <View style={[styles.sectionContainer, { marginTop: 28 }]}>
             <View style={styles.sectionHeaderRow}>
               <Text style={[styles.sectionTitle, { paddingHorizontal: 0, marginBottom: 0, color: theme.textPrimary }]}>빨리 먹어야 해요! ⏰</Text>
               {urgentIngredients.length > 0 && (
@@ -1372,11 +1413,7 @@ export default function RefrigeratorVisual({
       )}
 
       {mode === 'fridge' && (
-        <ScrollView
-          style={styles.dashboardScrollView}
-          contentContainerStyle={[styles.dashboardContent, { paddingBottom: 140 }]}
-          showsVerticalScrollIndicator={false}
-        >
+        <View style={[styles.dashboardScrollView, styles.fridgeModeContent]}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: 20, marginBottom: 20 }}>
             <Text style={[styles.pageTitle, { color: theme.textPrimary, marginBottom: 0 }]}>나의 냉장고</Text>
             <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -1401,16 +1438,17 @@ export default function RefrigeratorVisual({
             </View>
           </View>
           {/* 나의 냉장고 보관소 */}
-          <View style={[styles.sectionContainer, { marginTop: 0 }]}>
+          <View style={[styles.sectionContainer, { marginTop: 0, flex: 1 }]}>
             <View style={styles.carouselWrapper}>
               <ScrollView
                 ref={scrollViewRef}
+                style={{ flex: 1 }}
                 horizontal
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
                 onScroll={handleScroll}
                 scrollEventThrottle={16}
-                contentContainerStyle={{ alignItems: 'center' }}
+                contentContainerStyle={{ alignItems: 'stretch' }}
               >
                 {pages.map((page, index) => {
                   if (page.type === 'add') {
@@ -1464,7 +1502,7 @@ export default function RefrigeratorVisual({
               )}
             </View>
           </View>
-        </ScrollView>
+        </View>
       )}
 
       {mode === 'ingredients' && (
@@ -1804,26 +1842,29 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAFAFA',
   },
   slimHeader: {
-    height: 60,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
+    paddingVertical: 12,
     marginTop: 6,
   },
   headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    flex: 1,
+    justifyContent: 'center',
+    marginRight: 12,
   },
-  headerLogoText: {
-    fontSize: 22,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-    fontFamily: Platform.select({
-      ios: 'System',
-      android: 'sans-serif-black',
-    }),
+  headerGreetingName: {
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  headerGreetingMessage: {
+    marginTop: 2,
+    flexShrink: 1,
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.3,
   },
   headerRight: {
     justifyContent: 'center',
@@ -1845,6 +1886,10 @@ const styles = StyleSheet.create({
   dashboardContent: {
     paddingTop: 20,
     paddingBottom: 60, // 하단 탭바 높이에 맞춰 최소한의 여백만 부여
+  },
+  fridgeModeContent: {
+    paddingTop: 20,
+    paddingBottom: 16,
   },
   sectionContainer: {
     marginVertical: 14,
@@ -2027,11 +2072,10 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   carouselWrapper: {
-    height: 650,
+    flex: 1,
     width: '100%',
   },
   slideContainer: {
-    height: 640,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2057,7 +2101,7 @@ const styles = StyleSheet.create({
   },
   fridgeCard: {
     width: '90%',
-    height: 600,
+    height: '92%',
     borderRadius: 28,
     borderWidth: 1.5,
     padding: 20,
@@ -2207,7 +2251,7 @@ const styles = StyleSheet.create({
   },
   addFridgeBox: {
     width: '90%',
-    height: 600,
+    height: '92%',
     backgroundColor: '#FFFFFF',
     borderRadius: 28,
     borderWidth: 2.5,
