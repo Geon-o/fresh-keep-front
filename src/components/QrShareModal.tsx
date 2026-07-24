@@ -18,7 +18,7 @@ export default function QrShareModal({ visible, onClose, fridgeName, fridgeUuid 
     try {
       const shareUrl = `${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8086'}/share/fridge?uuid=${fridgeUuid}`;
       await Share.share({
-        message: `[FreshKeep] 냉장고 공동 관리에 초대합니다! ❄️\n냉장고 이름: ${fridgeName}\n\n아래 링크를 터치해 냉장고를 함께 관리해 보세요.\n${shareUrl}`,
+        message: `[냉장고집사] 냉장고 공동 관리에 초대합니다! ❄️\n냉장고 이름: ${fridgeName}\n\n아래 링크를 터치해 냉장고를 함께 관리해 보세요.\n${shareUrl}`,
       });
     } catch (error) {
       console.error('Error sharing text', error);

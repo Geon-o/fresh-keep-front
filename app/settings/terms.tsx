@@ -29,11 +29,11 @@ export default function TermsSettingScreen() {
 
       <ScrollView contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
         <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
-          <Text style={[styles.termsTitle, { color: titleColor }]}>FreshKeep 서비스 이용약관</Text>
+          <Text style={[styles.termsTitle, { color: titleColor }]}>냉장고집사 서비스 이용약관</Text>
           
           <Text style={[styles.sectionTitle, { color: titleColor }]}>제1조 (목적)</Text>
           <Text style={[styles.bodyText, { color: descColor }]}>
-            {"본 약관은 FreshKeep(이하 '서비스')이 제공하는 모바일 애플리케이션 및 제반 서비스의 이용 조건, 절차, 회원과 서비스 간의 권리, 의무 및 책임 사항을 규정함을 목적으로 합니다."}
+            {"본 약관은 냉장고집사(이하 '서비스')이 제공하는 모바일 애플리케이션 및 제반 서비스의 이용 조건, 절차, 회원과 서비스 간의 권리, 의무 및 책임 사항을 규정함을 목적으로 합니다."}
           </Text>
 
           <Text style={[styles.sectionTitle, { color: titleColor }]}>제2조 (용어의 정의)</Text>

@@ -1002,8 +1002,8 @@ export default function RefrigeratorVisual({
         <View style={[styles.slimHeader, { backgroundColor: theme.background }]}>
           <View style={styles.headerLeft}>
             <Text style={styles.headerLogoText}>
-              <Text style={{ color: theme.textPrimary }}>Fresh</Text>
-              <Text style={{ color: theme.primaryText }}>Keep</Text>
+              <Text style={{ color: theme.textPrimary }}>냉장고</Text>
+              <Text style={{ color: theme.primaryText }}>집사</Text>
             </Text>
           </View>
           <View style={styles.headerRight}>
