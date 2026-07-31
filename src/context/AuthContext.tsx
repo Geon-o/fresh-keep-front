@@ -190,11 +190,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // '로그아웃'이 아니라 회원탈퇴에 해당하는 파괴적 작업이다. 기기 이전이 목적이라면 restoreBackup을 사용한다.
   const deleteAccount = async () => {
     setIsLoading(true);
+    let serverDeleteSucceeded = false;
     try {
       try {
         await client.delete('/api/users/me');
+        serverDeleteSucceeded = true;
       } catch (apiErr) {
-        console.warn('Backend user delete API request failed or not implemented:', apiErr);
+        console.error('Backend user delete API request failed:', apiErr);
       }
 
       await clearAuthTokens();
@@ -206,7 +208,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       queryClient.clear();
       await loginAnonymously();
-      Alert.alert('초기화 완료', '계정이 완전히 삭제되고 안전하게 초기화되었습니다.');
+
+      if (serverDeleteSucceeded) {
+        Alert.alert('초기화 완료', '계정이 완전히 삭제되고 안전하게 초기화되었습니다.');
+      } else {
+        Alert.alert(
+          '일부만 완료됨 ⚠️',
+          '이 기기의 데이터는 초기화됐지만, 서버에서 계정 삭제 요청이 실패했습니다. 네트워크 상태를 확인한 뒤 설정에서 다시 시도해 주세요.'
+        );
+      }
     } catch (e) {
       console.error('Account delete / reset error', e);
     } finally {
