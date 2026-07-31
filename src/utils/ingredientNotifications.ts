@@ -91,13 +91,14 @@ export async function setNotificationsEnabled(enabled: boolean): Promise<void> {
 export async function rebuildAllNotifications(ingredients: Ingredient[]): Promise<void> {
   try {
     if (!(await isNotificationsEnabled())) return;
-    if (!(await requestNotificationPermission())) return;
 
+    // 이전 예약은 권한 여부와 무관하게 항상 정리한다 (취소는 권한이 필요 없음).
     const prevIdsRaw = await AsyncStorage.getItem(SCHEDULED_IDS_KEY);
     const prevIds: string[] = prevIdsRaw ? JSON.parse(prevIdsRaw) : [];
     for (const id of prevIds) {
       await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
     }
+    await AsyncStorage.setItem(SCHEDULED_IDS_KEY, JSON.stringify([]));
 
     const groups = new Map<string, DigestGroup>();
     const addToGroup = (date: string, type: DigestType, name: string) => {
@@ -116,18 +117,27 @@ export async function rebuildAllNotifications(ingredients: Ingredient[]): Promis
     }
 
     const now = Date.now();
-    const newIds: string[] = [];
+    const dueEntries: { group: DigestGroup; triggerDate: Date }[] = [];
     for (const group of groups.values()) {
       for (const hour of NOTIFY_HOURS) {
         const triggerDate = atHour(group.date, hour);
         if (triggerDate.getTime() <= now) continue;
-
-        const id = await Notifications.scheduleNotificationAsync({
-          content: buildDigestContent(group.type, group.names),
-          trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: triggerDate },
-        });
-        newIds.push(id);
+        dueEntries.push({ group, triggerDate });
       }
+    }
+
+    // 실제로 예약할 알림이 있을 때만 권한을 요청한다 — 앱 실행 즉시가 아니라
+    // "지금 임박/만료된 식재료가 있어서 알림이 필요한 시점"에만 다이얼로그가 뜨게 한다.
+    if (dueEntries.length === 0) return;
+    if (!(await requestNotificationPermission())) return;
+
+    const newIds: string[] = [];
+    for (const { group, triggerDate } of dueEntries) {
+      const id = await Notifications.scheduleNotificationAsync({
+        content: buildDigestContent(group.type, group.names),
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: triggerDate },
+      });
+      newIds.push(id);
     }
 
     await AsyncStorage.setItem(SCHEDULED_IDS_KEY, JSON.stringify(newIds));

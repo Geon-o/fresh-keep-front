@@ -11,7 +11,6 @@ import { ThemeProvider, useTheme } from "../src/context/ThemeContext";
 
 import * as KeepAwake from 'expo-keep-awake';
 import * as Notifications from 'expo-notifications';
-import { requestNotificationPermission } from '../src/utils/ingredientNotifications';
 
 // 포그라운드에서도 만료/임박 알림이 배너로 표시되도록 핸들러 등록
 Notifications.setNotificationHandler({
@@ -53,11 +52,6 @@ function AppContent() {
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(theme.background).catch(() => {});
   }, [theme.background]);
-
-  // 앱 최초 진입 시 만료/임박 알림 권한 요청 (이미 허용/거부된 상태면 다이얼로그 없이 즉시 반환)
-  useEffect(() => {
-    requestNotificationPermission();
-  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
