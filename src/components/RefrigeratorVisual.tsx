@@ -309,7 +309,7 @@ export default function RefrigeratorVisual({
     temp: null,
     humidity: null,
     city: null,
-    loading: true,
+    loading: false,
     isFallback: false,
   });
 
@@ -1002,8 +1002,24 @@ export default function RefrigeratorVisual({
     }
   };
 
+  // 위치 권한을 앱 실행과 동시에 요청하지 않고, 이미 허용된 이력이 있을 때만 조용히 조회한다.
+  // 아직 허용/거부 이력이 없으면(undetermined) 사용자가 카드를 직접 탭해야 권한 다이얼로그가 뜬다.
   useEffect(() => {
-    requestLocationAndFetchWeather();
+    const checkExistingPermission = async () => {
+      const now = Date.now();
+      if (weatherCache && (now - weatherCache.timestamp) < CACHE_DURATION) {
+        setWeatherInfo(weatherCache.weatherInfo);
+        setLocationPermission(weatherCache.locationPermission);
+        return;
+      }
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status === 'granted') {
+        requestLocationAndFetchWeather();
+      } else if (status === 'denied') {
+        setLocationPermission('denied');
+      }
+    };
+    checkExistingPermission();
   }, [theme]);
 
   // 인사말에 항상 표시할 닉네임 (미로그인 시 설정 화면과 동일하게 '익명 사용자'로 표기)
@@ -1267,6 +1283,22 @@ export default function RefrigeratorVisual({
                 </View>
                 <Text style={{ fontSize: 10, color: theme.textSecondary, lineHeight: 14, marginTop: 4 }}>
                   식중독 지수 조회를 위해 이 카드를 눌러 권한을 허용해 주세요.
+                </Text>
+              </TouchableOpacity>
+            ) : locationPermission === 'undetermined' ? (
+              <TouchableOpacity
+                style={[styles.foodSafetyColumnCard, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}
+                activeOpacity={0.8}
+                onPress={requestLocationAndFetchWeather}
+              >
+                <View style={styles.cardHeaderRow}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Ionicons name="location-outline" size={14} color={theme.primary} />
+                    <Text style={[styles.columnCardTitle, { color: theme.textPrimary }]}>식중독 지수 보기</Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 10, color: theme.textSecondary, lineHeight: 14, marginTop: 4 }}>
+                  탭하면 현재 위치 기반 식중독 지수를 확인할 수 있어요.
                 </Text>
               </TouchableOpacity>
             ) : (
