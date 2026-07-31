@@ -17,7 +17,15 @@
         "EXPO_PUBLIC_API_URL": "https://api.freshkeep.pe.kr"
       }
     },
-    "production": {}
+    "production": {
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true",
+        "EXPO_PUBLIC_API_URL": "https://api.freshkeep.pe.kr"
+      }
+    }
   },
   "submit": {
     "production": {}
