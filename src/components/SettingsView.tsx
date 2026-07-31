@@ -174,7 +174,7 @@ export default function SettingsView({
       {/* 하단 메타 정보 영역 */}
       <View style={styles.footerContainer}>
         <Text style={[styles.footerText, { color: descColor }]}>앱 버전 1.0.0 · 최신버전</Text>
-        <TouchableOpacity activeOpacity={0.6}>
+        <TouchableOpacity activeOpacity={0.6} onPress={() => router.push('/settings/licenses')}>
           <Text style={[styles.footerLink, { color: descColor }]}>오픈소스 라이선스 보기</Text>
         </TouchableOpacity>
       </View>
