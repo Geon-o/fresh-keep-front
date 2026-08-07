@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, Modal, TouchableOpacity, Text, Alert, Platform, TextInput, KeyboardAvoidingView, ActivityIndicator, Animated, Easing, BackHandler } from 'react-native';
+import { StyleSheet, View, Modal, TouchableOpacity, Text, Alert, Platform, TextInput, KeyboardAvoidingView, ActivityIndicator, Animated, BackHandler, Image } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Linking from 'expo-linking';
@@ -243,82 +243,6 @@ export default function Index() {
 
   // 스플래시 오버레이를 띄울지 여부 (인증/로딩 중이거나 최소 시간이 지나지 않았을 때)
   const showSplashOverlay = isAuthLoading || isRefrigeratorsLoading || !isMinTimeElapsed;
-
-  // 스플래시 오버레이 애니메이션 효과 기획 (부유, 회전, 호흡 맥박)
-  const rotateAnim = React.useRef(new Animated.Value(0)).current;
-  const pulseAnim = React.useRef(new Animated.Value(1)).current;
-  const floatAnim = React.useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (showSplashOverlay) {
-      // 1. 회전 애니메이션 (부드럽고 느리게 - 12초 주기)
-      const rotateAnimation = Animated.loop(
-        Animated.timing(rotateAnim, {
-          toValue: 1,
-          duration: 12000,
-          easing: Easing.linear,
-          useNativeDriver: true,
-        })
-      );
-
-      // 2. 맥박(호흡) 애니메이션 (2초 수축, 2초 팽창)
-      const pulseAnimation = Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.12,
-            duration: 2000,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1.0,
-            duration: 2000,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-        ])
-      );
-
-      // 3. 부유(위아래 흔들림) 애니메이션 (자연스러운 둥둥 떠있는 느낌)
-      const floatAnimation = Animated.loop(
-        Animated.sequence([
-          Animated.timing(floatAnim, {
-            toValue: -8, // 위로 8px
-            duration: 2500,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(floatAnim, {
-            toValue: 8, // 아래로 8px
-            duration: 2500,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(floatAnim, {
-            toValue: 0,
-            duration: 2500,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-        ])
-      );
-
-      rotateAnimation.start();
-      pulseAnimation.start();
-      floatAnimation.start();
-
-      return () => {
-        rotateAnimation.stop();
-        pulseAnimation.stop();
-        floatAnimation.stop();
-      };
-    }
-  }, [showSplashOverlay]);
-
-  const spin = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
 
   // 탭바 스프링 애니메이션 (햅틱 반응형 피드백)
   const homeTabScale = React.useRef(new Animated.Value(1.05)).current;
@@ -960,17 +884,11 @@ export default function Index() {
       {showSplashOverlay && (
         <View style={[styles.splashOverlayContainer, { backgroundColor: splashTheme.background }]}>
           <View style={styles.splashLogoContainer}>
-            <Animated.View 
-              style={{ 
-                transform: [
-                  { translateY: floatAnim }, 
-                  { rotate: spin }, 
-                  { scale: pulseAnim }
-                ] 
-              }}
-            >
-              <Ionicons name="snow-outline" size={96} color={splashTheme.icon} />
-            </Animated.View>
+            <Image
+              source={require('../assets/images/mustache_static.png')}
+              style={{ width: 140, height: 140 }}
+              resizeMode="contain"
+            />
             <Text style={[styles.splashAppDesc, { color: splashTheme.subText, marginTop: 28, fontSize: 15 }]}>
               신선함을 오래오래, 스마트 냉장고 관리
             </Text>
