@@ -18,6 +18,7 @@ interface CompartmentDetailProps {
   compartmentLabel: string;
   onBack: () => void;
   fridgeId: string;
+  autoOpenAddOnMount?: boolean;
   onNavigateCompartment?: (newId: string, newLabel: string) => void;
   onMoveIngredient?: (
     ingredientId: string,
@@ -354,6 +355,7 @@ export default function CompartmentDetail({
   compartmentLabel, 
   onBack, 
   fridgeId,
+  autoOpenAddOnMount,
   onNavigateCompartment,
   onMoveIngredient
 }: CompartmentDetailProps) {
@@ -1015,6 +1017,16 @@ export default function CompartmentDetail({
 
     setModalVisible(true);
   };
+
+  // 식재료 목록 탭의 + 버튼으로 진입한 경우, 선반 정보 로드가 끝나는 즉시 등록 폼을 바로 띄운다
+  const autoOpenAddTriggeredRef = useRef(false);
+  useEffect(() => {
+    if (!autoOpenAddOnMount || autoOpenAddTriggeredRef.current || isLoading) return;
+    const firstShelfId = insideShelves[0]?.id || doorShelves[0]?.id;
+    if (!firstShelfId) return;
+    autoOpenAddTriggeredRef.current = true;
+    handleOpenAddModal(firstShelfId);
+  }, [autoOpenAddOnMount, isLoading, insideShelves, doorShelves]);
 
   // 수정 모달 열기
   const handleOpenEditModal = (item: Ingredient) => {

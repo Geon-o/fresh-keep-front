@@ -228,7 +228,7 @@ const SEASONAL_INGREDIENTS: SeasonalIngredient[] = [
 interface RefrigeratorVisualProps {
   mode?: 'home' | 'ingredients' | 'fridge';
   refrigerators: { id: string; type: FridgeType; name: string; uuid?: string }[];
-  onPressCompartment: (id: string, label: string, fridgeId: string) => void;
+  onPressCompartment: (id: string, label: string, fridgeId: string, autoOpenAdd?: boolean) => void;
   activeIndex: number;
   setActiveIndex: (index: number) => void;
   onOpenAddSelector: () => void;
@@ -260,6 +260,10 @@ export default function RefrigeratorVisual({
   const [ingredientsLoaded, setIngredientsLoaded] = useState(false);
   const { theme, isDark } = useTheme();
   const [fridgeSettingsVisible, setFridgeSettingsVisible] = useState(false);
+
+  // 식재료 목록 탭 + 버튼으로 여는 등록 위치(냉장고/보관실) 선택 모달
+  const [addLocationPickerVisible, setAddLocationPickerVisible] = useState(false);
+  const [addPickerFridgeId, setAddPickerFridgeId] = useState<string | null>(null);
 
   const [fridgeCardWidth, setFridgeCardWidth] = useState(0);
   const [currentFridgeSwipeIndex, setCurrentFridgeSwipeIndex] = useState(0);
@@ -416,6 +420,39 @@ export default function RefrigeratorVisual({
       case 'freezer': return '냉동실';
       default: return '보관실';
     }
+  };
+
+  // 냉장고 타입별 보관실 목록 (도어 일러스트를 직접 탐색하지 않고 바로 선택할 수 있도록)
+  const getCompartmentsForType = (type: FridgeType): { id: string; label: string }[] => {
+    if (type === 'four-door') {
+      return [
+        { id: 'fridge_left', label: '냉장실 (좌)' },
+        { id: 'fridge_right', label: '냉장실 (우)' },
+        { id: 'freezer_left', label: '냉동실 (좌)' },
+        { id: 'freezer_right', label: '냉동실 (우)' },
+      ];
+    }
+    return [
+      { id: 'fridge', label: '냉장실' },
+      { id: 'freezer', label: '냉동실' },
+    ];
+  };
+
+  // 식재료 목록 탭의 + 버튼: 등록할 냉장고/보관실을 바로 고를 수 있는 모달을 연다
+  const handleOpenAddLocationPicker = () => {
+    if (refrigerators.length === 0) {
+      onOpenAddSelector();
+      return;
+    }
+    setAddPickerFridgeId(refrigerators.length === 1 ? refrigerators[0].id : null);
+    setAddLocationPickerVisible(true);
+  };
+
+  // 보관실 선택 완료: 해당 보관실로 진입하면서 식재료 등록 폼을 바로 띄운다
+  const handlePickAddCompartment = (compartmentId: string, label: string, fridgeId: string) => {
+    setAddLocationPickerVisible(false);
+    setAddPickerFridgeId(null);
+    onPressCompartment(compartmentId, label, fridgeId, true);
   };
 
   // 특정 냉장고의 칸 요약 뱃지 계산
@@ -1714,8 +1751,82 @@ export default function RefrigeratorVisual({
                   </Text>
                 </View>
               )}
+
+          {/* 식재료 바로 등록 플로팅 버튼 */}
+          <TouchableOpacity
+            style={[styles.addIngredientFab, { backgroundColor: theme.primary, shadowColor: theme.primary }]}
+            activeOpacity={0.85}
+            onPress={handleOpenAddLocationPicker}
+          >
+            <Ionicons name="add" size={28} color={theme.primaryOnPrimary} />
+          </TouchableOpacity>
         </View>
       )}
+
+      {/* 식재료 등록 위치(냉장고/보관실) 선택 모달 */}
+      <Modal
+        visible={addLocationPickerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { setAddLocationPickerVisible(false); setAddPickerFridgeId(null); }}
+      >
+        <View style={[styles.modalOverlay, { backgroundColor: theme.modalOverlay }]}>
+          <View style={[styles.settingsModalContent, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="add-circle-outline" size={20} color={theme.textPrimary} />
+                <Text style={[styles.modalTitleText, { color: theme.textPrimary }]}>
+                  {addPickerFridgeId ? '어디에 등록할까요?' : '어느 냉장고인가요?'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => { setAddLocationPickerVisible(false); setAddPickerFridgeId(null); }}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={24} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.settingsModalBody}>
+              {!addPickerFridgeId ? (
+                refrigerators.map(fridge => (
+                  <TouchableOpacity
+                    key={fridge.id}
+                    style={[styles.settingsActionRow, { borderBottomWidth: 1, borderBottomColor: theme.borderLight }]}
+                    activeOpacity={0.7}
+                    onPress={() => setAddPickerFridgeId(fridge.id)}
+                  >
+                    <View style={styles.settingsActionLeft}>
+                      <View style={[styles.settingsIconBadge, { backgroundColor: theme.primaryLight }]}>
+                        <Ionicons name="cube-outline" size={18} color={theme.primary} />
+                      </View>
+                      <Text style={[styles.settingsActionText, { color: theme.textSecondary }]}>{fridge.name}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+                  </TouchableOpacity>
+                ))
+              ) : (
+                getCompartmentsForType(refrigerators.find(f => f.id === addPickerFridgeId)!.type).map(comp => (
+                  <TouchableOpacity
+                    key={comp.id}
+                    style={[styles.settingsActionRow, { borderBottomWidth: 1, borderBottomColor: theme.borderLight }]}
+                    activeOpacity={0.7}
+                    onPress={() => handlePickAddCompartment(comp.id, comp.label, addPickerFridgeId)}
+                  >
+                    <View style={styles.settingsActionLeft}>
+                      <View style={[styles.settingsIconBadge, { backgroundColor: theme.primaryLight }]}>
+                        <Ionicons name="albums-outline" size={18} color={theme.primary} />
+                      </View>
+                      <Text style={[styles.settingsActionText, { color: theme.textSecondary }]}>{comp.label}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+                  </TouchableOpacity>
+                ))
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* 냉장고 관리 설정 모달 */}
       <Modal
@@ -2535,6 +2646,20 @@ const styles = StyleSheet.create({
   emptyStateText: {
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  addIngredientFab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   seasonalCard: {
     width: 140,
