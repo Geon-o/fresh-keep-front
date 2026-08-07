@@ -9,7 +9,6 @@ import { useTheme } from '../src/context/ThemeContext';
 export default function LoginScreen() {
   const router = useRouter();
   const { isLoading } = useAuth();
-  const loginAsDeveloper = async () => false;
   const { theme, isDark } = useTheme();
 
   // Floating bubble animations
@@ -57,18 +56,6 @@ export default function LoginScreen() {
     };
   }, []);
 
-
-
-  const handleDeveloperLogin = async () => {
-    const success = await loginAsDeveloper();
-    if (success) {
-      if (router.canGoBack()) {
-        router.back();
-      } else {
-        router.replace('/');
-      }
-    }
-  };
 
 
   return (
@@ -162,18 +149,6 @@ export default function LoginScreen() {
             }}
           >
             <Text style={[styles.backButtonText, { color: theme.primaryText }]}>로그인하지 않고 돌아가기 〉</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.footerContainer}>
-          {/* 개발자용 테스트 로그인 버튼 */}
-          <TouchableOpacity
-            style={[styles.devLoginButton, { backgroundColor: theme.surfaceTertiary, borderColor: theme.borderLight }]}
-            activeOpacity={0.7}
-            onPress={handleDeveloperLogin}
-            disabled={isLoading}
-          >
-            <Text style={[styles.devLoginButtonText, { color: theme.textSecondary }]}>🔧 테스트 계정으로 로그인 (개발자용)</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -325,23 +300,5 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     textAlign: 'center',
     marginBottom: 20,
-  },
-
-  footerContainer: {
-    alignItems: 'center',
-    gap: 16,
-  },
-  devLoginButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    backgroundColor: '#F1F5F9', // 연한 회색 배경
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  devLoginButtonText: {
-    fontSize: 12,
-    color: '#475569',
-    fontWeight: '600',
   },
 });
