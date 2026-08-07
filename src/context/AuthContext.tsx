@@ -17,6 +17,7 @@ interface AuthContextType {
   isLoggedIn: boolean;
   user: UserProfile | null;
   isLoading: boolean;
+  authFailed: boolean;
   loginAnonymously: () => Promise<boolean>;
   getBackupKey: () => Promise<string | null>;
   restoreBackup: (backupKey: string) => Promise<boolean>;
@@ -39,6 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [authFailed, setAuthFailed] = useState(false);
   const isAuthenticatingRef = useRef(false);
 
   // 1. 앱 구동 시 기기 UUID 확인 후 익명 로그인 처리
@@ -50,15 +52,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // 기존 토큰이 있으면 유저 정보 조회 시도
           const success = await fetchUserProfile();
           if (success) {
+            setAuthFailed(false);
             setIsLoading(false);
             return;
           }
         }
-        
+
         // 토큰이 없거나 유효하지 않으면 익명 로그인 시도
         await loginAnonymously();
       } catch (e) {
         console.error('Failed to initialize auth state', e);
+        setAuthFailed(true);
       } finally {
         setIsLoading(false);
       }
@@ -118,11 +122,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await AsyncStorage.setItem('@backup_key', backupKey);
         }
         await fetchUserProfile();
+        setAuthFailed(false);
         return true;
       }
+      setAuthFailed(true);
       return false;
     } catch (e) {
       console.error('Anonymous login failed', e);
+      setAuthFailed(true);
       return false;
     } finally {
       isAuthenticatingRef.current = false;
@@ -239,6 +246,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoggedIn,
         user,
         isLoading,
+        authFailed,
         loginAnonymously,
         getBackupKey,
         restoreBackup,

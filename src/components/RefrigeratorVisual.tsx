@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef } from 'react';
 import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions, TextInput, Platform, ActivityIndicator, Linking, Alert, Modal } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 
 import * as Location from 'expo-location';
 import * as WebBrowser from 'expo-web-browser';
@@ -257,7 +256,6 @@ export default function RefrigeratorVisual({
 }: RefrigeratorVisualProps) {
   const { width: screenWidth } = useWindowDimensions();
   const { isLoggedIn, user } = useAuth();
-  const router = useRouter();
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [ingredientsLoaded, setIngredientsLoaded] = useState(false);
   const { theme, isDark } = useTheme();
@@ -1561,9 +1559,7 @@ export default function RefrigeratorVisual({
         <View style={{ flex: 1 }}>
           <Text style={[styles.pageTitle, { color: theme.textPrimary, paddingTop: 16 }]}>식재료 목록</Text>
 
-          {isLoggedIn ? (
-            <>
-              {/* 검색 바 */}
+          {/* 검색 바 */}
               <View style={[styles.searchContainer, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderLight }]}>
                 <Ionicons name="search" size={18} color={theme.textTertiary} />
                 <TextInput
@@ -1718,51 +1714,6 @@ export default function RefrigeratorVisual({
                   </Text>
                 </View>
               )}
-            </>
-          ) : (
-            <ScrollView
-              style={{ flex: 1, marginTop: 4 }}
-              contentContainerStyle={{ paddingBottom: 100, gap: 16 }}
-              showsVerticalScrollIndicator={false}
-            >
-              <View style={[styles.loginPromptCard, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
-                <View style={styles.loginPromptHeader}>
-                  <Text style={{ fontSize: 32, marginBottom: 12 }}>🔒</Text>
-                  <Text style={[styles.loginPromptTitle, { color: theme.textPrimary }]}>로그인 후 이용 가능</Text>
-                  <Text style={[styles.loginPromptSubtitle, { color: theme.textSecondary }]}>나의 식재료를 스마트하게 관리해 보세요</Text>
-                </View>
-
-                <View style={[styles.loginBenefitContainer, { backgroundColor: theme.surfaceSecondary }]}>
-                  <View style={styles.loginBenefitItem}>
-                    <Ionicons name="notifications-outline" size={16} color={theme.primary} />
-                    <Text style={[styles.loginBenefitText, { color: theme.textPrimary }]}>유통기한 자동 알림</Text>
-                  </View>
-                  <View style={styles.loginBenefitItem}>
-                    <Ionicons name="apps-outline" size={16} color={theme.primary} />
-                    <Text style={[styles.loginBenefitText, { color: theme.textPrimary }]}>냉장고 칸별 식재료 관리</Text>
-                  </View>
-                  <View style={styles.loginBenefitItem}>
-                    <Ionicons name="sync-outline" size={16} color={theme.primary} />
-                    <Text style={[styles.loginBenefitText, { color: theme.textPrimary }]}>여러 기기에서 동시 사용</Text>
-                  </View>
-                </View>
-
-                <View style={styles.loginPromptFooter}>
-                  <Text style={[styles.loginPromptFooterText, { color: theme.textTertiary }]}>⚡ 안전한 로컬 저장 및 익명 세션 연동</Text>
-                </View>
-
-                <View style={styles.socialLoginButtonsContainer}>
-                  <TouchableOpacity
-                    style={[styles.socialButton, styles.backupManageButton, { backgroundColor: theme.primary }]}
-                    activeOpacity={0.8}
-                    onPress={() => router.push('/login')}
-                  >
-                    <Text style={styles.backupManageButtonText}>백업 및 데이터 복구 관리</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </ScrollView>
-          )}
         </View>
       )}
 
@@ -2911,76 +2862,6 @@ const styles = StyleSheet.create({
   donutCenterText: {
     fontSize: 12,
     fontWeight: '800',
-  },
-  loginPromptCard: {
-    borderRadius: 24,
-    borderWidth: 1,
-    padding: 24,
-    alignItems: 'stretch',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 3,
-    marginHorizontal: 20,
-    marginTop: 8,
-  },
-  loginPromptHeader: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  loginPromptTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 6,
-  },
-  loginPromptSubtitle: {
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  loginBenefitContainer: {
-    borderRadius: 16,
-    padding: 16,
-    gap: 12,
-    marginBottom: 24,
-  },
-  loginBenefitItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  loginBenefitText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  loginPromptFooter: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  loginPromptFooterText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  socialLoginButtonsContainer: {
-    gap: 10,
-  },
-  socialButton: {
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  backupManageButton: {
-    shadowColor: '#000',
-  },
-  backupManageButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: 'bold',
   },
   settingsModalContent: {
     width: '90%',

@@ -20,7 +20,7 @@ import { updateIngredient } from '../src/api/ingredientService';
 import { useTheme } from '../src/context/ThemeContext';
 
 export default function Index() {
-  const { isLoggedIn, user } = useAuth();
+  const { isLoggedIn, user, isLoading: isAuthLoading, authFailed, loginAnonymously } = useAuth();
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
@@ -241,8 +241,8 @@ export default function Index() {
     hideNativeSplash();
   }, []);
 
-  // 스플래시 오버레이를 띄울지 여부 (로딩 중이거나 최소 시간이 지나지 않았을 때)
-  const showSplashOverlay = isRefrigeratorsLoading || !isMinTimeElapsed;
+  // 스플래시 오버레이를 띄울지 여부 (인증/로딩 중이거나 최소 시간이 지나지 않았을 때)
+  const showSplashOverlay = isAuthLoading || isRefrigeratorsLoading || !isMinTimeElapsed;
 
   // 스플래시 오버레이 애니메이션 효과 기획 (부유, 회전, 호흡 맥박)
   const rotateAnim = React.useRef(new Animated.Value(0)).current;
@@ -667,7 +667,20 @@ export default function Index() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top', 'left', 'right']}>
-      {activeCompartment !== null ? (
+      {!showSplashOverlay && authFailed ? (
+        <View style={styles.networkErrorContainer}>
+          <Ionicons name="cloud-offline-outline" size={64} color={theme.textMuted} />
+          <Text style={[styles.networkErrorTitle, { color: theme.textPrimary }]}>네트워크 연결이 원활하지 않습니다</Text>
+          <Text style={[styles.networkErrorDesc, { color: theme.textSecondary }]}>인터넷 연결 상태를 확인한 후 다시 시도해 주세요.</Text>
+          <TouchableOpacity
+            style={[styles.networkErrorRetryButton, { backgroundColor: theme.primary }]}
+            activeOpacity={0.8}
+            onPress={() => loginAnonymously()}
+          >
+            <Text style={styles.networkErrorRetryButtonText}>다시 시도</Text>
+          </TouchableOpacity>
+        </View>
+      ) : activeCompartment !== null ? (
         <SafeAreaView style={{ flex: 1 }} edges={['bottom']}>
           <CompartmentDetail
             compartmentId={activeCompartment.id}
@@ -1034,6 +1047,35 @@ const styles = StyleSheet.create({
   },
   mainWrapper: {
     flex: 1,
+  },
+  networkErrorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  networkErrorTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginTop: 20,
+    textAlign: 'center',
+  },
+  networkErrorDesc: {
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  networkErrorRetryButton: {
+    marginTop: 28,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderRadius: 14,
+  },
+  networkErrorRetryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
   },
   contentWrapper: {
     flex: 1,
