@@ -63,11 +63,11 @@ export default function NicknameSettingScreen() {
       return;
     }
     
-    // 3. 특수문자, 공백, 이모지 방지 및 한글/영문/숫자 2~20자 길이 검증
-    const nicknameRegex = /^[a-zA-Z0-9가-힣]{2,20}$/;
+    // 3. 특수문자, 공백, 이모지 방지 및 한글/영문/숫자 2~8자 길이 검증
+    const nicknameRegex = /^[a-zA-Z0-9가-힣]{2,8}$/;
     if (!nicknameRegex.test(trimmed)) {
       setIsInvalid(true);
-      setErrorMessage('한글, 영문, 숫자 조합의 2~20자 닉네임을 입력해 주세요.');
+      setErrorMessage('한글, 영문, 숫자 조합의 2~8자 닉네임을 입력해 주세요.');
       return;
     }
 
@@ -91,7 +91,7 @@ export default function NicknameSettingScreen() {
         setErrorMessage('이미 사용 중인 닉네임입니다.');
       } else if (e.response?.status === 400 || e.response?.data?.message === 'INVALID_NICKNAME') {
         setIsInvalid(true);
-        setErrorMessage('한글, 영문, 숫자 조합의 2~20자 닉네임을 입력해 주세요.');
+        setErrorMessage('한글, 영문, 숫자 조합의 2~8자 닉네임을 입력해 주세요.');
       } else {
         console.error(e);
         Alert.alert('알림 ⚠️', '닉네임 변경에 실패했습니다. 다시 시도해 주세요.');
@@ -139,7 +139,7 @@ export default function NicknameSettingScreen() {
               onChangeText={handleChangeText}
               placeholder="닉네임을 입력하세요"
               placeholderTextColor={descColor}
-              maxLength={20}
+              maxLength={8}
               autoFocus
               selectTextOnFocus
             />
@@ -157,7 +157,7 @@ export default function NicknameSettingScreen() {
             <Text style={styles.errorText}>{errorMessage}</Text>
           ) : (
             <Text style={[styles.helperText, { color: descColor }]}>
-              특수문자, 공백, 이모지는 입력 불가하며 2~20자까지 가능합니다.
+              특수문자, 공백, 이모지는 입력 불가하며 2~8자까지 가능합니다.
             </Text>
           )}
         </View>
