@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, Modal, TouchableOpacity, Text, Alert, Platform, TextInput, KeyboardAvoidingView, ActivityIndicator, Animated, BackHandler, Image, DeviceEventEmitter } from 'react-native';
+import { StyleSheet, View, Modal, TouchableOpacity, Text, Alert, Platform, ActivityIndicator, Animated, BackHandler, Image, DeviceEventEmitter } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Linking from 'expo-linking';
@@ -54,10 +54,6 @@ export default function Index() {
   // 2. 냉장고 형태/추가 선택 모달 상태
   const [selectorVisible, setSelectorVisible] = useState(false);
   const [selectorMode, setSelectorMode] = useState<'add' | 'edit'>('add');
-
-  // 2.5. 냉장고 이름 변경 모달 상태
-  const [renameModalVisible, setRenameModalVisible] = useState(false);
-  const [renameValue, setRenameValue] = useState('');
 
   // 3. 로컬 모드 냉장고 목록 상태
   const [localRefrigerators, setLocalRefrigerators] = useState<{ id: string; type: FridgeType; name: string }[]>([]);
@@ -357,8 +353,6 @@ export default function Index() {
   // 현재 노출 중인 활성 냉장고
   const activeFridge = pages[activeIndex]?.type === 'fridge' ? pages[activeIndex].data : null;
 
-  const isSaveDisabled = renameValue.trim() === '' || renameValue === (activeFridge?.name || '');
-
   // 새 냉장고 추가 (최대 3개 제한)
   const handleAddFridge = async (type: FridgeType) => {
     if (refrigerators.length >= 3) return;
@@ -456,7 +450,6 @@ export default function Index() {
         console.error('Failed to rename local refrigerator', e);
       }
     }
-    setRenameModalVisible(false);
   };
 
   // 냉장고 삭제 및 해당 냉장고의 식재료 제거
@@ -589,13 +582,6 @@ export default function Index() {
     if (!activeFridge) return;
     setSelectorMode('edit');
     setSelectorVisible(true);
-  };
-
-  // 냉장고 이름 변경 모달 활성화
-  const handleOpenRenameModal = () => {
-    if (!activeFridge) return;
-    setRenameValue(activeFridge.name);
-    setRenameModalVisible(true);
   };
 
   const handlePressCompartment = async (id: string, label: string, fridgeId: string, autoOpenAdd?: boolean) => {
@@ -736,7 +722,7 @@ export default function Index() {
                   }
                 }}
                 onOpenAddSelector={handleOpenAddSelector}
-                onOpenRenameModal={handleOpenRenameModal}
+                onRenameFridge={handleRenameFridge}
                 onEditFridgeType={handleOpenEditSelector}
                 onDeleteFridge={handleDeleteConfirm}
                 onApproveDeletionRequest={handleApproveDeletionRequest}
@@ -902,76 +888,6 @@ export default function Index() {
             />
           </View>
         </View>
-      </Modal>
-
-      {/* 냉장고 이름 변경 모달 다이얼로그 */}
-      <Modal
-        visible={renameModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setRenameModalVisible(false)}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={[styles.renameModalOverlay, { backgroundColor: theme.modalOverlay }]}
-        >
-          <TouchableOpacity
-            style={styles.backdrop}
-            activeOpacity={1}
-            onPress={() => setRenameModalVisible(false)}
-          />
-          <View style={[styles.renameModalContent, { backgroundColor: theme.surface, shadowColor: theme.shadow }]}>
-            <Text style={[styles.renameModalTitle, { color: theme.textPrimary }]}>냉장고 이름 변경 ✏️</Text>
-            <Text style={[styles.renameModalDesc, { color: theme.textTertiary }]}>지정하고 싶으신 냉장고 이름을 입력해 주세요.</Text>
-
-            <View style={[styles.renameInputContainer, { borderColor: theme.border, backgroundColor: theme.surfaceSecondary }]}>
-              <TextInput
-                style={[styles.renameInput, { color: theme.textPrimary }]}
-                value={renameValue}
-                onChangeText={setRenameValue}
-                placeholder="예: 우리집 메인 냉장고"
-                placeholderTextColor={theme.textMuted}
-                maxLength={20}
-                autoFocus
-              />
-              {renameValue.length > 0 && (
-                <TouchableOpacity
-                  style={styles.renameClearButton}
-                  activeOpacity={0.7}
-                  onPress={() => setRenameValue('')}
-                >
-                  <Ionicons name="close-circle" size={18} color={theme.textMuted} />
-                </TouchableOpacity>
-              )}
-            </View>
-
-            <View style={styles.renameButtonRow}>
-              <TouchableOpacity
-                style={[styles.renameCancelButton, { backgroundColor: theme.surfaceTertiary }]}
-                activeOpacity={0.8}
-                onPress={() => setRenameModalVisible(false)}
-              >
-                <Text style={[styles.renameCancelButtonText, { color: theme.textSecondary }]}>취소</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.renameSaveButton, 
-                  { backgroundColor: theme.primary },
-                  isSaveDisabled && { backgroundColor: theme.primaryBorder }
-                ]}
-                activeOpacity={0.8}
-                disabled={isSaveDisabled}
-                onPress={() => activeFridge && handleRenameFridge(activeFridge.id, renameValue)}
-              >
-                <Text style={[
-                  styles.renameSaveButtonText, 
-                  { color: theme.primaryOnPrimary },
-                  isSaveDisabled && { color: theme.textMuted }
-                ]}>저장</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
       </Modal>
 
       {/* 냉장고 QR 공유 모달 */}
@@ -1180,99 +1096,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: '#757575',
     fontWeight: 'bold',
-  },
-  // 이름 변경 모달 스타일
-  renameModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  renameModalContent: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    width: '90%',
-    maxWidth: 360,
-    padding: 24,
-    alignItems: 'stretch',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 24,
-    elevation: 8,
-  },
-  renameModalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#0F172A',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  renameModalDesc: {
-    fontSize: 13,
-    color: '#64748B',
-    textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 18,
-  },
-  renameInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    backgroundColor: '#F8FAFC',
-    marginBottom: 20,
-    paddingRight: 12,
-  },
-  renameInput: {
-    flex: 1,
-    height: 48,
-    paddingHorizontal: 16,
-    fontSize: 15,
-    color: '#0F172A',
-  },
-  renameClearButton: {
-    padding: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  renameButtonRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  renameCancelButton: {
-    flex: 1,
-    backgroundColor: '#F1F5F9',
-    height: 48,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  renameCancelButtonText: {
-    color: '#475569',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  renameSaveButton: {
-    flex: 1,
-    backgroundColor: '#4F46E5',
-    height: 48,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  renameSaveButtonDisabled: {
-    backgroundColor: '#C7D2FE',
-  },
-  renameSaveButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  renameSaveButtonTextDisabled: {
-    color: '#E0E7FF',
   },
   toastContainer: {
     position: 'absolute',

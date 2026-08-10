@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions, TextInput, Platform, ActivityIndicator, Linking, Alert, Modal } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions, TextInput, Platform, ActivityIndicator, Linking, Alert, Modal, Animated, PanResponder } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -232,7 +232,7 @@ interface RefrigeratorVisualProps {
   activeIndex: number;
   setActiveIndex: (index: number) => void;
   onOpenAddSelector: () => void;
-  onOpenRenameModal: () => void;
+  onRenameFridge: (fridgeId: string, newName: string) => void;
   onEditFridgeType: () => void;
   onDeleteFridge: () => void;
   onApproveDeletionRequest?: () => void;
@@ -250,7 +250,7 @@ export default function RefrigeratorVisual({
   activeIndex,
   setActiveIndex,
   onOpenAddSelector,
-  onOpenRenameModal,
+  onRenameFridge,
   onEditFridgeType,
   onDeleteFridge,
   onApproveDeletionRequest,
@@ -260,18 +260,111 @@ export default function RefrigeratorVisual({
   onScanQr,
   onChangeTab
 }: RefrigeratorVisualProps) {
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const { isLoggedIn, user } = useAuth();
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [ingredientsLoaded, setIngredientsLoaded] = useState(false);
   const { theme, isDark } = useTheme();
+
+  // 냉장고 설정 바텀시트: 슬라이드가 다 올라온 뒤에 배경이 어두워지고,
+  // 닫힐 땐 배경이 먼저 사라진 뒤 슬라이드가 내려가도록 두 애니메이션을 순서대로 재생한다.
+  // 여닫힘(translateY)과 크기 조절(height)은 서로 다른 애니메이션 값으로 분리한다 —
+  // 바텀 고정 시트에서 translateY로 "위쪽만 가리기"는 불가능하고(아래쪽이 가려짐), height를 직접 늘려야
+  // 손잡이를 위로 끌수록 시트 자체가 위로 커지는 자연스러운 동작이 된다.
+  const SHEET_MIN_HEIGHT = screenHeight * 0.5;
+  const SHEET_MAX_HEIGHT = screenHeight * 0.7;
+
   const [fridgeSettingsVisible, setFridgeSettingsVisible] = useState(false);
+  const [sheetRendered, setSheetRendered] = useState(false);
+  const sheetTranslateY = useRef(new Animated.Value(screenHeight)).current;
+  const sheetHeight = useRef(new Animated.Value(SHEET_MIN_HEIGHT)).current;
+  const sheetBackdropOpacity = useRef(new Animated.Value(0)).current;
+  const sheetDragStartHeight = useRef(SHEET_MIN_HEIGHT);
+
+  const sheetPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dy) > 4,
+      onPanResponderGrant: () => {
+        sheetHeight.stopAnimation((value) => {
+          sheetDragStartHeight.current = value;
+        });
+      },
+      onPanResponderMove: (_, gestureState) => {
+        // 위로 끌면(dy 음수) 커지도록 부호를 뒤집는다.
+        const next = sheetDragStartHeight.current - gestureState.dy;
+        const clamped = Math.max(SHEET_MIN_HEIGHT, Math.min(SHEET_MAX_HEIGHT, next));
+        sheetHeight.setValue(clamped);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        const next = sheetDragStartHeight.current - gestureState.dy;
+        const clamped = Math.max(SHEET_MIN_HEIGHT, Math.min(SHEET_MAX_HEIGHT, next));
+        const midpoint = (SHEET_MIN_HEIGHT + SHEET_MAX_HEIGHT) / 2;
+        const target = clamped > midpoint ? SHEET_MAX_HEIGHT : SHEET_MIN_HEIGHT;
+        Animated.timing(sheetHeight, { toValue: target, duration: 200, useNativeDriver: false }).start();
+      },
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ).current;
+
+  useEffect(() => {
+    if (fridgeSettingsVisible) {
+      setSheetRendered(true);
+      sheetTranslateY.setValue(screenHeight);
+      sheetHeight.setValue(SHEET_MIN_HEIGHT);
+      sheetBackdropOpacity.setValue(0);
+      Animated.timing(sheetTranslateY, {
+        toValue: 0,
+        duration: 260,
+        useNativeDriver: true,
+      }).start(() => {
+        Animated.timing(sheetBackdropOpacity, {
+          toValue: 1,
+          duration: 150,
+          useNativeDriver: true,
+        }).start();
+      });
+    } else if (sheetRendered) {
+      Animated.timing(sheetBackdropOpacity, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }).start(() => {
+        Animated.timing(sheetTranslateY, {
+          toValue: screenHeight,
+          duration: 260,
+          useNativeDriver: true,
+        }).start(() => {
+          setSheetRendered(false);
+        });
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fridgeSettingsVisible]);
 
   // 식재료 목록 탭 + 버튼으로 여는 등록 위치(냉장고/보관실) 선택 모달
   const [addLocationPickerVisible, setAddLocationPickerVisible] = useState(false);
   const [addPickerFridgeId, setAddPickerFridgeId] = useState<string | null>(null);
 
   const [fridgeCardWidth, setFridgeCardWidth] = useState(0);
+
+  // 냉장고 이름 인라인 편집 상태 (설정 창 대신 카드에서 바로 수정)
+  const [editingNameFridgeId, setEditingNameFridgeId] = useState<string | null>(null);
+  const [nameDraft, setNameDraft] = useState('');
+
+  const startEditingName = (fridgeId: string, currentName: string) => {
+    setEditingNameFridgeId(fridgeId);
+    setNameDraft(currentName);
+  };
+
+  const confirmEditingName = (fridgeId: string) => {
+    onRenameFridge(fridgeId, nameDraft);
+    setEditingNameFridgeId(null);
+  };
+
+  const cancelEditingName = () => {
+    setEditingNameFridgeId(null);
+  };
   const [currentFridgeSwipeIndex, setCurrentFridgeSwipeIndex] = useState(0);
 
   const onFridgeCardLayout = (event: any) => {
@@ -1507,29 +1600,17 @@ export default function RefrigeratorVisual({
 
       {mode === 'fridge' && (
         <View style={[styles.dashboardScrollView, styles.fridgeModeContent]}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: 20, marginBottom: 20 }}>
-            <Text style={[styles.pageTitle, { color: theme.textPrimary, marginBottom: 0 }]}>나의 냉장고</Text>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              {onScanQr && !activeFridge && (
-                <TouchableOpacity
-                  style={[styles.fridgeSettingButton, { backgroundColor: theme.surfaceTertiary, padding: 8, borderRadius: 10 }]}
-                  activeOpacity={0.7}
-                  onPress={onScanQr}
-                >
-                  <Ionicons name="scan-outline" size={20} color={theme.textPrimary} />
-                </TouchableOpacity>
-              )}
-              {activeFridge && (
-                <TouchableOpacity
-                  style={[styles.fridgeSettingButton, { backgroundColor: theme.surfaceTertiary, padding: 8, borderRadius: 10 }]}
-                  activeOpacity={0.7}
-                  onPress={() => setFridgeSettingsVisible(true)}
-                >
-                  <Ionicons name="settings-outline" size={20} color={theme.textPrimary} />
-                </TouchableOpacity>
-              )}
+          {!activeFridge && onScanQr && (
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingRight: 20, marginBottom: 20 }}>
+              <TouchableOpacity
+                style={[styles.fridgeSettingButton, { backgroundColor: theme.surfaceTertiary, padding: 8, borderRadius: 10 }]}
+                activeOpacity={0.7}
+                onPress={onScanQr}
+              >
+                <Ionicons name="scan-outline" size={20} color={theme.textPrimary} />
+              </TouchableOpacity>
             </View>
-          </View>
+          )}
           {/* 나의 냉장고 보관소 */}
           <View style={[styles.sectionContainer, { marginTop: 0, flex: 1 }]}>
             <View style={styles.carouselWrapper}>
@@ -1538,6 +1619,7 @@ export default function RefrigeratorVisual({
                 style={{ flex: 1 }}
                 horizontal
                 pagingEnabled
+                scrollEnabled={!editingNameFridgeId}
                 showsHorizontalScrollIndicator={false}
                 onScroll={handleScroll}
                 scrollEventThrottle={16}
@@ -1567,11 +1649,29 @@ export default function RefrigeratorVisual({
                     <View key={fridge.id} style={[styles.slideContainer, { width: screenWidth }]}>
                       <View style={[styles.fridgeCard, { width: screenWidth - 40, backgroundColor: theme.surface, borderColor: theme.glassBorder }]}>
                         {fridge.memberNames && fridge.memberNames.length > 1 && (
-                          <View style={[styles.sharedBadge, { backgroundColor: theme.primaryLight }]}>
-                            <Ionicons name="link" size={12} color={theme.primary} />
-                            <Text style={[styles.sharedBadgeText, { color: theme.primary }]}>공유 중</Text>
+                          <View style={styles.sharedAvatarStack}>
+                            {fridge.memberNames.map((name, i) => (
+                              <View
+                                key={`${name}_${i}`}
+                                style={[
+                                  styles.sharedAvatar,
+                                  { backgroundColor: theme.primaryLight, borderColor: theme.surface, marginLeft: i === 0 ? 0 : -10 },
+                                ]}
+                              >
+                                <Text style={[styles.sharedAvatarText, { color: theme.primaryText }]}>{name.charAt(0)}</Text>
+                              </View>
+                            ))}
                           </View>
                         )}
+
+                        <TouchableOpacity
+                          style={[styles.fridgeCardSettingsButton, { backgroundColor: theme.surfaceTertiary }]}
+                          activeOpacity={0.7}
+                          onPress={() => setFridgeSettingsVisible(true)}
+                        >
+                          <Ionicons name="settings-outline" size={16} color={theme.textSecondary} />
+                        </TouchableOpacity>
+
                         <View style={styles.fridgeNameContainer}>
                           <Text style={[styles.fridgeNameTitle, { color: theme.textPrimary }]}>{fridge.name}</Text>
                         </View>
@@ -1883,15 +1983,36 @@ export default function RefrigeratorVisual({
         </View>
       </Modal>
 
-      {/* 냉장고 관리 설정 모달 */}
+      {/* 냉장고 관리 설정 바텀시트: 뒷배경 딤 처리는 슬라이드 애니메이션과 분리해서 순서대로 재생한다 */}
       <Modal
-        visible={fridgeSettingsVisible}
+        visible={sheetRendered}
         transparent
-        animationType="fade"
+        animationType="none"
         onRequestClose={() => setFridgeSettingsVisible(false)}
       >
-        <View style={[styles.modalOverlay, { backgroundColor: theme.modalOverlay }]}>
-          <View style={[styles.settingsModalContent, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
+        <View style={styles.settingsSheetOverlay}>
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFillObject,
+              { backgroundColor: theme.modalOverlay, opacity: sheetBackdropOpacity },
+            ]}
+          >
+            <TouchableOpacity
+              style={styles.sheetBackdrop}
+              activeOpacity={1}
+              onPress={() => setFridgeSettingsVisible(false)}
+            />
+          </Animated.View>
+          <Animated.View style={{ width: '100%', transform: [{ translateY: sheetTranslateY }] }}>
+          <Animated.View
+            style={[
+              styles.settingsSheetContent,
+              { backgroundColor: theme.surface, height: sheetHeight },
+            ]}
+          >
+            <View style={styles.sheetDragHandleArea} {...sheetPanResponder.panHandlers}>
+              <View style={[styles.sheetDragHandle, { backgroundColor: theme.borderLight }]} />
+            </View>
             <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Ionicons name="settings-outline" size={20} color={theme.textPrimary} />
@@ -1905,76 +2026,81 @@ export default function RefrigeratorVisual({
             <View style={styles.settingsModalBody}>
               {activeFridge ? (
                 <>
-                  <View style={[styles.settingsActiveFridgeInfo, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderLight }]}>
-                    <Text style={[styles.settingsActiveFridgeLabel, { color: theme.textSecondary }]}>현재 선택된 냉장고</Text>
-                    <Text style={[styles.settingsActiveFridgeName, { color: theme.textPrimary }]}>{activeFridge.name}</Text>
-                    <View style={[styles.settingsActiveFridgeTypeBadge, { backgroundColor: theme.primaryLight }]}>
-                      <Text style={[styles.settingsActiveFridgeTypeText, { color: theme.primaryText }]}>
+                  <ScrollView
+                    style={styles.settingsTopSectionScroll}
+                    contentContainerStyle={styles.settingsTopSection}
+                    showsVerticalScrollIndicator={false}
+                  >
+                    <View style={[styles.settingsActiveFridgeInfo, { borderBottomColor: theme.borderLight }]}>
+                      <Text style={[styles.settingsActiveFridgeName, { color: theme.textPrimary }]}>{activeFridge.name}</Text>
+                      <Text style={[styles.settingsActiveFridgeTypeText, { color: theme.textTertiary }]}>
                         {activeFridge.type === 'four-door' ? '4도어 냉장고' : activeFridge.type === 'side-by-side' ? '양문형 냉장고' : '일반 2도어 냉장고'}
                       </Text>
                     </View>
-                  </View>
 
-                  <View style={styles.settingsActionsContainer}>
-                    {/* 이름 변경 */}
-                    <TouchableOpacity
-                      style={[styles.settingsActionRow, { borderBottomWidth: 1, borderBottomColor: theme.borderLight }]}
-                      activeOpacity={0.7}
-                      onPress={() => {
-                        setFridgeSettingsVisible(false);
-                        onOpenRenameModal();
-                      }}
-                    >
-                      <View style={styles.settingsActionLeft}>
-                        <View style={[styles.settingsIconBadge, { backgroundColor: theme.primaryLight }]}>
-                          <Ionicons name="pencil-outline" size={18} color={theme.primary} />
-                        </View>
-                        <Text style={[styles.settingsActionText, { color: theme.textSecondary }]}>냉장고 이름 변경</Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
-                    </TouchableOpacity>
-
-                    {/* 타입 변경 — 구획/식재료를 초기화하는 파괴적 작업이라 내 냉장고(주인)일 때만 가능 */}
-                    {activeFridge.role !== 'MEMBER' && (
+                    <View style={styles.settingsActionsContainer}>
+                      {/* 이름 변경 */}
                       <TouchableOpacity
                         style={[styles.settingsActionRow, { borderBottomWidth: 1, borderBottomColor: theme.borderLight }]}
                         activeOpacity={0.7}
                         onPress={() => {
                           setFridgeSettingsVisible(false);
-                          onEditFridgeType();
+                          startEditingName(activeFridge.id, activeFridge.name);
                         }}
                       >
                         <View style={styles.settingsActionLeft}>
                           <View style={[styles.settingsIconBadge, { backgroundColor: theme.primaryLight }]}>
-                            <Ionicons name="swap-horizontal-outline" size={18} color={theme.primary} />
+                            <Ionicons name="pencil-outline" size={18} color={theme.primary} />
                           </View>
-                          <Text style={[styles.settingsActionText, { color: theme.textSecondary }]}>냉장고 타입 변경</Text>
+                          <Text style={[styles.settingsActionText, { color: theme.textSecondary }]}>냉장고 이름 변경</Text>
                         </View>
                         <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
                       </TouchableOpacity>
-                    )}
 
-                    {/* 냉장고 공유 (QR) — 공유받은 멤버는 재공유 불가, 내 냉장고(주인)일 때만 가능 */}
-                    {onShareFridge && activeFridge && activeFridge.uuid && activeFridge.role !== 'MEMBER' && (
-                      <TouchableOpacity
-                        style={[styles.settingsActionRow, { borderBottomWidth: 1, borderBottomColor: theme.borderLight }]}
-                        activeOpacity={0.7}
-                        onPress={() => {
-                          setFridgeSettingsVisible(false);
-                          onShareFridge(activeFridge.name, activeFridge.uuid!);
-                        }}
-                      >
-                        <View style={styles.settingsActionLeft}>
-                          <View style={[styles.settingsIconBadge, { backgroundColor: theme.primaryLight }]}>
-                            <Ionicons name="qr-code-outline" size={18} color={theme.primary} />
+                      {/* 타입 변경 — 구획/식재료를 초기화하는 파괴적 작업이라 내 냉장고(주인)일 때만 가능 */}
+                      {activeFridge.role !== 'MEMBER' && (
+                        <TouchableOpacity
+                          style={[styles.settingsActionRow, { borderBottomWidth: 1, borderBottomColor: theme.borderLight }]}
+                          activeOpacity={0.7}
+                          onPress={() => {
+                            setFridgeSettingsVisible(false);
+                            onEditFridgeType();
+                          }}
+                        >
+                          <View style={styles.settingsActionLeft}>
+                            <View style={[styles.settingsIconBadge, { backgroundColor: theme.primaryLight }]}>
+                              <Ionicons name="swap-horizontal-outline" size={18} color={theme.primary} />
+                            </View>
+                            <Text style={[styles.settingsActionText, { color: theme.textSecondary }]}>냉장고 타입 변경</Text>
                           </View>
-                          <Text style={[styles.settingsActionText, { color: theme.textSecondary }]}>냉장고 공유 (QR)</Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
-                      </TouchableOpacity>
-                    )}
+                          <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+                        </TouchableOpacity>
+                      )}
 
-                    {/* 삭제 요청/응답 또는 삭제·나가기 */}
+                      {/* 냉장고 공유 (QR) — 공유받은 멤버는 재공유 불가, 내 냉장고(주인)일 때만 가능 */}
+                      {onShareFridge && activeFridge && activeFridge.uuid && activeFridge.role !== 'MEMBER' && (
+                        <TouchableOpacity
+                          style={styles.settingsActionRow}
+                          activeOpacity={0.7}
+                          onPress={() => {
+                            setFridgeSettingsVisible(false);
+                            onShareFridge(activeFridge.name, activeFridge.uuid!);
+                          }}
+                        >
+                          <View style={styles.settingsActionLeft}>
+                            <View style={[styles.settingsIconBadge, { backgroundColor: theme.primaryLight }]}>
+                              <Ionicons name="qr-code-outline" size={18} color={theme.primary} />
+                            </View>
+                            <Text style={[styles.settingsActionText, { color: theme.textSecondary }]}>냉장고 공유 (QR)</Text>
+                          </View>
+                          <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </ScrollView>
+
+                  {/* 삭제 요청/응답 또는 삭제·나가기 — 영역 맨 아래로 고정 */}
+                  <View style={styles.settingsDangerZone}>
                     {activeFridge.deletionRequested ? (
                       activeFridge.role === 'MEMBER' ? (
                         <View style={[styles.deletionRequestBox, { backgroundColor: theme.dangerLight, borderColor: theme.danger }]}>
@@ -2048,6 +2174,45 @@ export default function RefrigeratorVisual({
                   선택된 냉장고가 없습니다.
                 </Text>
               )}
+            </View>
+          </Animated.View>
+          </Animated.View>
+        </View>
+      </Modal>
+
+      {/* 냉장고 이름 변경 다이얼로그 */}
+      <Modal
+        visible={editingNameFridgeId !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={cancelEditingName}
+      >
+        <View style={[styles.modalOverlay, { backgroundColor: theme.modalOverlay }]}>
+          <View style={[styles.renameDialogContent, { backgroundColor: theme.surface }]}>
+            <Text style={[styles.renameDialogTitle, { color: theme.textPrimary }]}>냉장고 이름 변경</Text>
+            <TextInput
+              style={[styles.renameDialogInput, { color: theme.textPrimary, borderColor: theme.border }]}
+              value={nameDraft}
+              onChangeText={setNameDraft}
+              maxLength={20}
+              autoFocus
+              onSubmitEditing={() => editingNameFridgeId && confirmEditingName(editingNameFridgeId)}
+            />
+            <View style={styles.renameDialogButtonRow}>
+              <TouchableOpacity
+                style={[styles.renameDialogButton, { backgroundColor: theme.surfaceTertiary }]}
+                activeOpacity={0.8}
+                onPress={cancelEditingName}
+              >
+                <Text style={[styles.renameDialogButtonText, { color: theme.textSecondary }]}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.renameDialogButton, { backgroundColor: theme.primary }]}
+                activeOpacity={0.8}
+                onPress={() => editingNameFridgeId && confirmEditingName(editingNameFridgeId)}
+              >
+                <Text style={[styles.renameDialogButtonText, { color: theme.primaryOnPrimary }]}>적용</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -2301,10 +2466,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   fridgeNameContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
+    width: '100%',
     marginBottom: 20,
   },
   fridgeNameTitle: {
@@ -2313,21 +2475,36 @@ const styles = StyleSheet.create({
     color: '#37474F',
     textAlign: 'center',
   },
-  sharedBadge: {
+  sharedAvatarStack: {
     position: 'absolute',
     top: 14,
     left: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
     zIndex: 10,
   },
-  sharedBadgeText: {
+  sharedAvatar: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sharedAvatarText: {
     fontSize: 11,
     fontWeight: '700',
+  },
+  fridgeCardSettingsButton: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
   },
   pencilIconButton: {
     padding: 4,
@@ -3153,39 +3330,69 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 5,
   },
+  settingsSheetOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  sheetBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  settingsSheetContent: {
+    width: '100%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    paddingTop: 8,
+    paddingBottom: 32,
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    elevation: 24,
+  },
+  sheetDragHandleArea: {
+    width: '100%',
+    paddingVertical: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetDragHandle: {
+    width: 56,
+    height: 5,
+    borderRadius: 3,
+  },
   settingsModalBody: {
+    flex: 1,
     marginTop: 16,
+    justifyContent: 'space-between',
+  },
+  settingsTopSectionScroll: {
+    flex: 1,
+  },
+  settingsTopSection: {
     gap: 16,
   },
-  settingsActiveFridgeInfo: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 16,
-    alignItems: 'center',
-    gap: 6,
+  settingsDangerZone: {
+    marginTop: 16,
   },
-  settingsActiveFridgeLabel: {
-    fontSize: 11,
-    fontWeight: 'bold',
+  settingsActiveFridgeInfo: {
+    alignItems: 'center',
+    gap: 4,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
   },
   settingsActiveFridgeName: {
     fontSize: 18,
     fontWeight: 'bold',
   },
-  settingsActiveFridgeTypeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    marginTop: 4,
-  },
   settingsActiveFridgeTypeText: {
-    fontSize: 10,
-    fontWeight: 'bold',
+    fontSize: 13,
+    fontWeight: '500',
   },
-  settingsActionsContainer: {
-    borderRadius: 18,
-    overflow: 'hidden',
-  },
+  settingsActionsContainer: {},
   settingsActionRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -3248,5 +3455,45 @@ const styles = StyleSheet.create({
   modalTitleText: {
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  renameDialogContent: {
+    width: '85%',
+    maxWidth: 340,
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  renameDialogTitle: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  renameDialogInput: {
+    fontSize: 15,
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  renameDialogButtonRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 16,
+  },
+  renameDialogButton: {
+    flex: 1,
+    height: 46,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  renameDialogButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
   },
 });
