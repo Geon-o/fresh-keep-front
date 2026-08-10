@@ -9,6 +9,7 @@ export interface ServerFridge {
   uuid: string;
   deletionRequested: boolean;
   ownerName?: string;
+  memberNames: string[];
 }
 
 export interface FridgeDeletionResult {

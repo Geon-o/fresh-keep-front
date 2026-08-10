@@ -15,7 +15,7 @@ import RefrigeratorSelector from '../src/components/RefrigeratorSelector';
 import QrShareModal from '../src/components/QrShareModal';
 import { useAuth } from '../src/context/AuthContext';
 import { serializeMemo } from '../src/utils/memoSerializer';
-import { getFridges, createFridge, deleteFridge, updateFridge, convertTypeToFrontend, getFridgeLayout, approveDeletion, rejectDeletion, cancelDeletionRequest } from '../src/api/fridgeService';
+import { getFridges, createFridge, deleteFridge, updateFridge, convertTypeToFrontend, getFridgeLayout, approveDeletion, rejectDeletion, cancelDeletionRequest, ServerFridge } from '../src/api/fridgeService';
 import { registerPushToken } from '../src/utils/pushToken';
 import { updateIngredient } from '../src/api/ingredientService';
 import { useTheme } from '../src/context/ThemeContext';
@@ -299,6 +299,7 @@ export default function Index() {
           role: f.role,
           deletionRequested: f.deletionRequested,
           ownerName: f.ownerName,
+          memberNames: f.memberNames,
         }))
       : localRefrigerators;
   }, [isLoggedIn, serverFridges, localRefrigerators]);
@@ -364,8 +365,18 @@ export default function Index() {
 
     if (isLoggedIn) {
       try {
-        await createFridge(`냉장고 ${refrigerators.length + 1}`, type);
+        const created = await createFridge(`냉장고 ${refrigerators.length + 1}`, type);
         await queryClient.invalidateQueries({ queryKey: ['fridges'] });
+
+        // 방금 만든 냉장고가 목록 몇 번째에 자리잡았는지 최신 캐시에서 찾아 그쪽으로 포커스 이동
+        const latest = queryClient.getQueryData<ServerFridge[]>(['fridges']);
+        const newIndex = latest?.findIndex(f => f.id === created.id) ?? -1;
+        if (newIndex >= 0) {
+          setActiveIndex(newIndex);
+          try {
+            await AsyncStorage.setItem('@active_fridge_index', String(newIndex));
+          } catch (e) {}
+        }
       } catch (e) {
         console.error('Failed to add refrigerator on server', e);
       }
@@ -379,6 +390,12 @@ export default function Index() {
         const updated = [...localRefrigerators, newFridge];
         setLocalRefrigerators(updated);
         await AsyncStorage.setItem('@refrigerators', JSON.stringify(updated));
+
+        const newIndex = updated.length - 1;
+        setActiveIndex(newIndex);
+        try {
+          await AsyncStorage.setItem('@active_fridge_index', String(newIndex));
+        } catch (e) {}
       } catch (e) {
         console.error('Failed to add local refrigerator', e);
       }

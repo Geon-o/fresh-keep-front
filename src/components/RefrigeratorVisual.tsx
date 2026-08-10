@@ -227,7 +227,7 @@ const SEASONAL_INGREDIENTS: SeasonalIngredient[] = [
 
 interface RefrigeratorVisualProps {
   mode?: 'home' | 'ingredients' | 'fridge';
-  refrigerators: { id: string; type: FridgeType; name: string; uuid?: string; role?: 'OWNER' | 'MEMBER'; deletionRequested?: boolean; ownerName?: string }[];
+  refrigerators: { id: string; type: FridgeType; name: string; uuid?: string; role?: 'OWNER' | 'MEMBER'; deletionRequested?: boolean; ownerName?: string; memberNames?: string[] }[];
   onPressCompartment: (id: string, label: string, fridgeId: string, autoOpenAdd?: boolean) => void;
   activeIndex: number;
   setActiveIndex: (index: number) => void;
@@ -1510,7 +1510,7 @@ export default function RefrigeratorVisual({
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: 20, marginBottom: 20 }}>
             <Text style={[styles.pageTitle, { color: theme.textPrimary, marginBottom: 0 }]}>나의 냉장고</Text>
             <View style={{ flexDirection: 'row', gap: 10 }}>
-              {onScanQr && (
+              {onScanQr && !activeFridge && (
                 <TouchableOpacity
                   style={[styles.fridgeSettingButton, { backgroundColor: theme.surfaceTertiary, padding: 8, borderRadius: 10 }]}
                   activeOpacity={0.7}
@@ -1566,6 +1566,12 @@ export default function RefrigeratorVisual({
                   return (
                     <View key={fridge.id} style={[styles.slideContainer, { width: screenWidth }]}>
                       <View style={[styles.fridgeCard, { width: screenWidth - 40, backgroundColor: theme.surface, borderColor: theme.glassBorder }]}>
+                        {fridge.memberNames && fridge.memberNames.length > 1 && (
+                          <View style={[styles.sharedBadge, { backgroundColor: theme.primaryLight }]}>
+                            <Ionicons name="link" size={12} color={theme.primary} />
+                            <Text style={[styles.sharedBadgeText, { color: theme.primary }]}>공유 중</Text>
+                          </View>
+                        )}
                         <View style={styles.fridgeNameContainer}>
                           <Text style={[styles.fridgeNameTitle, { color: theme.textPrimary }]}>{fridge.name}</Text>
                         </View>
@@ -1946,8 +1952,8 @@ export default function RefrigeratorVisual({
                       <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
                     </TouchableOpacity>
 
-                    {/* 냉장고 공유 (QR) */}
-                    {onShareFridge && activeFridge && activeFridge.uuid && (
+                    {/* 냉장고 공유 (QR) — 공유받은 멤버는 재공유 불가, 내 냉장고(주인)일 때만 가능 */}
+                    {onShareFridge && activeFridge && activeFridge.uuid && activeFridge.role !== 'MEMBER' && (
                       <TouchableOpacity
                         style={[styles.settingsActionRow, { borderBottomWidth: 1, borderBottomColor: theme.borderLight }]}
                         activeOpacity={0.7}
@@ -2304,6 +2310,22 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#37474F',
     textAlign: 'center',
+  },
+  sharedBadge: {
+    position: 'absolute',
+    top: 14,
+    left: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    zIndex: 10,
+  },
+  sharedBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   pencilIconButton: {
     padding: 4,
