@@ -342,6 +342,47 @@ export default function RefrigeratorVisual({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fridgeSettingsVisible]);
 
+  // 사용자 목록 바텀시트: 화면의 40%만 차지하는 고정 높이 시트
+  const MEMBER_SHEET_HEIGHT = screenHeight * 0.4;
+  const [memberSheetVisible, setMemberSheetVisible] = useState(false);
+  const [memberSheetRendered, setMemberSheetRendered] = useState(false);
+  const memberSheetTranslateY = useRef(new Animated.Value(screenHeight)).current;
+  const memberSheetBackdropOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (memberSheetVisible) {
+      setMemberSheetRendered(true);
+      memberSheetTranslateY.setValue(screenHeight);
+      memberSheetBackdropOpacity.setValue(0);
+      Animated.timing(memberSheetTranslateY, {
+        toValue: 0,
+        duration: 260,
+        useNativeDriver: true,
+      }).start(() => {
+        Animated.timing(memberSheetBackdropOpacity, {
+          toValue: 1,
+          duration: 150,
+          useNativeDriver: true,
+        }).start();
+      });
+    } else if (memberSheetRendered) {
+      Animated.timing(memberSheetBackdropOpacity, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }).start(() => {
+        Animated.timing(memberSheetTranslateY, {
+          toValue: screenHeight,
+          duration: 260,
+          useNativeDriver: true,
+        }).start(() => {
+          setMemberSheetRendered(false);
+        });
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [memberSheetVisible]);
+
   // 식재료 목록 탭 + 버튼으로 여는 등록 위치(냉장고/보관실) 선택 모달
   const [addLocationPickerVisible, setAddLocationPickerVisible] = useState(false);
   const [addPickerFridgeId, setAddPickerFridgeId] = useState<string | null>(null);
@@ -1649,7 +1690,11 @@ export default function RefrigeratorVisual({
                     <View key={fridge.id} style={[styles.slideContainer, { width: screenWidth }]}>
                       <View style={[styles.fridgeCard, { width: screenWidth - 40, backgroundColor: theme.surface, borderColor: theme.glassBorder }]}>
                         {fridge.memberNames && fridge.memberNames.length > 1 && (
-                          <View style={styles.sharedAvatarStack}>
+                          <TouchableOpacity
+                            style={styles.sharedAvatarStack}
+                            activeOpacity={0.7}
+                            onPress={() => setMemberSheetVisible(true)}
+                          >
                             {fridge.memberNames.map((name, i) => (
                               <View
                                 key={`${name}_${i}`}
@@ -1661,7 +1706,7 @@ export default function RefrigeratorVisual({
                                 <Text style={[styles.sharedAvatarText, { color: theme.primaryText }]}>{name.charAt(0)}</Text>
                               </View>
                             ))}
-                          </View>
+                          </TouchableOpacity>
                         )}
 
                         <TouchableOpacity
@@ -2180,6 +2225,62 @@ export default function RefrigeratorVisual({
         </View>
       </Modal>
 
+      {/* 사용자 목록 바텀시트 */}
+      <Modal
+        visible={memberSheetRendered}
+        transparent
+        animationType="none"
+        onRequestClose={() => setMemberSheetVisible(false)}
+      >
+        <View style={styles.settingsSheetOverlay}>
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFillObject,
+              { backgroundColor: theme.modalOverlay, opacity: memberSheetBackdropOpacity },
+            ]}
+          >
+            <TouchableOpacity
+              style={styles.sheetBackdrop}
+              activeOpacity={1}
+              onPress={() => setMemberSheetVisible(false)}
+            />
+          </Animated.View>
+          <Animated.View style={{ width: '100%', transform: [{ translateY: memberSheetTranslateY }] }}>
+            <View
+              style={[
+                styles.settingsSheetContent,
+                { backgroundColor: theme.surface, height: MEMBER_SHEET_HEIGHT },
+              ]}
+            >
+              <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Ionicons name="people-outline" size={20} color={theme.textPrimary} />
+                  <Text style={[styles.modalTitleText, { color: theme.textPrimary }]}>사용자</Text>
+                </View>
+                <TouchableOpacity onPress={() => setMemberSheetVisible(false)} style={styles.modalCloseButton}>
+                  <Ionicons name="close" size={24} color={theme.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={{ flex: 1, marginTop: 8 }} showsVerticalScrollIndicator={false}>
+                {activeFridge?.memberNames?.map((name, i) => (
+                  <View
+                    key={`${name}_${i}`}
+                    style={[styles.memberRow, { borderBottomColor: theme.borderLight }]}
+                  >
+                    <View style={[styles.memberAvatarCircle, { backgroundColor: theme.primaryLight }]}>
+                      <Text style={[styles.memberAvatarText, { color: theme.primaryText }]}>{name.charAt(0)}</Text>
+                    </View>
+                    <Text style={[styles.memberName, { color: theme.textPrimary }]}>{name}</Text>
+                    {name === activeFridge.ownerName && <Text style={styles.memberOwnerBadge}>👑</Text>}
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
+
       {/* 냉장고 이름 변경 다이얼로그 */}
       <Modal
         visible={editingNameFridgeId !== null}
@@ -2494,6 +2595,32 @@ const styles = StyleSheet.create({
   sharedAvatarText: {
     fontSize: 11,
     fontWeight: '700',
+  },
+  memberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  memberAvatarCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  memberAvatarText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  memberName: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  memberOwnerBadge: {
+    fontSize: 16,
   },
   fridgeCardSettingsButton: {
     position: 'absolute',
