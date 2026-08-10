@@ -1934,23 +1934,25 @@ export default function RefrigeratorVisual({
                       <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
                     </TouchableOpacity>
 
-                    {/* 타입 변경 */}
-                    <TouchableOpacity
-                      style={[styles.settingsActionRow, { borderBottomWidth: 1, borderBottomColor: theme.borderLight }]}
-                      activeOpacity={0.7}
-                      onPress={() => {
-                        setFridgeSettingsVisible(false);
-                        onEditFridgeType();
-                      }}
-                    >
-                      <View style={styles.settingsActionLeft}>
-                        <View style={[styles.settingsIconBadge, { backgroundColor: theme.primaryLight }]}>
-                          <Ionicons name="swap-horizontal-outline" size={18} color={theme.primary} />
+                    {/* 타입 변경 — 구획/식재료를 초기화하는 파괴적 작업이라 내 냉장고(주인)일 때만 가능 */}
+                    {activeFridge.role !== 'MEMBER' && (
+                      <TouchableOpacity
+                        style={[styles.settingsActionRow, { borderBottomWidth: 1, borderBottomColor: theme.borderLight }]}
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          setFridgeSettingsVisible(false);
+                          onEditFridgeType();
+                        }}
+                      >
+                        <View style={styles.settingsActionLeft}>
+                          <View style={[styles.settingsIconBadge, { backgroundColor: theme.primaryLight }]}>
+                            <Ionicons name="swap-horizontal-outline" size={18} color={theme.primary} />
+                          </View>
+                          <Text style={[styles.settingsActionText, { color: theme.textSecondary }]}>냉장고 타입 변경</Text>
                         </View>
-                        <Text style={[styles.settingsActionText, { color: theme.textSecondary }]}>냉장고 타입 변경</Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
-                    </TouchableOpacity>
+                        <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+                      </TouchableOpacity>
+                    )}
 
                     {/* 냉장고 공유 (QR) — 공유받은 멤버는 재공유 불가, 내 냉장고(주인)일 때만 가능 */}
                     {onShareFridge && activeFridge && activeFridge.uuid && activeFridge.role !== 'MEMBER' && (
