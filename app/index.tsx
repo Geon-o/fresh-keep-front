@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, Modal, TouchableOpacity, Text, Alert, Platform, TextInput, KeyboardAvoidingView, ActivityIndicator, Animated, BackHandler, Image } from 'react-native';
+import { StyleSheet, View, Modal, TouchableOpacity, Text, Alert, Platform, TextInput, KeyboardAvoidingView, ActivityIndicator, Animated, BackHandler, Image, DeviceEventEmitter } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Linking from 'expo-linking';
@@ -104,6 +104,14 @@ export default function Index() {
       });
     }, 2000);
   };
+
+  // QR 스캔/공유 등록 화면에서 결과를 알려오면, 화면 전환 후 이 홈 화면에서 토스트로 안내
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('fridgeShareResult', (message: string) => {
+      showToast(message);
+    });
+    return () => subscription.remove();
+  }, []);
 
   // 딥링크 수신 및 처리 리스너
   useEffect(() => {

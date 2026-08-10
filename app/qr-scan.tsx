@@ -1,11 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, TextInput, ActivityIndicator, DeviceEventEmitter } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
+import * as Linking from 'expo-linking';
 import { Ionicons } from '@expo/vector-icons';
 import { client } from '../src/api/client';
 import { queryClient } from '../src/api/queryClient';
 import { useTheme } from '../src/context/ThemeContext';
+
+// QR 코드에는 "https://.../share/fridge?uuid=xxxx" 형태의 공유 링크가 인코딩되어 있으므로,
+// 스캔/수동 입력된 원문에서 실제 공유 코드(uuid)만 추출한다. 링크 형식이 아니면 입력값 자체를 코드로 취급한다.
+const extractFridgeUuid = (raw: string): string => {
+  const trimmed = raw.trim();
+  try {
+    const { queryParams } = Linking.parse(trimmed);
+    const uuidParam = queryParams?.uuid;
+    if (typeof uuidParam === 'string' && uuidParam) return uuidParam;
+  } catch (e) {
+    // 링크 형식이 아니면 무시하고 원문을 그대로 사용
+  }
+  return trimmed;
+};
 
 export default function QrScanScreen() {
   const router = useRouter();
@@ -13,6 +28,8 @@ export default function QrScanScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [manualEntryOpen, setManualEntryOpen] = useState(false);
+  const [manualCode, setManualCode] = useState('');
 
   // 권한 획득 처리
   useEffect(() => {
@@ -55,48 +72,44 @@ export default function QrScanScreen() {
     );
   }
 
-  const handleBarcodeScanned = async ({ data }: { data: string }) => {
-    if (scanned || isProcessing) return;
-    setScanned(true);
-    setIsProcessing(true);
+  // QR 스캔/수동 입력 공용 등록 처리
+  // 결과 알림은 이 화면에 Alert로 띄우지 않고, 홈으로 돌아간 뒤 토스트로 안내한다.
+  const registerSharedFridge = async (rawValue: string) => {
+    if (isProcessing) return;
 
-    const fridgeUuid = data.trim();
-    console.log('Scanned QR code data:', fridgeUuid);
-
-    // 단순 UUID 형식 검증 (선택적)
+    const fridgeUuid = extractFridgeUuid(rawValue);
     if (!fridgeUuid) {
-      Alert.alert('오류 ⚠️', '유효하지 않은 QR 코드입니다.', [
-        { text: '확인', onPress: () => { setScanned(false); setIsProcessing(false); } }
-      ]);
+      DeviceEventEmitter.emit('fridgeShareResult', '유효하지 않은 공유 코드입니다 ⚠️');
+      router.back();
       return;
     }
 
+    setIsProcessing(true);
     try {
       // 백엔드에 냉장고 공유 등록 API 호출
       await client.post('/api/fridges/share', { fridgeUuid });
-      
+
       // 캐시 갱신
       queryClient.invalidateQueries({ queryKey: ['fridges'] });
 
-      Alert.alert(
-        '공동 관리 추가 성공 🎉',
-        '해당 냉장고가 정상적으로 공유 목록에 추가되었습니다!',
-        [
-          { 
-            text: '확인', 
-            onPress: () => {
-              router.replace('/');
-            } 
-          }
-        ]
-      );
+      DeviceEventEmitter.emit('fridgeShareResult', '공동 관리 냉장고가 추가되었습니다 🎉');
+      router.back();
     } catch (e: any) {
-      console.error('Failed to share fridge via QR', e);
+      console.error('Failed to share fridge', e);
       const errMsg = e.response?.data?.message || '이미 등록된 냉장고이거나 유효하지 않은 공유 코드입니다.';
-      Alert.alert('등록 실패 ❌', errMsg, [
-        { text: '확인', onPress: () => { setScanned(false); setIsProcessing(false); } }
-      ]);
+      DeviceEventEmitter.emit('fridgeShareResult', `등록 실패 ❌ ${errMsg}`);
+      router.back();
     }
+  };
+
+  const handleBarcodeScanned = ({ data }: { data: string }) => {
+    if (scanned || isProcessing) return;
+    setScanned(true);
+    registerSharedFridge(data);
+  };
+
+  const handleManualSubmit = () => {
+    registerSharedFridge(manualCode);
   };
 
   return (
@@ -148,6 +161,32 @@ export default function QrScanScreen() {
             <Text style={styles.guideText}>
               공동 관리할 냉장고의 QR 코드를 사각형 안에 맞춰주세요.
             </Text>
+
+            {manualEntryOpen ? (
+              <View style={styles.manualEntryBox}>
+                <TextInput
+                  style={styles.manualEntryInput}
+                  value={manualCode}
+                  onChangeText={setManualCode}
+                  placeholder="공유 코드 붙여넣기"
+                  placeholderTextColor="rgba(255,255,255,0.4)"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={!isProcessing}
+                />
+                <TouchableOpacity
+                  style={[styles.manualEntryButton, (!manualCode.trim() || isProcessing) && styles.manualEntryButtonDisabled]}
+                  onPress={handleManualSubmit}
+                  disabled={!manualCode.trim() || isProcessing}
+                >
+                  <Text style={styles.manualEntryButtonText}>등록</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity onPress={() => setManualEntryOpen(true)} style={{ marginTop: 16 }}>
+                <Text style={styles.manualEntryToggleText}>QR을 인식하지 못하나요? 코드 직접 입력하기</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>
@@ -299,5 +338,42 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
     fontWeight: '600',
+  },
+  manualEntryToggleText: {
+    color: '#38BDF8',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  manualEntryBox: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 16,
+    width: '100%',
+  },
+  manualEntryInput: {
+    flex: 1,
+    height: 44,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    color: '#FFFFFF',
+    fontSize: 13,
+  },
+  manualEntryButton: {
+    height: 44,
+    paddingHorizontal: 18,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#38BDF8',
+  },
+  manualEntryButtonDisabled: {
+    backgroundColor: 'rgba(56,189,248,0.35)',
+  },
+  manualEntryButtonText: {
+    color: '#0F172A',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });
