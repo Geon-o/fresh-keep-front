@@ -15,7 +15,8 @@ import RefrigeratorSelector from '../src/components/RefrigeratorSelector';
 import QrShareModal from '../src/components/QrShareModal';
 import { useAuth } from '../src/context/AuthContext';
 import { serializeMemo } from '../src/utils/memoSerializer';
-import { getFridges, createFridge, deleteFridge, updateFridge, convertTypeToFrontend, getFridgeLayout } from '../src/api/fridgeService';
+import { getFridges, createFridge, deleteFridge, updateFridge, convertTypeToFrontend, getFridgeLayout, approveDeletion, rejectDeletion, cancelDeletionRequest } from '../src/api/fridgeService';
+import { registerPushToken } from '../src/utils/pushToken';
 import { updateIngredient } from '../src/api/ingredientService';
 import { useTheme } from '../src/context/ThemeContext';
 
@@ -295,6 +296,9 @@ export default function Index() {
           type: convertTypeToFrontend(f.type),
           name: f.name,
           uuid: f.uuid,
+          role: f.role,
+          deletionRequested: f.deletionRequested,
+          ownerName: f.ownerName,
         }))
       : localRefrigerators;
   }, [isLoggedIn, serverFridges, localRefrigerators]);
@@ -439,13 +443,16 @@ export default function Index() {
   };
 
   // 냉장고 삭제 및 해당 냉장고의 식재료 제거
-  const handleDeleteFridge = async (fridgeId: string) => {
+  // 서버 삭제 요청 결과({deleted})를 그대로 반환. 실패 시 null.
+  const handleDeleteFridge = async (fridgeId: string): Promise<{ deleted: boolean } | null> => {
     if (isLoggedIn) {
       try {
-        await deleteFridge(Number(fridgeId));
+        const result = await deleteFridge(Number(fridgeId));
         queryClient.invalidateQueries({ queryKey: ['fridges'] });
+        return result;
       } catch (e) {
         console.error('Failed to delete refrigerator on server', e);
+        return null;
       }
     } else {
       try {
@@ -460,31 +467,94 @@ export default function Index() {
           const filtered = allIngredients.filter(item => item.fridgeId !== fridgeId);
           await AsyncStorage.setItem('@ingredients', JSON.stringify(filtered));
         }
+        return { deleted: true };
       } catch (e) {
         console.error('Failed to delete local refrigerator', e);
+        return null;
       }
     }
   };
 
-  // 냉장고 삭제 확인 알림
+  const resetActiveFridgeIndex = async () => {
+    setActiveIndex(0);
+    try {
+      await AsyncStorage.setItem('@active_fridge_index', '0');
+    } catch (e) {}
+  };
+
+  // 냉장고 삭제/나가기 확인 알림
+  // 주인(OWNER)이 삭제하면: 혼자 쓰는 냉장고는 즉시 삭제, 공유 중이면 삭제 요청만 등록됨(deleted: false)
+  // 멤버(MEMBER)가 누르면: 항상 본인만 나가는 것(서버에서 deleted: false로 응답)
   const handleDeleteConfirm = async () => {
     if (!activeFridge) return;
+    const isOwner = !isLoggedIn || (activeFridge as any).role !== 'MEMBER';
+
     const performDelete = async () => {
-      await handleDeleteFridge(activeFridge.id);
-      setActiveIndex(0);
-      try {
-        await AsyncStorage.setItem('@active_fridge_index', '0');
-      } catch (e) {}
+      const result = await handleDeleteFridge(activeFridge.id);
+      if (!result) return;
+
+      if (result.deleted) {
+        showToast('냉장고가 삭제되었습니다 🗑️');
+        await resetActiveFridgeIndex();
+      } else if (isOwner) {
+        showToast('삭제 요청을 보냈습니다. 함께 쓰는 멤버가 동의하면 삭제됩니다.');
+      } else {
+        showToast('냉장고에서 나갔습니다.');
+        await resetActiveFridgeIndex();
+      }
     };
 
     Alert.alert(
-      '냉장고 삭제 ❌',
-      `[${activeFridge.name}]와 보관 중인 모든 식재료 데이터가 함께 영구 삭제됩니다. 삭제하시겠습니까?`,
+      isOwner ? '냉장고 삭제 ❌' : '냉장고 나가기',
+      isOwner
+        ? `[${activeFridge.name}]와 보관 중인 모든 식재료 데이터가 함께 영구 삭제됩니다. 함께 쓰는 멤버가 있다면 먼저 동의를 요청합니다. 삭제하시겠습니까?`
+        : `[${activeFridge.name}]에서 나가시겠습니까? 나가도 그동안 등록한 식재료는 그대로 남습니다.`,
       [
         { text: '취소', style: 'cancel' },
-        { text: '삭제', style: 'destructive', onPress: performDelete }
+        { text: isOwner ? '삭제' : '나가기', style: 'destructive', onPress: performDelete }
       ]
     );
+  };
+
+  // 다른 멤버가 보낸 삭제 요청에 동의 (전원 동의 시 그 시점에 실제 삭제됨)
+  const handleApproveDeletionRequest = async () => {
+    if (!activeFridge) return;
+    try {
+      const result = await approveDeletion(Number(activeFridge.id));
+      queryClient.invalidateQueries({ queryKey: ['fridges'] });
+      if (result.deleted) {
+        showToast('삭제에 동의했습니다. 냉장고가 삭제되었습니다 🗑️');
+        await resetActiveFridgeIndex();
+      } else {
+        showToast('삭제에 동의했습니다. 다른 멤버의 동의를 기다리는 중입니다.');
+      }
+    } catch (e) {
+      console.error('Failed to approve fridge deletion', e);
+    }
+  };
+
+  // 삭제 요청 거절 (즉시 요청 자체가 취소됨)
+  const handleRejectDeletionRequest = async () => {
+    if (!activeFridge) return;
+    try {
+      await rejectDeletion(Number(activeFridge.id));
+      queryClient.invalidateQueries({ queryKey: ['fridges'] });
+      showToast('삭제 요청을 거절했습니다.');
+    } catch (e) {
+      console.error('Failed to reject fridge deletion', e);
+    }
+  };
+
+  // 주인이 본인이 보낸 삭제 요청을 철회
+  const handleCancelDeletionRequest = async () => {
+    if (!activeFridge) return;
+    try {
+      await cancelDeletionRequest(Number(activeFridge.id));
+      queryClient.invalidateQueries({ queryKey: ['fridges'] });
+      showToast('삭제 요청을 철회했습니다.');
+    } catch (e) {
+      console.error('Failed to cancel fridge deletion request', e);
+    }
   };
 
   // 냉장고 추가 모달 활성화
@@ -652,10 +722,15 @@ export default function Index() {
                 onOpenRenameModal={handleOpenRenameModal}
                 onEditFridgeType={handleOpenEditSelector}
                 onDeleteFridge={handleDeleteConfirm}
+                onApproveDeletionRequest={handleApproveDeletionRequest}
+                onRejectDeletionRequest={handleRejectDeletionRequest}
+                onCancelDeletionRequest={handleCancelDeletionRequest}
                 onShareFridge={(fridgeName, fridgeUuid) => {
                   setShareFridgeName(fridgeName);
                   setShareFridgeUuid(fridgeUuid);
                   setQrShareVisible(true);
+                  // 삭제 요청 등 이 냉장고 관련 알림을 받을 수 있도록 공유를 시작하는 시점에 푸시 토큰을 등록한다.
+                  registerPushToken();
                 }}
                 onScanQr={() => router.push('/qr-scan')}
                 onChangeTab={setActiveTab}

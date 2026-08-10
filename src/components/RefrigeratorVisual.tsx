@@ -227,7 +227,7 @@ const SEASONAL_INGREDIENTS: SeasonalIngredient[] = [
 
 interface RefrigeratorVisualProps {
   mode?: 'home' | 'ingredients' | 'fridge';
-  refrigerators: { id: string; type: FridgeType; name: string; uuid?: string }[];
+  refrigerators: { id: string; type: FridgeType; name: string; uuid?: string; role?: 'OWNER' | 'MEMBER'; deletionRequested?: boolean; ownerName?: string }[];
   onPressCompartment: (id: string, label: string, fridgeId: string, autoOpenAdd?: boolean) => void;
   activeIndex: number;
   setActiveIndex: (index: number) => void;
@@ -235,6 +235,9 @@ interface RefrigeratorVisualProps {
   onOpenRenameModal: () => void;
   onEditFridgeType: () => void;
   onDeleteFridge: () => void;
+  onApproveDeletionRequest?: () => void;
+  onRejectDeletionRequest?: () => void;
+  onCancelDeletionRequest?: () => void;
   onShareFridge?: (fridgeName: string, fridgeUuid: string) => void;
   onScanQr?: () => void;
   onChangeTab?: (tab: 'home' | 'ingredients' | 'fridge' | 'settings') => void;
@@ -250,6 +253,9 @@ export default function RefrigeratorVisual({
   onOpenRenameModal,
   onEditFridgeType,
   onDeleteFridge,
+  onApproveDeletionRequest,
+  onRejectDeletionRequest,
+  onCancelDeletionRequest,
   onShareFridge,
   onScanQr,
   onChangeTab
@@ -1566,6 +1572,49 @@ export default function RefrigeratorVisual({
                         {fridge.type === 'four-door' && renderFourDoor(fridge.id)}
                         {fridge.type === 'side-by-side' && renderSideBySide(fridge.id)}
                         {fridge.type === 'two-door' && renderTwoDoor(fridge.id)}
+
+                        {fridge.deletionRequested && (
+                          <View style={styles.deletionOverlay}>
+                            {fridge.role === 'MEMBER' ? (
+                              <>
+                                <Ionicons name="warning-outline" size={32} color="#FFFFFF" style={{ marginBottom: 10 }} />
+                                <Text style={styles.deletionOverlayText}>
+                                  {fridge.ownerName ? `${fridge.ownerName}님이` : '냉장고 주인이'} 냉장고를 삭제하려고 합니다.{'\n'}동의하시겠습니까?
+                                </Text>
+                                <View style={styles.deletionOverlayButtonRow}>
+                                  <TouchableOpacity
+                                    style={[styles.deletionOverlayButton, { backgroundColor: 'rgba(255,255,255,0.15)' }]}
+                                    activeOpacity={0.8}
+                                    onPress={onRejectDeletionRequest}
+                                  >
+                                    <Text style={styles.deletionOverlayButtonText}>거절</Text>
+                                  </TouchableOpacity>
+                                  <TouchableOpacity
+                                    style={[styles.deletionOverlayButton, { backgroundColor: theme.danger }]}
+                                    activeOpacity={0.8}
+                                    onPress={onApproveDeletionRequest}
+                                  >
+                                    <Text style={styles.deletionOverlayButtonText}>동의</Text>
+                                  </TouchableOpacity>
+                                </View>
+                              </>
+                            ) : (
+                              <>
+                                <Ionicons name="time-outline" size={32} color="#FFFFFF" style={{ marginBottom: 10 }} />
+                                <Text style={styles.deletionOverlayText}>
+                                  삭제 요청을 보냈습니다.{'\n'}함께 쓰는 멤버의 동의를 기다리는 중입니다.
+                                </Text>
+                                <TouchableOpacity
+                                  style={[styles.deletionOverlayButton, { backgroundColor: 'rgba(255,255,255,0.15)' }]}
+                                  activeOpacity={0.8}
+                                  onPress={onCancelDeletionRequest}
+                                >
+                                  <Text style={styles.deletionOverlayButtonText}>요청 철회</Text>
+                                </TouchableOpacity>
+                              </>
+                            )}
+                          </View>
+                        )}
                       </View>
                     </View>
                   );
@@ -1917,23 +1966,73 @@ export default function RefrigeratorVisual({
                       </TouchableOpacity>
                     )}
 
-                    {/* 냉장고 삭제 */}
-                    <TouchableOpacity
-                      style={styles.settingsActionRow}
-                      activeOpacity={0.7}
-                      onPress={() => {
-                        setFridgeSettingsVisible(false);
-                        onDeleteFridge();
-                      }}
-                    >
-                      <View style={styles.settingsActionLeft}>
-                        <View style={[styles.settingsIconBadge, { backgroundColor: theme.dangerLight }]}>
-                          <Ionicons name="trash-outline" size={18} color={theme.danger} />
+                    {/* 삭제 요청/응답 또는 삭제·나가기 */}
+                    {activeFridge.deletionRequested ? (
+                      activeFridge.role === 'MEMBER' ? (
+                        <View style={[styles.deletionRequestBox, { backgroundColor: theme.dangerLight, borderColor: theme.danger }]}>
+                          <Text style={[styles.deletionRequestText, { color: theme.danger }]}>
+                            냉장고 주인이 삭제를 요청했습니다. 동의하시나요?
+                          </Text>
+                          <View style={styles.deletionRequestButtonRow}>
+                            <TouchableOpacity
+                              style={[styles.deletionRequestButton, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}
+                              activeOpacity={0.8}
+                              onPress={() => {
+                                setFridgeSettingsVisible(false);
+                                onRejectDeletionRequest?.();
+                              }}
+                            >
+                              <Text style={[styles.deletionRequestButtonText, { color: theme.textSecondary }]}>거절</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[styles.deletionRequestButton, { backgroundColor: theme.danger, borderColor: theme.danger }]}
+                              activeOpacity={0.8}
+                              onPress={() => {
+                                setFridgeSettingsVisible(false);
+                                onApproveDeletionRequest?.();
+                              }}
+                            >
+                              <Text style={[styles.deletionRequestButtonText, { color: '#FFFFFF' }]}>동의</Text>
+                            </TouchableOpacity>
+                          </View>
                         </View>
-                        <Text style={[styles.settingsActionText, { color: theme.danger }]}>현재 냉장고 삭제</Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={16} color={theme.dangerMuted} />
-                    </TouchableOpacity>
+                      ) : (
+                        <View style={[styles.deletionRequestBox, { backgroundColor: theme.dangerLight, borderColor: theme.danger }]}>
+                          <Text style={[styles.deletionRequestText, { color: theme.danger }]}>
+                            삭제 요청을 보냈습니다. 함께 쓰는 멤버의 동의를 기다리는 중입니다.
+                          </Text>
+                          <TouchableOpacity
+                            style={[styles.deletionRequestButton, { backgroundColor: theme.surface, borderColor: theme.borderLight, alignSelf: 'stretch' }]}
+                            activeOpacity={0.8}
+                            onPress={() => {
+                              setFridgeSettingsVisible(false);
+                              onCancelDeletionRequest?.();
+                            }}
+                          >
+                            <Text style={[styles.deletionRequestButtonText, { color: theme.textSecondary }]}>요청 철회</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )
+                    ) : (
+                      <TouchableOpacity
+                        style={styles.settingsActionRow}
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          setFridgeSettingsVisible(false);
+                          onDeleteFridge();
+                        }}
+                      >
+                        <View style={styles.settingsActionLeft}>
+                          <View style={[styles.settingsIconBadge, { backgroundColor: theme.dangerLight }]}>
+                            <Ionicons name={activeFridge.role === 'MEMBER' ? 'log-out-outline' : 'trash-outline'} size={18} color={theme.danger} />
+                          </View>
+                          <Text style={[styles.settingsActionText, { color: theme.danger }]}>
+                            {activeFridge.role === 'MEMBER' ? '냉장고 나가기' : '현재 냉장고 삭제'}
+                          </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color={theme.dangerMuted} />
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </>
               ) : (
@@ -2212,6 +2311,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 6,
     backgroundColor: '#ECEFF1',
+  },
+  deletionOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 28,
+    backgroundColor: 'rgba(15, 23, 42, 0.82)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    zIndex: 20,
+  },
+  deletionOverlayText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  deletionOverlayButtonRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  deletionOverlayButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+  },
+  deletionOverlayButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
   fridgeCard: {
     width: '90%',
@@ -3038,6 +3168,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 14,
     paddingHorizontal: 12,
+  },
+  deletionRequestBox: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    gap: 12,
+  },
+  deletionRequestText: {
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+  deletionRequestButtonRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  deletionRequestButton: {
+    flex: 1,
+    height: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deletionRequestButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   settingsActionLeft: {
     flexDirection: 'row',

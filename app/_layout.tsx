@@ -53,6 +53,25 @@ function AppContent() {
     SystemUI.setBackgroundColorAsync(theme.background).catch(() => {});
   }, [theme.background]);
 
+  // 냉장고 삭제 요청/동의/거절/철회 푸시가 도착하면, 앱을 재시작하지 않아도
+  // 그 자리에서 바로 냉장고 목록을 다시 불러오도록 연결한다.
+  useEffect(() => {
+    const receivedSub = Notifications.addNotificationReceivedListener((notification) => {
+      if (notification.request.content.data?.type === 'fridge_deletion') {
+        queryClient.invalidateQueries({ queryKey: ['fridges'] });
+      }
+    });
+    const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
+      if (response.notification.request.content.data?.type === 'fridge_deletion') {
+        queryClient.invalidateQueries({ queryKey: ['fridges'] });
+      }
+    });
+    return () => {
+      receivedSub.remove();
+      responseSub.remove();
+    };
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>

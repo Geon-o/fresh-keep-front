@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "340573870221",
+    "project_id": "fresh-keep-adb27",
+    "storage_bucket": "fresh-keep-adb27.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:340573870221:android:f25d4eb79e19322e422ac4",
+        "android_client_info": {
+          "package_name": "com.jgo_geon.freshkeep"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCW3Cq1QEQhs4ktpoQKq_laR8tW69ZgbeU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

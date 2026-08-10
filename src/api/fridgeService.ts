@@ -7,6 +7,12 @@ export interface ServerFridge {
   type: 'FOUR_DOOR' | 'SIDE_BY_SIDE' | 'TWO_DOOR';
   role: 'OWNER' | 'MEMBER';
   uuid: string;
+  deletionRequested: boolean;
+  ownerName?: string;
+}
+
+export interface FridgeDeletionResult {
+  deleted: boolean;
 }
 
 export interface ServerIngredient {
@@ -72,10 +78,36 @@ export async function getFridges(): Promise<ServerFridge[]> {
 }
 
 /**
- * 3. 냉장고 삭제
+ * 3. 냉장고 삭제 요청
+ * 혼자 쓰는 냉장고는 즉시 삭제되지만(deleted: true), 다른 멤버와 공유 중이면
+ * 삭제 요청만 등록되고(deleted: false) 전원 동의해야 실제로 삭제된다.
+ * OWNER가 아닌 멤버가 호출하면 본인 멤버십만 제거(나가기)되며 항상 deleted: false를 반환한다.
  */
-export async function deleteFridge(fridgeId: number): Promise<void> {
-  await client.delete(`/api/fridges/${fridgeId}`);
+export async function deleteFridge(fridgeId: number): Promise<FridgeDeletionResult> {
+  const response = await client.delete<FridgeDeletionResult>(`/api/fridges/${fridgeId}`);
+  return response.data;
+}
+
+/**
+ * 3-1. 다른 멤버가 보낸 삭제 요청에 동의. 전원 동의 시 그 시점에 실제로 삭제된다.
+ */
+export async function approveDeletion(fridgeId: number): Promise<FridgeDeletionResult> {
+  const response = await client.post<FridgeDeletionResult>(`/api/fridges/${fridgeId}/deletion/approve`);
+  return response.data;
+}
+
+/**
+ * 3-2. 삭제 요청 거절. 거절 즉시 요청 자체가 취소된다.
+ */
+export async function rejectDeletion(fridgeId: number): Promise<void> {
+  await client.post(`/api/fridges/${fridgeId}/deletion/reject`);
+}
+
+/**
+ * 3-3. 주인이 본인이 보낸 삭제 요청을 철회.
+ */
+export async function cancelDeletionRequest(fridgeId: number): Promise<void> {
+  await client.post(`/api/fridges/${fridgeId}/deletion/cancel`);
 }
 
 /**

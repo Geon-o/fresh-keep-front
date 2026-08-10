@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { client } from '../src/api/client';
 import { queryClient } from '../src/api/queryClient';
 import { useTheme } from '../src/context/ThemeContext';
+import { registerPushToken } from '../src/utils/pushToken';
 
 // QR 코드에는 "https://.../share/fridge?uuid=xxxx" 형태의 공유 링크가 인코딩되어 있으므로,
 // 스캔/수동 입력된 원문에서 실제 공유 코드(uuid)만 추출한다. 링크 형식이 아니면 입력값 자체를 코드로 취급한다.
@@ -91,6 +92,8 @@ export default function QrScanScreen() {
 
       // 캐시 갱신
       queryClient.invalidateQueries({ queryKey: ['fridges'] });
+      // 삭제 요청 등 이 냉장고 관련 알림을 받을 수 있도록 지금 시점에 푸시 토큰을 등록한다.
+      registerPushToken();
 
       DeviceEventEmitter.emit('fridgeShareResult', '공동 관리 냉장고가 추가되었습니다 🎉');
       router.back();
