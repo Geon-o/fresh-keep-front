@@ -80,7 +80,7 @@ export default function QrScanScreen() {
 
     const fridgeUuid = extractFridgeUuid(rawValue);
     if (!fridgeUuid) {
-      DeviceEventEmitter.emit('fridgeShareResult', '유효하지 않은 공유 코드입니다 ⚠️');
+      DeviceEventEmitter.emit('fridgeShareResult', '유효하지 않은 공유 코드입니다');
       router.back();
       return;
     }
@@ -88,19 +88,24 @@ export default function QrScanScreen() {
     setIsProcessing(true);
     try {
       // 백엔드에 냉장고 공유 등록 API 호출
-      await client.post('/api/fridges/share', { fridgeUuid });
+      const response = await client.post('/api/fridges/share', { fridgeUuid });
 
       // 캐시 갱신
       queryClient.invalidateQueries({ queryKey: ['fridges'] });
       // 삭제 요청 등 이 냉장고 관련 알림을 받을 수 있도록 지금 시점에 푸시 토큰을 등록한다.
       registerPushToken();
 
-      DeviceEventEmitter.emit('fridgeShareResult', '공동 관리 냉장고가 추가되었습니다 🎉');
+      DeviceEventEmitter.emit(
+        'fridgeShareResult',
+        response.data?.alreadyMember
+          ? '이미 공유 중인 냉장고입니다'
+          : '공동 관리 냉장고가 추가되었습니다'
+      );
       router.back();
     } catch (e: any) {
       console.error('Failed to share fridge', e);
       const errMsg = e.response?.data?.message || '이미 등록된 냉장고이거나 유효하지 않은 공유 코드입니다.';
-      DeviceEventEmitter.emit('fridgeShareResult', `등록 실패 ❌ ${errMsg}`);
+      DeviceEventEmitter.emit('fridgeShareResult', `등록 실패: ${errMsg}`);
       router.back();
     }
   };
