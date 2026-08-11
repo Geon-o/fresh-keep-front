@@ -699,7 +699,7 @@ export default function RefrigeratorVisual({
             onPress={() => onPressCompartment('fridge_left', '냉장실 (좌)', fridgeId)}
           >
             {renderDoorAlertBadge(fridgeId, 'fridge_left')}
-            <Text style={[styles.doorLabel, { color: theme.fridgeLabel }]}>냉장실 (좌)</Text>
+            <Text style={[styles.doorLabel, { color: theme.fridgeLabel }]}>냉장실</Text>
             <Text style={[styles.doorCount, { color: theme.fridgeCountText, backgroundColor: theme.fridgeCountBg }]}>
               {getCompartmentSummary(fridgeId, 'fridge_left')}
             </Text>
@@ -712,7 +712,7 @@ export default function RefrigeratorVisual({
             onPress={() => onPressCompartment('fridge_right', '냉장실 (우)', fridgeId)}
           >
             {renderDoorAlertBadge(fridgeId, 'fridge_right')}
-            <Text style={[styles.doorLabel, { color: theme.fridgeLabel }]}>냉장실 (우)</Text>
+            <Text style={[styles.doorLabel, { color: theme.fridgeLabel }]}>냉장실</Text>
             <Text style={[styles.doorCount, { color: theme.fridgeCountText, backgroundColor: theme.fridgeCountBg }]}>
               {getCompartmentSummary(fridgeId, 'fridge_right')}
             </Text>
@@ -731,7 +731,7 @@ export default function RefrigeratorVisual({
             onPress={() => onPressCompartment('freezer_left', '냉동실 (좌)', fridgeId)}
           >
             {renderDoorAlertBadge(fridgeId, 'freezer_left')}
-            <Text style={[styles.doorLabel, { color: theme.fridgeLabel }]}>냉동실 (좌)</Text>
+            <Text style={[styles.doorLabel, { color: theme.fridgeLabel }]}>냉동실</Text>
             <Text style={[styles.doorCount, { color: theme.fridgeCountText, backgroundColor: theme.fridgeCountBg }]}>
               {getCompartmentSummary(fridgeId, 'freezer_left')}
             </Text>
@@ -744,7 +744,7 @@ export default function RefrigeratorVisual({
             onPress={() => onPressCompartment('freezer_right', '냉동실 (우)', fridgeId)}
           >
             {renderDoorAlertBadge(fridgeId, 'freezer_right')}
-            <Text style={[styles.doorLabel, { color: theme.fridgeLabel }]}>냉동실 (우)</Text>
+            <Text style={[styles.doorLabel, { color: theme.fridgeLabel }]}>냉동실</Text>
             <Text style={[styles.doorCount, { color: theme.fridgeCountText, backgroundColor: theme.fridgeCountBg }]}>
               {getCompartmentSummary(fridgeId, 'freezer_right')}
             </Text>
@@ -1700,7 +1700,7 @@ export default function RefrigeratorVisual({
                                 key={`${name}_${i}`}
                                 style={[
                                   styles.sharedAvatar,
-                                  { backgroundColor: theme.primaryLight, borderColor: theme.surface, marginLeft: i === 0 ? 0 : -10 },
+                                  { backgroundColor: theme.primaryLight, borderColor: theme.primaryBorder, marginLeft: i === 0 ? 0 : -10 },
                                 ]}
                               >
                                 <Text style={[styles.sharedAvatarText, { color: theme.primaryText }]}>{name.charAt(0)}</Text>
