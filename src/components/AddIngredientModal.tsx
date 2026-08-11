@@ -4,38 +4,31 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ingredient, IngredientCategory, ExpiryType } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { getFridgeLayout } from '../api/fridgeService';
 import { addIngredient } from '../api/ingredientService';
 import { getCustomUnits, addCustomUnit } from '../api/unitService';
 import { serializeMemo } from '../utils/memoSerializer';
 import { rebuildAllNotifications } from '../utils/ingredientNotifications';
-import {
-  createStyles,
-  CATEGORIES,
-  DEFAULT_UNITS,
-  EXPIRY_TYPE_LABELS,
-  DEFAULT_INSIDE_SHELVES,
-  DEFAULT_DOOR_SHELVES,
-} from './CompartmentDetail';
+import { createStyles, CATEGORIES, DEFAULT_UNITS, EXPIRY_TYPE_LABELS } from './CompartmentDetail';
 
 interface AddIngredientModalProps {
   visible: boolean;
   fridgeId: string;
   compartmentId: string;
+  // 목록 화면의 선택 단계(냉장고 → 칸 → 선반/문쪽)에서 이미 정해진 값을 그대로 받는다.
+  shelfId: string;
+  serverCompartmentId: number | null;
   onClose: () => void;
   onSaved: () => void;
 }
 
-// 식재료 목록 탭의 + 버튼 흐름 전용: 냉장고/칸을 고른 뒤 등록 폼을 이 화면(목록 화면) 위에 바로 띄운다.
-// CompartmentDetail로 이동하지 않으므로, 저장에 필요한 서버 구획 ID/선반 정보만 이 모달이 직접 준비한다.
-export default function AddIngredientModal({ visible, fridgeId, compartmentId, onClose, onSaved }: AddIngredientModalProps) {
+// 식재료 목록 탭의 + 버튼 흐름 전용: 냉장고/칸/선반을 고른 뒤 등록 폼을 이 화면(목록 화면) 위에 바로 띄운다.
+// CompartmentDetail로 이동하지 않는다.
+export default function AddIngredientModal({ visible, fridgeId, compartmentId, shelfId, serverCompartmentId, onClose, onSaved }: AddIngredientModalProps) {
   const { isLoggedIn } = useAuth();
   const { theme, isDark } = useTheme();
   const styles = React.useMemo(() => createStyles(theme, isDark), [theme, isDark]);
 
   const [isPreparing, setIsPreparing] = useState(true);
-  const [serverCompartmentId, setServerCompartmentId] = useState<number | null>(null);
-  const [selectedShelfId, setSelectedShelfId] = useState('');
 
   const [formName, setFormName] = useState('');
   const [formCategory, setFormCategory] = useState<IngredientCategory>('etc');
@@ -65,7 +58,7 @@ export default function AddIngredientModal({ visible, fridgeId, compartmentId, o
     return `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-${String(target.getDate()).padStart(2, '0')}`;
   };
 
-  // 모달이 열릴 때마다: 폼 초기화 + 저장에 필요한 서버 구획 ID/기본 선반 조회
+  // 모달이 열릴 때마다: 폼 초기화 + 단위 드롭다운에 쓸 커스텀 단위 목록 조회
   useEffect(() => {
     if (!visible) return;
 
@@ -86,67 +79,20 @@ export default function AddIngredientModal({ visible, fridgeId, compartmentId, o
     const prepare = async () => {
       try {
         if (isLoggedIn) {
-          const [layout, units] = await Promise.all([
-            getFridgeLayout(Number(fridgeId)),
-            getCustomUnits().catch(() => []),
-          ]);
+          const units = await getCustomUnits().catch(() => []);
           setCustomUnits(units);
-
-          const isLeft = compartmentId.includes('left');
-          const isRight = compartmentId.includes('right');
-          const serverComp = layout.compartments.find(comp => {
-            if (compartmentId.startsWith('freezer')) {
-              if (comp.storageType !== 'FROZEN') return false;
-            } else {
-              if (comp.storageType !== 'REFRIGERATED') return false;
-            }
-            if (isLeft && !comp.name.includes('좌')) return false;
-            if (isRight && !comp.name.includes('우')) return false;
-            return true;
-          }) || layout.compartments[0];
-
-          if (serverComp) {
-            setServerCompartmentId(serverComp.id);
-            let insideShelves = DEFAULT_INSIDE_SHELVES;
-            let doorShelves = DEFAULT_DOOR_SHELVES;
-            try {
-              if (serverComp.insideShelves) insideShelves = JSON.parse(serverComp.insideShelves);
-            } catch (e) {
-              console.error('Failed to parse insideShelves', e);
-            }
-            try {
-              if (serverComp.doorShelves) doorShelves = JSON.parse(serverComp.doorShelves);
-            } catch (e) {
-              console.error('Failed to parse doorShelves', e);
-            }
-            setSelectedShelfId(insideShelves[0]?.id || doorShelves[0]?.id || DEFAULT_INSIDE_SHELVES[0].id);
-          } else {
-            setServerCompartmentId(null);
-            setSelectedShelfId(DEFAULT_INSIDE_SHELVES[0].id);
-          }
         } else {
           const stored = await AsyncStorage.getItem('@custom_units');
           setCustomUnits(stored ? JSON.parse(stored) : []);
-
-          const configStr = await AsyncStorage.getItem(`@shelf_config_${fridgeId}_${compartmentId}`);
-          if (configStr) {
-            const config = JSON.parse(configStr);
-            const insideShelves = config.insideShelves || DEFAULT_INSIDE_SHELVES;
-            const doorShelves = config.doorShelves || DEFAULT_DOOR_SHELVES;
-            setSelectedShelfId(insideShelves[0]?.id || doorShelves[0]?.id || DEFAULT_INSIDE_SHELVES[0].id);
-          } else {
-            setSelectedShelfId(DEFAULT_INSIDE_SHELVES[0].id);
-          }
         }
       } catch (e) {
-        console.error('Failed to prepare add-ingredient modal', e);
-        setSelectedShelfId(DEFAULT_INSIDE_SHELVES[0].id);
+        console.error('Failed to load custom units', e);
       } finally {
         setIsPreparing(false);
       }
     };
     prepare();
-  }, [visible, fridgeId, compartmentId, isLoggedIn]);
+  }, [visible, isLoggedIn]);
 
   const toggleCategoryDropdown = () => {
     setUnitDropdownOpen(false);
@@ -207,7 +153,7 @@ export default function AddIngredientModal({ visible, fridgeId, compartmentId, o
     isSavingRef.current = true;
     setIsSaving(true);
     try {
-      const memoContent = serializeMemo(formCategory, selectedShelfId, formMemo);
+      const memoContent = serializeMemo(formCategory, shelfId, formMemo);
 
       if (isLoggedIn) {
         if (!serverCompartmentId) {
@@ -227,7 +173,7 @@ export default function AddIngredientModal({ visible, fridgeId, compartmentId, o
           id: `ing_${Date.now()}`,
           name: formName.trim(),
           location: compartmentId,
-          subLocation: selectedShelfId as any,
+          subLocation: shelfId as any,
           category: formCategory,
           expiryDate: formExpiryDate,
           expiryType: formExpiryType,

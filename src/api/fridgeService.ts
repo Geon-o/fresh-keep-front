@@ -131,6 +131,63 @@ export async function updateFridge(fridgeId: number, name: string, type: FridgeT
   return response.data;
 }
 
+const DEFAULT_INSIDE_SHELVES = [
+  { id: 'shelf_1', label: '선반 1단' },
+  { id: 'shelf_2', label: '선반 2단' },
+  { id: 'shelf_3', label: '선반 3단' },
+];
+const DEFAULT_DOOR_SHELVES = [
+  { id: 'pocket_1', label: '선반 1단' },
+  { id: 'pocket_2', label: '선반 2단' },
+];
+
+export interface CompartmentShelfInfo {
+  serverCompartmentId: number | null;
+  insideShelves: { id: string; label: string }[];
+  doorShelves: { id: string; label: string }[];
+  hasDoorStorage: boolean;
+}
+
+/**
+ * 5-1. 특정 구획(냉장실/냉동실 좌우)의 서버 구획 ID와 선반 구성(내부/문쪽) 조회.
+ * 식재료 등록 시 "어느 칸에 넣을지" 선택지를 만드는 데 사용한다.
+ */
+export async function getCompartmentShelves(fridgeId: string, compartmentId: string): Promise<CompartmentShelfInfo> {
+  const layout = await getFridgeLayout(Number(fridgeId));
+  const isLeft = compartmentId.includes('left');
+  const isRight = compartmentId.includes('right');
+  const serverComp = layout.compartments.find(comp => {
+    if (compartmentId.startsWith('freezer')) {
+      if (comp.storageType !== 'FROZEN') return false;
+    } else {
+      if (comp.storageType !== 'REFRIGERATED') return false;
+    }
+    if (isLeft && !comp.name.includes('좌')) return false;
+    if (isRight && !comp.name.includes('우')) return false;
+    return true;
+  }) || layout.compartments[0];
+
+  if (!serverComp) {
+    return { serverCompartmentId: null, insideShelves: DEFAULT_INSIDE_SHELVES, doorShelves: DEFAULT_DOOR_SHELVES, hasDoorStorage: true };
+  }
+
+  let insideShelves = DEFAULT_INSIDE_SHELVES;
+  let doorShelves = DEFAULT_DOOR_SHELVES;
+  try {
+    if (serverComp.insideShelves) insideShelves = JSON.parse(serverComp.insideShelves);
+  } catch (e) {
+    console.error('Failed to parse insideShelves', e);
+  }
+  try {
+    if (serverComp.doorShelves) doorShelves = JSON.parse(serverComp.doorShelves);
+  } catch (e) {
+    console.error('Failed to parse doorShelves', e);
+  }
+  const hasDoorStorage = serverComp.hasDoorStorage !== undefined && serverComp.hasDoorStorage !== null ? serverComp.hasDoorStorage : true;
+
+  return { serverCompartmentId: serverComp.id, insideShelves, doorShelves, hasDoorStorage };
+}
+
 /**
  * 6. 특정 구획의 선반 설정 및 문쪽 보관실 사용 설정 변경
  */

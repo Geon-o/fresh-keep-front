@@ -6,10 +6,10 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import * as WebBrowser from 'expo-web-browser';
 import { FridgeType, Ingredient } from '../types';
-import { SAMPLE_INGREDIENTS, CATEGORY_EMOJI } from './CompartmentDetail';
+import { SAMPLE_INGREDIENTS, CATEGORY_EMOJI, DEFAULT_INSIDE_SHELVES, DEFAULT_DOOR_SHELVES } from './CompartmentDetail';
 import AddIngredientModal from './AddIngredientModal';
 import { useAuth } from '../context/AuthContext';
-import { getFridgeLayout } from '../api/fridgeService';
+import { getFridgeLayout, getCompartmentShelves, CompartmentShelfInfo } from '../api/fridgeService';
 import { deserializeMemo, convertServerLocationToLocal } from '../utils/memoSerializer';
 import { rebuildAllNotifications } from '../utils/ingredientNotifications';
 import { useTheme } from '../context/ThemeContext';
@@ -384,11 +384,14 @@ export default function RefrigeratorVisual({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [memberSheetVisible]);
 
-  // 식재료 목록 탭 + 버튼으로 여는 등록 위치(냉장고/보관실) 선택 모달
+  // 식재료 목록 탭 + 버튼으로 여는 등록 위치(냉장고 → 칸 → 선반/문쪽) 선택 모달
   const [addLocationPickerVisible, setAddLocationPickerVisible] = useState(false);
   const [addPickerFridgeId, setAddPickerFridgeId] = useState<string | null>(null);
+  const [addPickerCompartmentId, setAddPickerCompartmentId] = useState<string | null>(null);
+  const [addPickerShelves, setAddPickerShelves] = useState<CompartmentShelfInfo | null>(null);
+  const [addPickerShelvesLoading, setAddPickerShelvesLoading] = useState(false);
   // 위치 선택이 끝나면 이 화면(식재료 목록)을 벗어나지 않고 바로 등록 폼을 띄운다
-  const [addIngredientTarget, setAddIngredientTarget] = useState<{ fridgeId: string; compartmentId: string } | null>(null);
+  const [addIngredientTarget, setAddIngredientTarget] = useState<{ fridgeId: string; compartmentId: string; shelfId: string; serverCompartmentId: number | null } | null>(null);
 
   const [fridgeCardWidth, setFridgeCardWidth] = useState(0);
 
@@ -567,6 +570,10 @@ export default function RefrigeratorVisual({
     }
   };
 
+  // 문쪽(pocket_*)에 보관 중인 식재료는 목록에서도 "문쪽"까지 표기해 구분되도록 한다
+  const getLocationDisplayLabel = (locationLabel: string, subLocation?: string): string =>
+    subLocation?.startsWith('pocket') ? `${locationLabel} 문쪽` : locationLabel;
+
   // 냉장고 타입별 보관실 목록 (도어 일러스트를 직접 탐색하지 않고 바로 선택할 수 있도록)
   const getCompartmentsForType = (type: FridgeType): { id: string; label: string }[] => {
     if (type === 'four-door') {
@@ -593,11 +600,61 @@ export default function RefrigeratorVisual({
     setAddLocationPickerVisible(true);
   };
 
-  // 보관실 선택 완료: 이 화면(식재료 목록)을 벗어나지 않고 바로 등록 폼을 띄운다
-  const handlePickAddCompartment = (compartmentId: string, fridgeId: string) => {
+  // 보관실(냉장실/냉동실 좌우) 선택 완료: 문쪽 보관 포함 선반 목록을 불러와 다음 단계(선반 선택)로 넘어간다
+  const handlePickAddCompartment = async (compartmentId: string, fridgeId: string) => {
+    setAddPickerCompartmentId(compartmentId);
+    setAddPickerShelves(null);
+    setAddPickerShelvesLoading(true);
+    try {
+      if (isLoggedIn) {
+        const info = await getCompartmentShelves(fridgeId, compartmentId);
+        setAddPickerShelves(info);
+      } else {
+        const configStr = await AsyncStorage.getItem(`@shelf_config_${fridgeId}_${compartmentId}`);
+        if (configStr) {
+          const config = JSON.parse(configStr);
+          setAddPickerShelves({
+            serverCompartmentId: null,
+            insideShelves: config.insideShelves || DEFAULT_INSIDE_SHELVES,
+            doorShelves: config.doorShelves || DEFAULT_DOOR_SHELVES,
+            hasDoorStorage: config.hasDoorStorage !== undefined ? config.hasDoorStorage : true,
+          });
+        } else {
+          setAddPickerShelves({
+            serverCompartmentId: null,
+            insideShelves: DEFAULT_INSIDE_SHELVES,
+            doorShelves: DEFAULT_DOOR_SHELVES,
+            hasDoorStorage: true,
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load shelves for add picker', e);
+      setAddPickerShelves({
+        serverCompartmentId: null,
+        insideShelves: DEFAULT_INSIDE_SHELVES,
+        doorShelves: DEFAULT_DOOR_SHELVES,
+        hasDoorStorage: true,
+      });
+    } finally {
+      setAddPickerShelvesLoading(false);
+    }
+  };
+
+  // 선반 선택 완료: 이 화면(식재료 목록)을 벗어나지 않고 바로 등록 폼을 띄운다
+  const handlePickAddShelf = (shelfId: string) => {
+    if (!addPickerFridgeId || !addPickerCompartmentId) return;
+    const target = {
+      fridgeId: addPickerFridgeId,
+      compartmentId: addPickerCompartmentId,
+      shelfId,
+      serverCompartmentId: addPickerShelves?.serverCompartmentId ?? null,
+    };
     setAddLocationPickerVisible(false);
     setAddPickerFridgeId(null);
-    setAddIngredientTarget({ fridgeId, compartmentId });
+    setAddPickerCompartmentId(null);
+    setAddPickerShelves(null);
+    setAddIngredientTarget(target);
   };
 
   // 특정 냉장고의 칸 요약 뱃지 계산
@@ -1421,7 +1478,7 @@ export default function RefrigeratorVisual({
                               {item.name}
                             </Text>
                             <Text style={[styles.urgentListLocation, { color: theme.textSecondary }]} numberOfLines={1}>
-                              {`${fridge ? fridge.name : '냉장고'} > ${locationLabel}`}
+                              {`${fridge ? fridge.name : '냉장고'} > ${getLocationDisplayLabel(locationLabel, item.subLocation)}`}
                             </Text>
                           </View>
                         </View>
@@ -1972,7 +2029,7 @@ export default function RefrigeratorVisual({
                               {item.name}
                             </Text>
                             <Text style={[styles.ingCardLoc, { color: theme.textSecondary }]}>
-                              {`${fridge ? fridge.name : '냉장고'} > ${locationLabel}`}
+                              {`${fridge ? fridge.name : '냉장고'} > ${getLocationDisplayLabel(locationLabel, item.subLocation)}`}
                             </Text>
                             <Text style={[styles.ingCardQty, { color: theme.textSecondary }]}>
                               수량: {item.quantity} {item.unit}
@@ -2011,32 +2068,105 @@ export default function RefrigeratorVisual({
         </View>
       )}
 
-      {/* 식재료 등록 위치(냉장고/보관실) 선택 모달 */}
+      {/* 식재료 등록 위치(냉장고 → 칸 → 선반/문쪽) 선택 모달 */}
       <Modal
         visible={addLocationPickerVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => { setAddLocationPickerVisible(false); setAddPickerFridgeId(null); }}
+        onRequestClose={() => {
+          setAddLocationPickerVisible(false);
+          setAddPickerFridgeId(null);
+          setAddPickerCompartmentId(null);
+          setAddPickerShelves(null);
+        }}
       >
         <View style={[styles.modalOverlay, { backgroundColor: theme.modalOverlay }]}>
           <View style={[styles.settingsModalContent, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Ionicons name="add-circle-outline" size={20} color={theme.textPrimary} />
-                <Text style={[styles.modalTitleText, { color: theme.textPrimary }]}>
-                  {addPickerFridgeId ? '어디에 등록할까요?' : '어느 냉장고인가요?'}
-                </Text>
+            <View>
+              {(addPickerCompartmentId || (addPickerFridgeId && refrigerators.length > 1)) && (
+                <TouchableOpacity
+                  onPress={() => {
+                    if (addPickerCompartmentId) {
+                      setAddPickerCompartmentId(null);
+                      setAddPickerShelves(null);
+                    } else {
+                      setAddPickerFridgeId(null);
+                    }
+                  }}
+                  style={styles.modalCloseButton}
+                >
+                  <Ionicons name="chevron-back" size={22} color={theme.textSecondary} />
+                </TouchableOpacity>
+              )}
+              <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={[styles.modalTitleText, { color: theme.textPrimary }]}>
+                    {addPickerCompartmentId ? '어느 칸에 등록할까요?' : addPickerFridgeId ? '어디에 등록할까요?' : '냉장고를 선택해주세요'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    setAddLocationPickerVisible(false);
+                    setAddPickerFridgeId(null);
+                    setAddPickerCompartmentId(null);
+                    setAddPickerShelves(null);
+                  }}
+                  style={styles.modalCloseButton}
+                >
+                  <Ionicons name="close" size={24} color={theme.textSecondary} />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                onPress={() => { setAddLocationPickerVisible(false); setAddPickerFridgeId(null); }}
-                style={styles.modalCloseButton}
-              >
-                <Ionicons name="close" size={24} color={theme.textSecondary} />
-              </TouchableOpacity>
             </View>
 
             <View style={styles.pickerModalBody}>
-              {!addPickerFridgeId ? (
+              {addPickerCompartmentId ? (
+                addPickerShelvesLoading || !addPickerShelves ? (
+                  <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                    <ActivityIndicator size="small" color={theme.primary} />
+                  </View>
+                ) : (
+                  <>
+                    <Text style={[styles.pickerSectionLabel, { color: theme.textMuted }]}>내부 보관</Text>
+                    {addPickerShelves.insideShelves.map(shelf => (
+                      <TouchableOpacity
+                        key={shelf.id}
+                        style={[styles.settingsActionRow, { borderBottomWidth: 1, borderBottomColor: theme.borderLight }]}
+                        activeOpacity={0.7}
+                        onPress={() => handlePickAddShelf(shelf.id)}
+                      >
+                        <View style={styles.settingsActionLeft}>
+                          <View style={[styles.settingsIconBadge, { backgroundColor: theme.primaryLight }]}>
+                            <Ionicons name="albums-outline" size={18} color={theme.primary} />
+                          </View>
+                          <Text style={[styles.settingsActionText, { color: theme.textSecondary }]}>{shelf.label}</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+                      </TouchableOpacity>
+                    ))}
+                    {addPickerShelves.hasDoorStorage && addPickerShelves.doorShelves.length > 0 && (
+                      <>
+                        <Text style={[styles.pickerSectionLabel, { color: theme.textMuted, marginTop: 12 }]}>문쪽 보관</Text>
+                        {addPickerShelves.doorShelves.map(shelf => (
+                          <TouchableOpacity
+                            key={shelf.id}
+                            style={[styles.settingsActionRow, { borderBottomWidth: 1, borderBottomColor: theme.borderLight }]}
+                            activeOpacity={0.7}
+                            onPress={() => handlePickAddShelf(shelf.id)}
+                          >
+                            <View style={styles.settingsActionLeft}>
+                              <View style={[styles.settingsIconBadge, { backgroundColor: theme.primaryLight }]}>
+                                <Ionicons name="reorder-two-outline" size={18} color={theme.primary} />
+                              </View>
+                              <Text style={[styles.settingsActionText, { color: theme.textSecondary }]}>{shelf.label}</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+                          </TouchableOpacity>
+                        ))}
+                      </>
+                    )}
+                  </>
+                )
+              ) : !addPickerFridgeId ? (
                 refrigerators.map(fridge => (
                   <TouchableOpacity
                     key={fridge.id}
@@ -2082,6 +2212,8 @@ export default function RefrigeratorVisual({
           visible={!!addIngredientTarget}
           fridgeId={addIngredientTarget.fridgeId}
           compartmentId={addIngredientTarget.compartmentId}
+          shelfId={addIngredientTarget.shelfId}
+          serverCompartmentId={addIngredientTarget.serverCompartmentId}
           onClose={() => setAddIngredientTarget(null)}
           onSaved={loadIngredients}
         />
@@ -3576,6 +3708,11 @@ const styles = StyleSheet.create({
   },
   pickerModalBody: {
     marginTop: 16,
+  },
+  pickerSectionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 4,
   },
   settingsTopSectionScroll: {
     flex: 1,
