@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, ScrollView, Platform, Alert, TextInput, Modal, ActivityIndicator, PanResponder, Dimensions, Animated, Easing } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, Text, ScrollView, Platform, Alert, TextInput, Modal, ActivityIndicator, PanResponder, Dimensions, Animated, Easing, Switch } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
@@ -638,11 +638,15 @@ export default function CompartmentDetail({
   // 안쪽 보관실 선반 아코디언 펼침 상태 (여러 선반 동시 펼침 가능)
   const [expandedShelfIds, setExpandedShelfIds] = useState<Set<string>>(new Set());
 
-  // 문쪽 보관실 하단 탭 + 위로 펼쳐지는 드로어 상태
+  // 문쪽 보관실 사용 토글 아래 여닫기 버튼 + 아래로 펼쳐지는 드로어 상태
   const [doorDrawerOpen, setDoorDrawerOpen] = useState(false);
   const doorDrawerAnim = useRef(new Animated.Value(0)).current; // 0: 닫힘, 1: 열림
-  const DOOR_BOTTOM_TAB_HEIGHT = 38;
+  // 드로어 내용물(선반 카드들)의 실제 높이. 여닫기 버튼 위치에서 시작/수렴하도록
+  // 애니메이션 이동 거리를 이 실측값에 맞춘다 (고정값을 쓰면 화면 위쪽에서 내려오는 것처럼 보임).
+  const [doorPanelHeight, setDoorPanelHeight] = useState(0);
+  const DOOR_TOGGLE_BAR_HEIGHT = 38;
   const DOOR_DRAWER_HEIGHT = Math.min(screenHeight * 0.6, 480);
+  const doorSlideDistance = Math.min(doorPanelHeight || DOOR_DRAWER_HEIGHT, DOOR_DRAWER_HEIGHT);
 
   // 식재료 폼 상태
   const [formName, setFormName] = useState('');
@@ -956,14 +960,15 @@ export default function CompartmentDetail({
     });
   };
 
-  // 문쪽 보관실 드로어 열기/닫기 (애니메이션 완료 후 드래그앤드롭용 좌표 재측정)
+  // 문쪽 보관실 드로어 열기/닫기: 토글 바에 붙은 채로 높이만 늘어나며 펼쳐진다.
+  // (height는 useNativeDriver를 지원하지 않아 JS 드라이버로 돌린다. 애니메이션 완료 후 드래그앤드롭용 좌표 재측정)
   const openDoorDrawer = () => {
     setDoorDrawerOpen(true);
     Animated.timing(doorDrawerAnim, {
       toValue: 1,
       duration: 320,
       easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start(() => {
       measureShelves();
     });
@@ -974,7 +979,7 @@ export default function CompartmentDetail({
       toValue: 0,
       duration: 260,
       easing: Easing.in(Easing.cubic),
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start(() => {
       setDoorDrawerOpen(false);
       measureShelves();
@@ -1488,81 +1493,60 @@ export default function CompartmentDetail({
           {/* 설정 바: 문쪽 보관실 사용 설정 */}
           <View style={styles.settingsBar}>
             <Text style={styles.settingsLabel}>문쪽 보관실 사용</Text>
-            <View style={styles.toggleGroup}>
-              <TouchableOpacity
-                style={{ ...styles.toggleButton, ...(hasDoorStorage ? styles.toggleButtonActive : {}) }}
-                onPress={() => handleToggleDoorStorage(true)}
-                activeOpacity={0.7}
-              >
-                <Text style={{ ...styles.toggleButtonText, ...(hasDoorStorage ? styles.toggleButtonTextActive : {}) }}>있음</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={{ ...styles.toggleButton, ...(!hasDoorStorage ? styles.toggleButtonActive : {}) }}
-                onPress={() => handleToggleDoorStorage(false)}
-                activeOpacity={0.7}
-              >
-                <Text style={{ ...styles.toggleButtonText, ...(!hasDoorStorage ? styles.toggleButtonTextActive : {}) }}>없음</Text>
-              </TouchableOpacity>
-            </View>
+            <Switch
+              value={hasDoorStorage}
+              onValueChange={handleToggleDoorStorage}
+              trackColor={{ false: theme.toggleBg, true: theme.primary }}
+              thumbColor="#FFFFFF"
+            />
           </View>
 
-          <Animated.View style={[styles.body, { opacity: contentOpacity, transform: [{ translateX: contentTranslateX }] }]}>
-            {/* 안쪽 보관실: 전체 폭 아코디언 리스트 */}
-            <ScrollView
-              style={styles.insideScroll}
-              contentContainerStyle={[
-                styles.insideScrollContent,
-                hasDoorStorage && { paddingBottom: 32 + DOOR_BOTTOM_TAB_HEIGHT },
-              ]}
-            >
-              {insideShelves.map((shelf) => renderShelfCard(shelf, 'inside'))}
-
-              <TouchableOpacity
-                style={styles.addShelfButton}
-                activeOpacity={0.7}
-                onPress={() => handleAddShelf('inside')}
-              >
-                <Text style={styles.addShelfButtonText}>+ 선반 추가</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </Animated.View>
-
-          {/* 문쪽 보관실: 하단 탭 + 위로 펼쳐지는 드로어 */}
+          {/* 문쪽 보관실 여닫기 바 + 아래로 펼쳐지는 드로어 (설정 바 바로 아래, 안쪽 보관실 위에 겹쳐서 열림) */}
           {hasDoorStorage && (
-            <>
-              {doorDrawerOpen && (
-                <TouchableOpacity
-                  style={styles.doorDrawerBackdrop}
-                  activeOpacity={1}
-                  onPress={closeDoorDrawer}
-                />
-              )}
+            <View style={styles.doorSection}>
+              <TouchableOpacity
+                style={[
+                  styles.doorToggleBar,
+                  { height: DOOR_TOGGLE_BAR_HEIGHT },
+                  doorDrawerOpen && styles.doorToggleBarFlush,
+                ]}
+                activeOpacity={0.8}
+                onPress={() => (doorDrawerOpen ? closeDoorDrawer() : openDoorDrawer())}
+              >
+                <Text style={styles.doorToggleBarText}>
+                  {doorDrawerOpen ? '▴  문쪽 보관실 닫기' : '▾  문쪽 보관실'}
+                  {(() => {
+                    const doorItemCount = doorShelves.reduce((sum, shelf) => sum + getItemsBySubLocation(shelf.id).length, 0);
+                    return doorItemCount > 0 ? ` (${doorItemCount})` : '';
+                  })()}
+                </Text>
+              </TouchableOpacity>
 
               <Animated.View
                 style={[
                   styles.doorDrawerPanel,
                   {
-                    height: DOOR_DRAWER_HEIGHT,
-                    bottom: DOOR_BOTTOM_TAB_HEIGHT,
+                    top: DOOR_TOGGLE_BAR_HEIGHT,
+                    height: doorDrawerAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, doorSlideDistance],
+                    }),
                     opacity: doorDrawerAnim,
-                    transform: [{
-                      translateY: doorDrawerAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [DOOR_DRAWER_HEIGHT, 0],
-                      }),
-                    }],
                   },
                 ]}
                 pointerEvents={doorDrawerOpen ? 'auto' : 'none'}
               >
-                <View style={styles.doorDrawerPanelInner}>
+                <View
+                  style={styles.doorDrawerPanelInner}
+                  onLayout={(e) => setDoorPanelHeight(e.nativeEvent.layout.height)}
+                >
                   <View style={styles.doorDrawerHeader}>
                     <Text style={styles.sectionTitle}>문쪽 보관실</Text>
                     <TouchableOpacity style={styles.modalCloseButton} onPress={closeDoorDrawer}>
                       <Text style={styles.modalCloseText}>✕</Text>
                     </TouchableOpacity>
                   </View>
-                  <ScrollView style={styles.doorDrawerScroll} contentContainerStyle={styles.insideScrollContent}>
+                  <ScrollView contentContainerStyle={styles.insideScrollContent}>
                     {doorShelves.map((shelf) => renderShelfCard(shelf, 'door'))}
 
                     <TouchableOpacity
@@ -1575,22 +1559,35 @@ export default function CompartmentDetail({
                   </ScrollView>
                 </View>
               </Animated.View>
+            </View>
+          )}
+
+          <Animated.View style={[styles.body, { opacity: contentOpacity, transform: [{ translateX: contentTranslateX }] }]}>
+            {/* 안쪽 보관실: 전체 폭 아코디언 리스트 */}
+            <ScrollView
+              style={styles.insideScroll}
+              contentContainerStyle={styles.insideScrollContent}
+            >
+              {insideShelves.map((shelf) => renderShelfCard(shelf, 'inside'))}
 
               <TouchableOpacity
-                style={[
-                  styles.doorBottomTab,
-                  { height: DOOR_BOTTOM_TAB_HEIGHT },
-                  doorDrawerOpen && styles.doorBottomTabFlush,
-                ]}
-                activeOpacity={0.8}
-                onPress={() => (doorDrawerOpen ? closeDoorDrawer() : openDoorDrawer())}
+                style={styles.addShelfButton}
+                activeOpacity={0.7}
+                onPress={() => handleAddShelf('inside')}
               >
-                <Text style={styles.doorBottomTabText}>
-                  {doorDrawerOpen ? '▾  문쪽 보관실 닫기' : '▴  문쪽 보관실'}
-                </Text>
+                <Text style={styles.addShelfButtonText}>+ 선반 추가</Text>
               </TouchableOpacity>
-            </>
-          )}
+            </ScrollView>
+
+            {/* 문쪽 보관실이 열려있는 동안 안쪽 보관실 영역만 어둡게 (뒷배경 전체가 아니라 이 영역만) */}
+            {hasDoorStorage && doorDrawerOpen && (
+              <TouchableOpacity
+                style={styles.doorDrawerBackdrop}
+                activeOpacity={1}
+                onPress={closeDoorDrawer}
+              />
+            )}
+          </Animated.View>
         </>
       )}
 
@@ -1947,35 +1944,6 @@ export function createStyles(theme: ThemeColors, isDark: boolean) {
       fontWeight: 'bold',
       color: theme.textSecondary,
     },
-    toggleGroup: {
-      flexDirection: 'row',
-      backgroundColor: theme.toggleBg,
-      borderRadius: 20,
-      padding: 3,
-    },
-    toggleButton: {
-      paddingVertical: 6,
-      paddingHorizontal: 16,
-      borderRadius: 18,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    toggleButtonActive: {
-      backgroundColor: theme.primary,
-      shadowColor: '#000000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 3,
-      elevation: 2,
-    },
-    toggleButtonText: {
-      fontSize: 12,
-      fontWeight: 'bold',
-      color: theme.toggleInactiveText,
-    },
-    toggleButtonTextActive: {
-      color: theme.primaryOnPrimary,
-    },
     header: {
       width: '100%',
       height: 64,
@@ -2072,40 +2040,42 @@ export function createStyles(theme: ThemeColors, isDark: boolean) {
       color: theme.textMuted,
       fontWeight: 'bold',
     },
-    doorBottomTab: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      bottom: 0,
+    // 문쪽 보관실 여닫기 바 + 드로어를 담는 컨테이너. 안쪽 보관실 스크롤 바로 위에서
+    // top 기준으로 드로어를 절대 위치시키기 위한 기준점 역할만 한다.
+    doorSection: {
+      position: 'relative',
+      zIndex: 20,
+    },
+    doorToggleBar: {
       backgroundColor: theme.primary,
       alignItems: 'center',
       justifyContent: 'center',
-      borderTopWidth: 1,
-      borderTopColor: isDark ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.06)',
-      borderTopLeftRadius: 14,
-      borderTopRightRadius: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.06)',
+      borderBottomLeftRadius: 14,
+      borderBottomRightRadius: 14,
       shadowColor: isDark ? '#FFFFFF' : '#000000',
-      shadowOffset: { width: 0, height: -2 },
+      shadowOffset: { width: 0, height: 2 },
       shadowOpacity: isDark ? 0.1 : 0.12,
       shadowRadius: 6,
       elevation: 8,
-      zIndex: 25,
     },
     // 드로어가 열려 패널과 맞닿아 있을 때는 각진 모서리로 이어 붙여
     // 둥근 모서리 틈으로 그림자가 비치는 현상을 없앰
-    doorBottomTabFlush: {
-      borderTopLeftRadius: 0,
-      borderTopRightRadius: 0,
-      borderTopWidth: 0,
+    doorToggleBarFlush: {
+      borderBottomLeftRadius: 0,
+      borderBottomRightRadius: 0,
+      borderBottomWidth: 0,
       shadowOpacity: 0,
       elevation: 0,
     },
-    doorBottomTabText: {
+    doorToggleBarText: {
       fontSize: 13,
       fontWeight: 'bold',
       color: theme.primaryOnPrimary,
       textAlign: 'center',
     },
+    // 안쪽 보관실(body) 영역에만 씌우는 딤 처리. 화면 전체가 아니라 이 영역의 부모(body) 크기만큼만 덮인다.
     doorDrawerBackdrop: {
       position: 'absolute',
       top: 0,
@@ -2117,30 +2087,30 @@ export function createStyles(theme: ThemeColors, isDark: boolean) {
     },
     // 애니메이션(transform)이 걸리는 바깥 컨테이너: 그림자만 담당하고
     // overflow/borderRadius를 함께 두지 않아 프레임마다 클립 마스크를 다시
-    // 계산하지 않도록 분리 (안 그러면 위로 올라오는 모션이 끊겨 보임)
+    // 계산하지 않도록 분리 (안 그러면 아래로 펼쳐지는 모션이 끊겨 보임)
     doorDrawerPanel: {
       position: 'absolute',
       left: 0,
       right: 0,
-      shadowColor: isDark ? '#FFFFFF' : '#000000',
-      shadowOffset: { width: 0, height: -4 },
-      shadowOpacity: isDark ? 0.1 : 0.15,
-      shadowRadius: 10,
-      elevation: 10,
-      zIndex: 20,
-    },
-    // 실제 배경/모서리 둥글림/스크롤 클리핑은 애니메이션되지 않는 내부 뷰가 담당
-    doorDrawerPanelInner: {
-      flex: 1,
-      backgroundColor: theme.surface,
-      borderTopWidth: isDark ? 1.5 : 1,
-      borderTopColor: isDark ? 'rgba(255,255,255,0.16)' : theme.borderLight,
-      borderTopLeftRadius: 16,
-      borderTopRightRadius: 16,
       overflow: 'hidden',
+      // 뒤쪽 선반들과 확실히 구분되도록 공중에 떠 있는 느낌으로 그림자를 강하게 준다
+      shadowColor: isDark ? '#FFFFFF' : '#000000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: isDark ? 0.16 : 0.28,
+      shadowRadius: 18,
+      elevation: 18,
     },
-    doorDrawerScroll: {
-      flex: 1,
+    // 실제 배경/모서리 둥글림은 애니메이션되지 않는 내부 뷰가 담당.
+    // flex:1을 주지 않아 고정 높이가 아니라 선반 내용물만큼만 자연스럽게 늘어난다.
+    // 위쪽(여닫기 바와 맞닿는 면)만 빼고 테두리를 둘러서 뒤쪽 선반들과 확실히 구분한다.
+    doorDrawerPanelInner: {
+      backgroundColor: theme.surface,
+      borderLeftWidth: isDark ? 1.5 : 1,
+      borderRightWidth: isDark ? 1.5 : 1,
+      borderBottomWidth: isDark ? 1.5 : 1,
+      borderColor: isDark ? 'rgba(255,255,255,0.16)' : theme.borderLight,
+      borderBottomLeftRadius: 16,
+      borderBottomRightRadius: 16,
     },
     doorDrawerHeader: {
       flexDirection: 'row',
