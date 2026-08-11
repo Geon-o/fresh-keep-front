@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions, TextInput, Platform, ActivityIndicator, Linking, Alert, Modal, Animated, PanResponder } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Circle } from 'react-native-svg';
 
 import * as Location from 'expo-location';
 import * as WebBrowser from 'expo-web-browser';
@@ -136,10 +137,6 @@ const formatKoreanRegion = (text: string): string => {
   }
   return cleaned;
 };
-
-// 전역 홈 인사말 캐시 (설정 탭 등으로 이동해 컴포넌트가 언마운트/재마운트돼도
-// 앱을 완전히 재시작하기 전까지는 멘트가 바뀌지 않도록 세션 동안 고정한다)
-let greetingCache: string | null = null;
 
 // 전역 날씨 캐시
 let weatherCache: {
@@ -1308,46 +1305,18 @@ export default function RefrigeratorVisual({
   // 인사말에 항상 표시할 닉네임 (미로그인 시 설정 화면과 동일하게 '익명 사용자'로 표기)
   const greetingName = isLoggedIn && user?.name ? user.name : '익명 사용자';
 
-  // 개인화 멘트: 냉장고 상태(만료/임박)에 따라 다른 멘트 후보 중 하나를 골라
-  // 전역 캐시에 저장해두고, 앱을 재시작하기 전까지는 탭을 오가도 그대로 유지한다.
-  // 식재료 목록은 비동기로 로드되므로(마운트 시점엔 아직 빈 배열) 로드가 끝난 뒤에 골라야
-  // 만료/임박 개수를 정확히 반영할 수 있다.
-  const [greeting, setGreeting] = useState(() => greetingCache || '');
-
-  useEffect(() => {
-    if (greetingCache) return;
-    if (!ingredientsLoaded) return;
-
-    let candidates: string[];
-
-    if (totalExpired > 0) {
-      candidates = [
-        `만료된 식재료가 ${totalExpired}개 있어요, 확인해보세요`,
-        `유통기한이 지난 식재료 ${totalExpired}개를 정리해볼까요?`,
-      ];
-    } else if (totalImminent > 0) {
-      candidates = [
-        `곧 소비기한이 다가오는 식재료가 ${totalImminent}개 있어요`,
-        `식재료 ${totalImminent}개가 곧 만료돼요, 오늘 먼저 드셔보세요`,
-      ];
-    } else {
-      candidates = [
-        `냉장고가 아주 깔끔하게 관리되고 있어요`,
-        `모든 식재료가 신선하게 잘 보관되고 있어요`,
-        `완벽해요, 지금처럼만 유지해봐요`,
-      ];
-    }
-
-    candidates.push(
-      `오늘도 신선하게 관리해볼까요?`,
-      `오늘 뭐 먹을지 냉장고에서 찾아볼까요?`,
-      `냉장고 속 재료들을 한 번 둘러보세요`,
-    );
-
-    const picked = candidates[Math.floor(Math.random() * candidates.length)];
-    greetingCache = picked;
-    setGreeting(picked);
-  }, [ingredientsLoaded]);
+  // 인사말: 랜덤 후보 뽑기 + 캐싱 대신, 현재 냉장고 상태를 그대로 반영하는 결정론적 문구.
+  // 캐시가 없으므로 만료/임박 개수가 바뀌면 즉시 따라간다.
+  const totalIngredientCount = totalExpired + totalImminent + totalSafe;
+  const greeting = !ingredientsLoaded
+    ? ''
+    : totalExpired > 0
+      ? `만료된 식재료 ${totalExpired}개, 지금 확인해보세요`
+      : totalImminent > 0
+        ? `곧 만료되는 식재료 ${totalImminent}개가 있어요`
+        : totalIngredientCount > 0
+          ? `등록된 식재료 ${totalIngredientCount}개, 모두 안전해요`
+          : `등록된 식재료가 없어요`;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -1385,14 +1354,6 @@ export default function RefrigeratorVisual({
           {/* 식재료 신선도 요약 대시보드 */}
           {(() => {
             const totalCount = totalExpired + totalImminent + totalSafe;
-            const freshnessScore = totalCount > 0 ? Math.round((totalSafe / totalCount) * 100) : 0;
-            const ringColor = totalCount === 0
-              ? theme.textTertiary
-              : totalExpired > 0 
-                ? theme.ddayExpired 
-                : totalImminent > 0 
-                  ? theme.ddayImminent 
-                  : theme.ddaySafe;
 
             const friendlyTitle = totalCount === 0
               ? `보관 중인 식재료가 없어요\n첫 식재료를 등록해 볼까요? 🍎`
@@ -1420,7 +1381,8 @@ export default function RefrigeratorVisual({
                         }]}
                         activeOpacity={0.7}
                         onPress={() => {
-                          setSelectedFilter(selectedFilter === 'expired' ? 'all' : 'expired');
+                          setSelectedFilter('expired');
+                          onChangeTab?.('ingredients');
                         }}
                       >
                         <Text style={[styles.statusChipText, { color: theme.ddayExpired }]}>
@@ -1436,7 +1398,8 @@ export default function RefrigeratorVisual({
                         }]}
                         activeOpacity={0.7}
                         onPress={() => {
-                          setSelectedFilter(selectedFilter === 'imminent' ? 'all' : 'imminent');
+                          setSelectedFilter('imminent');
+                          onChangeTab?.('ingredients');
                         }}
                       >
                         <Text style={[styles.statusChipText, { color: theme.ddayImminent === '#EAB308' ? '#CA8A04' : theme.ddayImminent }]}>
@@ -1452,7 +1415,8 @@ export default function RefrigeratorVisual({
                         }]}
                         activeOpacity={0.7}
                         onPress={() => {
-                          setSelectedFilter(selectedFilter === 'safe' ? 'all' : 'safe');
+                          setSelectedFilter('safe');
+                          onChangeTab?.('ingredients');
                         }}
                       >
                         <Text style={[styles.statusChipText, { color: theme.ddaySafe }]}>
@@ -1462,13 +1426,51 @@ export default function RefrigeratorVisual({
                     </View>
                   </View>
 
-                  {/* 우측: 미니 도넛 게이지 차트 */}
+                  {/* 우측: 미니 도넛 게이지 차트 — 만료/임박/안전 개수 비율만큼 색깔별로만 표시 (가운데는 비워둠) */}
                   <View style={styles.donutChartContainer}>
-                    <View style={[styles.donutBaseCircle, { borderColor: theme.borderLight }]} />
-                    <View style={[styles.donutBaseCircle, { borderColor: ringColor, borderTopColor: 'transparent', borderLeftColor: 'transparent', transform: [{ rotate: '45deg' }] }]} />
-                    <Text style={[styles.donutCenterText, { color: ringColor }]}>
-                      {freshnessScore}%
-                    </Text>
+                    {(() => {
+                      const r = 35;
+                      const circumference = 2 * Math.PI * r;
+                      const expiredLen = totalCount > 0 ? circumference * (totalExpired / totalCount) : 0;
+                      const imminentLen = totalCount > 0 ? circumference * (totalImminent / totalCount) : 0;
+                      const safeLen = totalCount > 0 ? circumference * (totalSafe / totalCount) : 0;
+
+                      return (
+                        <Svg width={86} height={86} style={{ transform: [{ rotate: '-90deg' }] }}>
+                          <Circle cx={43} cy={43} r={r} stroke={theme.borderLight} strokeWidth={6} fill="none" />
+                          {totalExpired > 0 && (
+                            <Circle
+                              cx={43} cy={43} r={r}
+                              stroke={theme.ddayExpired}
+                              strokeWidth={6}
+                              fill="none"
+                              strokeDasharray={`${expiredLen} ${circumference - expiredLen}`}
+                              strokeDashoffset={0}
+                            />
+                          )}
+                          {totalImminent > 0 && (
+                            <Circle
+                              cx={43} cy={43} r={r}
+                              stroke={theme.ddayImminent}
+                              strokeWidth={6}
+                              fill="none"
+                              strokeDasharray={`${imminentLen} ${circumference - imminentLen}`}
+                              strokeDashoffset={-expiredLen}
+                            />
+                          )}
+                          {totalSafe > 0 && (
+                            <Circle
+                              cx={43} cy={43} r={r}
+                              stroke={theme.ddaySafe}
+                              strokeWidth={6}
+                              fill="none"
+                              strokeDasharray={`${safeLen} ${circumference - safeLen}`}
+                              strokeDashoffset={-(expiredLen + imminentLen)}
+                            />
+                          )}
+                        </Svg>
+                      );
+                    })()}
                   </View>
                 </View>
               </View>
@@ -3759,45 +3761,34 @@ const styles = StyleSheet.create({
     paddingRight: 12,
   },
   tossFriendlyTitle: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '800',
-    lineHeight: 25,
+    lineHeight: 19,
     letterSpacing: -0.5,
   },
   statusChipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 8,
     marginTop: 16,
   },
   statusChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 5.5,
-    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 24,
     borderWidth: 1,
   },
   statusChipText: {
-    fontSize: 12,
+    fontSize: 15,
     fontWeight: 'bold',
   },
   donutChartContainer: {
-    width: 72,
-    height: 72,
+    width: 86,
+    height: 86,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  donutBaseCircle: {
-    position: 'absolute',
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    borderWidth: 6,
-  },
-  donutCenterText: {
-    fontSize: 12,
-    fontWeight: '800',
   },
   settingsModalContent: {
     width: '90%',
