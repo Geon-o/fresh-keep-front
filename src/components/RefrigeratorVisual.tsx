@@ -403,6 +403,22 @@ export default function RefrigeratorVisual({
     }
   };
 
+  // 이력 한 줄 요약 텍스트 (액션 종류별로 문구가 다르다)
+  const getHistoryLabel = (entry: IngredientHistoryEntry) => {
+    switch (entry.actionType) {
+      case 'CREATED':
+        return `"${entry.ingredientName}" 등록`;
+      case 'UPDATED':
+        return `"${entry.ingredientName}" 수정${entry.summary ? ` · ${entry.summary}` : ''}`;
+      case 'NAME_CHANGED':
+        return `냉장고 이름 변경${entry.summary ? ` · ${entry.summary}` : ''}`;
+      case 'TYPE_CHANGED':
+        return `냉장고 타입 변경${entry.summary ? ` · ${entry.summary}` : ''}`;
+      default:
+        return entry.summary || '';
+    }
+  };
+
   // "MM/DD HH:mm" 형식으로 이력 발생 시각 표시
   const formatHistoryDateTime = (iso: string) => {
     const d = new Date(iso);
@@ -2271,9 +2287,7 @@ export default function RefrigeratorVisual({
                       </Text>
                     </View>
                     <Text style={[styles.historyBodyText, { color: theme.textSecondary }]}>
-                      {entry.actionType === 'CREATED'
-                        ? `"${entry.ingredientName}" 등록`
-                        : `"${entry.ingredientName}" 수정${entry.summary ? ` · ${entry.summary}` : ''}`}
+                      {getHistoryLabel(entry)}
                     </Text>
                   </View>
                 ))}

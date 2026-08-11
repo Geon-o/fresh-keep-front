@@ -126,16 +126,17 @@ export async function getFridgeLayout(fridgeId: number): Promise<ServerFridgeLay
 
 export interface IngredientHistoryEntry {
   id: number;
-  actionType: 'CREATED' | 'UPDATED';
+  actionType: 'CREATED' | 'UPDATED' | 'NAME_CHANGED' | 'TYPE_CHANGED';
+  // CREATED/UPDATED일 때는 식재료명, NAME_CHANGED/TYPE_CHANGED일 때는 변경 후 냉장고명이 온다
   ingredientName: string;
   actorName?: string;
-  // 등록(CREATED)일 때는 없고, 수정(UPDATED)일 때만 "필드: 이전값 → 새값" 형식으로 온다
+  // 등록(CREATED)일 때만 없고, 그 외에는 "필드: 이전값 → 새값" 형식으로 온다
   summary?: string;
   occurredAt: string;
 }
 
 /**
- * 4-1. 공유 냉장고의 식재료 등록/수정 이력 (최신순)
+ * 4-1. 공유 냉장고의 식재료 등록/수정 및 냉장고 이름/타입 변경 이력 (최신순)
  */
 export async function getFridgeHistory(fridgeId: number): Promise<IngredientHistoryEntry[]> {
   const response = await client.get<IngredientHistoryEntry[]>(`/api/fridges/${fridgeId}/history`);
