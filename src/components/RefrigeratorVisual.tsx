@@ -1372,7 +1372,11 @@ export default function RefrigeratorVisual({
                       {friendlyTitle}
                     </Text>
                     
-                    <View style={styles.statusChipRow}>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.statusChipRow}
+                    >
                       {/* 만료 칩 */}
                       <TouchableOpacity 
                         style={[styles.statusChip, { 
@@ -1423,7 +1427,7 @@ export default function RefrigeratorVisual({
                           안전 {totalSafe}
                         </Text>
                       </TouchableOpacity>
-                    </View>
+                    </ScrollView>
                   </View>
 
                   {/* 우측: 미니 도넛 게이지 차트 — 만료/임박/안전 개수 비율만큼 색깔별로만 표시 (가운데는 비워둠) */}
@@ -3768,7 +3772,6 @@ const styles = StyleSheet.create({
   },
   statusChipRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 8,
     marginTop: 16,
   },
