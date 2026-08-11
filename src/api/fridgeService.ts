@@ -25,6 +25,11 @@ export interface ServerIngredient {
   expirationType?: 'SELL_BY' | 'USE_BY';
   dday: number;
   memo?: string;
+  createdByName?: string;
+  createdAt?: string;
+  // 실제로 수정된 적이 있을 때만 값이 온다 (수정 이력 없으면 둘 다 undefined)
+  updatedByName?: string;
+  updatedAt?: string;
 }
 
 export interface ServerCompartment {
@@ -116,6 +121,24 @@ export async function cancelDeletionRequest(fridgeId: number): Promise<void> {
  */
 export async function getFridgeLayout(fridgeId: number): Promise<ServerFridgeLayout> {
   const response = await client.get<ServerFridgeLayout>(`/api/fridges/${fridgeId}/layouts`);
+  return response.data;
+}
+
+export interface IngredientHistoryEntry {
+  id: number;
+  actionType: 'CREATED' | 'UPDATED';
+  ingredientName: string;
+  actorName?: string;
+  // 등록(CREATED)일 때는 없고, 수정(UPDATED)일 때만 "필드: 이전값 → 새값" 형식으로 온다
+  summary?: string;
+  occurredAt: string;
+}
+
+/**
+ * 4-1. 공유 냉장고의 식재료 등록/수정 이력 (최신순)
+ */
+export async function getFridgeHistory(fridgeId: number): Promise<IngredientHistoryEntry[]> {
+  const response = await client.get<IngredientHistoryEntry[]>(`/api/fridges/${fridgeId}/history`);
   return response.data;
 }
 

@@ -18,6 +18,8 @@ interface CompartmentDetailProps {
   compartmentLabel: string;
   onBack: () => void;
   fridgeId: string;
+  // 함께 쓰는 사람이 있는 냉장고일 때만 등록/수정자 정보를 보여준다
+  isSharedFridge?: boolean;
   onNavigateCompartment?: (newId: string, newLabel: string) => void;
   onMoveIngredient?: (
     ingredientId: string,
@@ -354,6 +356,7 @@ export default function CompartmentDetail({
   compartmentLabel, 
   onBack, 
   fridgeId,
+  isSharedFridge,
   onNavigateCompartment,
   onMoveIngredient
 }: CompartmentDetailProps) {
@@ -815,6 +818,10 @@ export default function CompartmentDetail({
               unit: ing.unit,
               memo: deserialized.memo || undefined,
               fridgeId: String(fridgeId),
+              createdByName: ing.createdByName,
+              createdAt: ing.createdAt,
+              updatedByName: ing.updatedByName,
+              updatedAt: ing.updatedAt,
             };
           });
           setIngredients(mapped);
@@ -993,6 +1000,16 @@ export default function CompartmentDetail({
     return `${yyyy}-${mm}-${dd}`;
   };
 
+  // 등록/수정 시각을 "MM/DD HH:mm" 형식으로 표시 (등록·수정자 안내용)
+  const formatAuditDateTime = (iso: string) => {
+    const d = new Date(iso);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${mm}/${dd} ${hh}:${min}`;
+  };
+
   // 추가 모달 열기
   const handleOpenAddModal = (shelfId: string) => {
     setModalMode('add');
@@ -1096,6 +1113,8 @@ export default function CompartmentDetail({
             unit: savedIng.unit,
             memo: formMemo.trim() || undefined,
             fridgeId,
+            createdByName: savedIng.createdByName,
+            createdAt: savedIng.createdAt,
           };
           setIngredients([...ingredients, newIngredient]);
         } else {
@@ -1120,6 +1139,8 @@ export default function CompartmentDetail({
                   quantity: updatedIng.quantity,
                   unit: updatedIng.unit,
                   memo: formMemo.trim() || undefined,
+                  updatedByName: updatedIng.updatedByName,
+                  updatedAt: updatedIng.updatedAt,
                 }
               : item
           ));
@@ -1588,16 +1609,34 @@ export default function CompartmentDetail({
           <View style={styles.modalContent}>
             {/* 헤더 */}
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {modalMode === 'add' ? '식재료 등록' : '식재료 정보 및 수정'}
-              </Text>
-              <TouchableOpacity
-                style={[styles.modalCloseButton, isSaving && { opacity: 0.5 }]}
-                onPress={handleCloseAddEditModal}
-                disabled={isSaving}
-              >
-                <Text style={styles.modalCloseText}>✕</Text>
-              </TouchableOpacity>
+              <View style={styles.modalHeaderTopRow}>
+                <Text style={styles.modalTitle}>
+                  {modalMode === 'add' ? '식재료 등록' : '식재료 정보 및 수정'}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.modalCloseButton, isSaving && { opacity: 0.5 }]}
+                  onPress={handleCloseAddEditModal}
+                  disabled={isSaving}
+                >
+                  <Text style={styles.modalCloseText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              {isSharedFridge && modalMode === 'edit' && selectedIngredientId && (() => {
+                const current = ingredients.find(item => item.id === selectedIngredientId);
+                if (!current || !current.createdByName) return null;
+                return (
+                  <View style={styles.auditInfoContainer}>
+                    <Text style={styles.auditInfoText}>
+                      등록: {current.createdByName}{current.createdAt ? ` · ${formatAuditDateTime(current.createdAt)}` : ''}
+                    </Text>
+                    {current.updatedByName && (
+                      <Text style={styles.auditInfoText}>
+                        수정: {current.updatedByName}{current.updatedAt ? ` · ${formatAuditDateTime(current.updatedAt)}` : ''}
+                      </Text>
+                    )}
+                  </View>
+                );
+              })()}
             </View>
 
             <ScrollView 
@@ -2213,13 +2252,15 @@ export function createStyles(theme: ThemeColors, isDark: boolean) {
       elevation: 10,
     },
     modalHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
       borderBottomWidth: 1,
       borderBottomColor: theme.borderLight,
       paddingBottom: 12,
       marginBottom: 16,
+    },
+    modalHeaderTopRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
     },
     modalTitle: {
       fontSize: 18,
@@ -2404,6 +2445,15 @@ export function createStyles(theme: ThemeColors, isDark: boolean) {
     textArea: {
       height: 60,
       textAlignVertical: 'top',
+    },
+    auditInfoContainer: {
+      marginTop: 8,
+      gap: 2,
+    },
+    auditInfoText: {
+      fontSize: 11,
+      fontWeight: '500',
+      color: theme.textMuted,
     },
     modalFooter: {
       flexDirection: 'row',

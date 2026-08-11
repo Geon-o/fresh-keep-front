@@ -29,6 +29,11 @@ export interface Ingredient {
   unit: string;
   memo?: string;
   fridgeId?: string; // 연결된 냉장고 식별 ID
+  createdByName?: string;
+  createdAt?: string;
+  // 실제로 수정된 적이 있을 때만 값이 있다 (수정 이력 없으면 둘 다 undefined)
+  updatedByName?: string;
+  updatedAt?: string;
 }
 
 export interface Recipe {

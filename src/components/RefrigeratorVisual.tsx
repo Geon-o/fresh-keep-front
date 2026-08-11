@@ -9,7 +9,7 @@ import { FridgeType, Ingredient } from '../types';
 import { SAMPLE_INGREDIENTS, CATEGORY_EMOJI, DEFAULT_INSIDE_SHELVES, DEFAULT_DOOR_SHELVES } from './CompartmentDetail';
 import AddIngredientModal from './AddIngredientModal';
 import { useAuth } from '../context/AuthContext';
-import { getFridgeLayout, getCompartmentShelves, CompartmentShelfInfo } from '../api/fridgeService';
+import { getFridgeLayout, getCompartmentShelves, CompartmentShelfInfo, getFridgeHistory, IngredientHistoryEntry } from '../api/fridgeService';
 import { deserializeMemo, convertServerLocationToLocal } from '../utils/memoSerializer';
 import { rebuildAllNotifications } from '../utils/ingredientNotifications';
 import { useTheme } from '../context/ThemeContext';
@@ -383,6 +383,35 @@ export default function RefrigeratorVisual({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [memberSheetVisible]);
+
+  // 공유 냉장고 기록 이력 바텀시트
+  const [historyVisible, setHistoryVisible] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyEntries, setHistoryEntries] = useState<IngredientHistoryEntry[]>([]);
+
+  const openHistory = async (fridgeId: string) => {
+    setHistoryVisible(true);
+    setHistoryLoading(true);
+    try {
+      const entries = await getFridgeHistory(Number(fridgeId));
+      setHistoryEntries(entries);
+    } catch (e) {
+      console.error('Failed to load fridge history', e);
+      setHistoryEntries([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  // "MM/DD HH:mm" 형식으로 이력 발생 시각 표시
+  const formatHistoryDateTime = (iso: string) => {
+    const d = new Date(iso);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${mm}/${dd} ${hh}:${min}`;
+  };
 
   // 식재료 목록 탭 + 버튼으로 여는 등록 위치(냉장고 → 칸 → 선반/문쪽) 선택 모달
   const [addLocationPickerVisible, setAddLocationPickerVisible] = useState(false);
@@ -2203,6 +2232,57 @@ export default function RefrigeratorVisual({
         </View>
       </Modal>
 
+      {/* 기록 이력 (공유 냉장고 전용) */}
+      <Modal
+        visible={historyVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setHistoryVisible(false)}
+      >
+        <View style={[styles.modalOverlay, { backgroundColor: theme.modalOverlay }]}>
+          <View style={[styles.settingsModalContent, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={[styles.modalTitleText, { color: theme.textPrimary }]}>기록 이력</Text>
+              </View>
+              <TouchableOpacity onPress={() => setHistoryVisible(false)} style={styles.modalCloseButton}>
+                <Ionicons name="close" size={24} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {historyLoading ? (
+              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                <ActivityIndicator size="small" color={theme.primary} />
+              </View>
+            ) : historyEntries.length === 0 ? (
+              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                <Text style={{ color: theme.textMuted, fontSize: 13 }}>아직 기록이 없습니다.</Text>
+              </View>
+            ) : (
+              <ScrollView style={styles.pickerModalBody} showsVerticalScrollIndicator={false}>
+                {historyEntries.map(entry => (
+                  <View key={entry.id} style={[styles.historyRow, { borderBottomColor: theme.borderLight }]}>
+                    <View style={styles.historyRowTop}>
+                      <Text style={[styles.historyActorText, { color: theme.textPrimary }]} numberOfLines={1}>
+                        {entry.actorName || '알 수 없음'}
+                      </Text>
+                      <Text style={[styles.historyTimeText, { color: theme.textMuted }]}>
+                        {formatHistoryDateTime(entry.occurredAt)}
+                      </Text>
+                    </View>
+                    <Text style={[styles.historyBodyText, { color: theme.textSecondary }]}>
+                      {entry.actionType === 'CREATED'
+                        ? `"${entry.ingredientName}" 등록`
+                        : `"${entry.ingredientName}" 수정${entry.summary ? ` · ${entry.summary}` : ''}`}
+                    </Text>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
       {/* 위치 선택이 끝나면 화면 이동 없이 이 자리에서 바로 등록 폼을 띄운다 */}
       {addIngredientTarget && (
         <AddIngredientModal
@@ -2325,6 +2405,26 @@ export default function RefrigeratorVisual({
                               <Ionicons name="qr-code-outline" size={18} color={theme.primary} />
                             </View>
                             <Text style={[styles.settingsActionText, { color: theme.textSecondary }]}>냉장고 공유 (QR)</Text>
+                          </View>
+                          <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+                        </TouchableOpacity>
+                      )}
+
+                      {/* 기록 이력 — 함께 쓰는 사람이 있을 때만 의미가 있어서 그때만 노출 */}
+                      {activeFridge.memberNames && activeFridge.memberNames.length > 1 && (
+                        <TouchableOpacity
+                          style={styles.settingsActionRow}
+                          activeOpacity={0.7}
+                          onPress={() => {
+                            setFridgeSettingsVisible(false);
+                            openHistory(activeFridge.id);
+                          }}
+                        >
+                          <View style={styles.settingsActionLeft}>
+                            <View style={[styles.settingsIconBadge, { backgroundColor: theme.primaryLight }]}>
+                              <Ionicons name="time-outline" size={18} color={theme.primary} />
+                            </View>
+                            <Text style={[styles.settingsActionText, { color: theme.textSecondary }]}>기록 이력</Text>
                           </View>
                           <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
                         </TouchableOpacity>
@@ -3742,6 +3842,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     marginBottom: 4,
+  },
+  historyRow: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    gap: 4,
+  },
+  historyRowTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
+  historyActorText: {
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+  },
+  historyTimeText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  historyBodyText: {
+    fontSize: 13,
+    lineHeight: 18,
   },
   settingsTopSectionScroll: {
     flex: 1,

@@ -705,6 +705,7 @@ export default function Index() {
             compartmentLabel={activeCompartment.label}
             onBack={() => setActiveCompartment(null)}
             fridgeId={activeCompartment.fridgeId}
+            isSharedFridge={(refrigerators.find(f => f.id === activeCompartment.fridgeId) as any)?.memberNames?.length > 1}
             onNavigateCompartment={(newId, newLabel) => {
               setActiveCompartment({
                 id: newId,
