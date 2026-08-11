@@ -32,17 +32,17 @@ export default function RefrigeratorSelector({ onSelect, currentType }: Refriger
     }
   };
 
-  const renderCard = (type: FridgeType, title: string, desc: string, renderGraphic: () => React.JSX.Element) => {
+  const renderCard = (type: FridgeType, title: string, renderGraphic: () => React.JSX.Element) => {
     const isCurrent = currentType !== undefined && type === currentType;
 
     return (
       <TouchableOpacity
         style={[
           styles.card,
-          { 
-            backgroundColor: theme.surface, 
+          {
+            backgroundColor: theme.surface,
             borderColor: theme.borderLight,
-            opacity: isCurrent ? 0.5 : 1.0 
+            opacity: isCurrent ? 0.5 : 1.0
           }
         ]}
         activeOpacity={isCurrent ? 1.0 : 0.7}
@@ -56,7 +56,6 @@ export default function RefrigeratorSelector({ onSelect, currentType }: Refriger
         )}
         {renderGraphic()}
         <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>{title}</Text>
-        <Text style={[styles.cardDesc, { color: theme.textSecondary }]}>{desc}</Text>
       </TouchableOpacity>
     );
   };
@@ -68,14 +67,12 @@ export default function RefrigeratorSelector({ onSelect, currentType }: Refriger
       showsVerticalScrollIndicator={false}
     >
       <Text style={[styles.title, { color: theme.textPrimary }]}>
-        {currentType !== undefined
-          ? '변경할 냉장고의 형태를 선택해 주세요! ❄️'
-          : '우리 집 냉장고의 형태를 선택해 주세요! ❄️'}
+        {currentType !== undefined ? '변경할 형태를 선택해 주세요' : '냉장고 형태를 선택해 주세요'}
       </Text>
 
       <View style={styles.cardContainer}>
         {/* 4문형 */}
-        {renderCard('four-door', '4문형 냉장고', '상단 양문 냉장실 / 하단 양문 냉동실 구조', () => (
+        {renderCard('four-door', '4문형 냉장고', () => (
           <View style={[styles.miniFridge, { backgroundColor: theme.fridgeFrame }]}>
             <View style={styles.fourDoorTop}>
               <View style={[styles.door, { backgroundColor: theme.fridgeDoor }, { borderTopLeftRadius: 6 }]} />
@@ -89,7 +86,7 @@ export default function RefrigeratorSelector({ onSelect, currentType }: Refriger
         ))}
 
         {/* 양문형 */}
-        {renderCard('side-by-side', '양문형 (세로 2문)', '좌측 냉동실 / 우측 냉장실 구조', () => (
+        {renderCard('side-by-side', '양문형 (세로 2문)', () => (
           <View style={[styles.miniFridge, { backgroundColor: theme.fridgeFrame }]}>
             <View style={styles.sideBySide}>
               <View style={[styles.door, { backgroundColor: theme.freezerDoor }, { borderTopLeftRadius: 6, borderBottomLeftRadius: 6 }]} />
@@ -99,7 +96,7 @@ export default function RefrigeratorSelector({ onSelect, currentType }: Refriger
         ))}
 
         {/* 일반 2문형 */}
-        {renderCard('two-door', '일반 2문형 (가로 2문)', '상단 냉동실 / 하단 냉장실 구조', () => (
+        {renderCard('two-door', '일반 2문형 (가로 2문)', () => (
           <View style={[styles.miniFridge, { backgroundColor: theme.fridgeFrame }]}>
             <View style={styles.twoDoor}>
               <View style={[styles.door, { backgroundColor: theme.freezerDoor }, { height: '35%', borderTopLeftRadius: 6, borderTopRightRadius: 6 }]} />
@@ -225,12 +222,6 @@ const styles = StyleSheet.create({
     color: '#1A1A1A',
     marginTop: 12,
     marginBottom: 4,
-  },
-  cardDesc: {
-    fontSize: 12,
-    color: '#666666',
-    textAlign: 'center',
-    lineHeight: 16,
   },
   miniFridge: {
     width: 60,

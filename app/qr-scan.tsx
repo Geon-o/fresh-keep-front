@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, TextInput, ActivityIndicator, DeviceEventEmitter } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, DeviceEventEmitter } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
@@ -29,8 +29,6 @@ export default function QrScanScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [manualEntryOpen, setManualEntryOpen] = useState(false);
-  const [manualCode, setManualCode] = useState('');
 
   // 권한 획득 처리
   useEffect(() => {
@@ -116,8 +114,9 @@ export default function QrScanScreen() {
     registerSharedFridge(data);
   };
 
-  const handleManualSubmit = () => {
-    registerSharedFridge(manualCode);
+  const handleManualEntryPress = () => {
+    DeviceEventEmitter.emit('openManualFridgeCodeEntry');
+    router.back();
   };
 
   return (
@@ -135,19 +134,17 @@ export default function QrScanScreen() {
       <View style={styles.overlayContainer}>
         {/* 상단 헤더 */}
         <View style={styles.header}>
-          <TouchableOpacity 
-            style={[styles.closeButton, { backgroundColor: 'rgba(0,0,0,0.5)' }]} 
+          <TouchableOpacity
+            style={[styles.closeButton, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
             onPress={() => router.back()}
           >
             <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>QR 코드 스캔</Text>
-          <View style={{ width: 40 }} />
         </View>
 
         {/* 중앙 스캔 영역 프레임 */}
         <View style={styles.maskContainer}>
-          <View style={styles.maskRow} />
+          <View style={[styles.maskRow, { flex: 0.7 }]} />
           <View style={styles.maskCenterRow}>
             <View style={styles.maskSide} />
             <View style={styles.scanTarget}>
@@ -165,36 +162,14 @@ export default function QrScanScreen() {
             </View>
             <View style={styles.maskSide} />
           </View>
-          <View style={styles.maskRow}>
+          <View style={[styles.maskRow, styles.bottomMaskRow]}>
             <Text style={styles.guideText}>
               공동 관리할 냉장고의 QR 코드를 사각형 안에 맞춰주세요.
             </Text>
 
-            {manualEntryOpen ? (
-              <View style={styles.manualEntryBox}>
-                <TextInput
-                  style={styles.manualEntryInput}
-                  value={manualCode}
-                  onChangeText={setManualCode}
-                  placeholder="공유 코드 붙여넣기"
-                  placeholderTextColor="rgba(255,255,255,0.4)"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  editable={!isProcessing}
-                />
-                <TouchableOpacity
-                  style={[styles.manualEntryButton, (!manualCode.trim() || isProcessing) && styles.manualEntryButtonDisabled]}
-                  onPress={handleManualSubmit}
-                  disabled={!manualCode.trim() || isProcessing}
-                >
-                  <Text style={styles.manualEntryButtonText}>등록</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity onPress={() => setManualEntryOpen(true)} style={{ marginTop: 16 }}>
-                <Text style={styles.manualEntryToggleText}>QR을 인식하지 못하나요? 코드 직접 입력하기</Text>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity onPress={handleManualEntryPress} style={{ marginTop: 16 }}>
+              <Text style={styles.manualEntryToggleText}>QR을 인식하지 못하나요? 코드 직접 입력하기</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -253,17 +228,11 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 50,
+    paddingTop: 44,
     paddingHorizontal: 20,
     paddingBottom: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     zIndex: 10,
-  },
-  headerTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
   },
   closeButton: {
     width: 40,
@@ -285,6 +254,11 @@ const styles = StyleSheet.create({
   maskCenterRow: {
     height: 250,
     flexDirection: 'row',
+    marginVertical: -1,
+  },
+  bottomMaskRow: {
+    justifyContent: 'flex-start',
+    paddingTop: 32,
   },
   maskSide: {
     flex: 1,
@@ -352,36 +326,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     textAlign: 'center',
-  },
-  manualEntryBox: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 16,
-    width: '100%',
-  },
-  manualEntryInput: {
-    flex: 1,
-    height: 44,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    color: '#FFFFFF',
-    fontSize: 13,
-  },
-  manualEntryButton: {
-    height: 44,
-    paddingHorizontal: 18,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#38BDF8',
-  },
-  manualEntryButtonDisabled: {
-    backgroundColor: 'rgba(56,189,248,0.35)',
-  },
-  manualEntryButtonText: {
-    color: '#0F172A',
-    fontSize: 13,
-    fontWeight: '700',
   },
 });

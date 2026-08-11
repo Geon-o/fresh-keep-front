@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, Modal, TouchableOpacity, Text, Alert, Platform, ActivityIndicator, Animated, BackHandler, Image, DeviceEventEmitter } from 'react-native';
+import { StyleSheet, View, Modal, TouchableOpacity, Text, TextInput, Alert, Platform, ActivityIndicator, Animated, BackHandler, Image, DeviceEventEmitter } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Linking from 'expo-linking';
@@ -34,6 +34,10 @@ export default function Index() {
   const [shareFridgeName, setShareFridgeName] = useState('');
   const [shareFridgeUuid, setShareFridgeUuid] = useState('');
   const [pendingShareUuid, setPendingShareUuid] = useState<string | null>(null);
+
+  // QR 스캔 화면에서 "코드 직접 입력하기"를 누르면 이 모달이 열린다
+  const [manualCodeModalVisible, setManualCodeModalVisible] = useState(false);
+  const [manualCodeInput, setManualCodeInput] = useState('');
 
   const splashTheme = {
     background: theme.splashBg,
@@ -106,6 +110,15 @@ export default function Index() {
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('fridgeShareResult', (message: string) => {
       showToast(message);
+    });
+    return () => subscription.remove();
+  }, []);
+
+  // QR 스캔 화면에서 "코드 직접 입력하기"를 누르면 스캔 화면은 닫히고, 이 홈 화면에서 입력 모달을 연다
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('openManualFridgeCodeEntry', () => {
+      setManualCodeInput('');
+      setManualCodeModalVisible(true);
     });
     return () => subscription.remove();
   }, []);
@@ -897,6 +910,64 @@ export default function Index() {
         fridgeName={shareFridgeName}
         fridgeUuid={shareFridgeUuid}
       />
+
+      {/* 공유 코드 직접 입력 모달 */}
+      <Modal
+        visible={manualCodeModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setManualCodeModalVisible(false)}
+      >
+        <View style={[styles.manualCodeModalOverlay, { backgroundColor: theme.modalOverlay }]}>
+          <TouchableOpacity
+            style={styles.backdrop}
+            activeOpacity={1}
+            onPress={() => setManualCodeModalVisible(false)}
+          />
+          <View style={[styles.manualCodeModalContent, { backgroundColor: theme.surface, shadowColor: theme.shadow }]}>
+            <Text style={[styles.manualCodeModalTitle, { color: theme.textPrimary }]}>공유 코드 입력</Text>
+            <Text style={[styles.manualCodeModalDesc, { color: theme.textSecondary }]}>
+              공동 관리할 냉장고의 공유 코드를 입력해 주세요.
+            </Text>
+            <TextInput
+              style={[styles.manualCodeModalInput, { borderColor: theme.borderLight, color: theme.textPrimary, backgroundColor: theme.surfaceSecondary }]}
+              value={manualCodeInput}
+              onChangeText={setManualCodeInput}
+              placeholder="공유 코드 붙여넣기"
+              placeholderTextColor={theme.textMuted}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <View style={styles.manualCodeModalButtonRow}>
+              <TouchableOpacity
+                style={[styles.manualCodeModalButton, { backgroundColor: theme.surfaceSecondary }]}
+                activeOpacity={0.7}
+                onPress={() => setManualCodeModalVisible(false)}
+              >
+                <Text style={[styles.manualCodeModalCancelText, { color: theme.textSecondary }]}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.manualCodeModalButton,
+                  { backgroundColor: manualCodeInput.trim() ? theme.primary : theme.borderLight },
+                ]}
+                activeOpacity={manualCodeInput.trim() ? 0.8 : 1}
+                disabled={!manualCodeInput.trim()}
+                onPress={() => {
+                  const code = manualCodeInput.trim();
+                  setManualCodeModalVisible(false);
+                  setPendingShareUuid(code);
+                }}
+              >
+                <Text style={[styles.manualCodeModalConfirmText, { color: manualCodeInput.trim() ? theme.primaryOnPrimary : theme.textMuted }]}>
+                  등록
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* 100% 신뢰성 있는 인앱 비주얼 스플래시 스크린 */}
       {showSplashOverlay && (
         <View style={[styles.splashOverlayContainer, { backgroundColor: splashTheme.background }]}>
@@ -1088,6 +1159,57 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#37474F',
+  },
+  manualCodeModalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  manualCodeModalContent: {
+    width: '85%',
+    borderRadius: 20,
+    padding: 20,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 5,
+  },
+  manualCodeModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  manualCodeModalDesc: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  manualCodeModalInput: {
+    height: 46,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    fontSize: 14,
+    marginBottom: 16,
+  },
+  manualCodeModalButtonRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  manualCodeModalButton: {
+    flex: 1,
+    height: 46,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  manualCodeModalCancelText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  manualCodeModalConfirmText: {
+    fontSize: 14,
+    fontWeight: 'bold',
   },
   selectorCloseButton: {
     padding: 6,

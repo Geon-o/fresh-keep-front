@@ -1641,17 +1641,6 @@ export default function RefrigeratorVisual({
 
       {mode === 'fridge' && (
         <View style={[styles.dashboardScrollView, styles.fridgeModeContent]}>
-          {!activeFridge && onScanQr && (
-            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingRight: 20, marginBottom: 20 }}>
-              <TouchableOpacity
-                style={[styles.fridgeSettingButton, { backgroundColor: theme.surfaceTertiary, padding: 8, borderRadius: 10 }]}
-                activeOpacity={0.7}
-                onPress={onScanQr}
-              >
-                <Ionicons name="scan-outline" size={20} color={theme.textPrimary} />
-              </TouchableOpacity>
-            </View>
-          )}
           {/* 나의 냉장고 보관소 */}
           <View style={[styles.sectionContainer, { marginTop: 0, flex: 1 }]}>
             <View style={styles.carouselWrapper}>
@@ -1670,17 +1659,29 @@ export default function RefrigeratorVisual({
                   if (page.type === 'add') {
                     return (
                       <View key="add_page" style={[styles.slideContainer, { width: screenWidth }]}>
-                        <TouchableOpacity
-                          style={[styles.addFridgeBox, { width: screenWidth - 40, backgroundColor: theme.surface, borderColor: theme.primary, shadowColor: theme.shadow }]}
-                          activeOpacity={0.8}
-                          onPress={onOpenAddSelector}
-                        >
-                          <View style={[styles.addIconCircle, { backgroundColor: theme.primaryLight }]}>
-                            <Text style={[styles.addIconText, { color: theme.primary }]}>+</Text>
-                          </View>
-                          <Text style={[styles.addFridgeTitle, { color: theme.textPrimary }]}>냉장고 추가</Text>
-                          <Text style={[styles.addFridgeDesc, { color: theme.textMuted }]}>새로운 냉장고 타입을 설정하고 관리를 시작하세요 (최대 3대)</Text>
-                        </TouchableOpacity>
+                        <View style={[styles.addFridgeBox, { width: screenWidth - 40, backgroundColor: theme.surface, borderColor: theme.primary, shadowColor: theme.shadow }]}>
+                          <TouchableOpacity activeOpacity={0.8} onPress={onOpenAddSelector} style={styles.addFridgeMainArea}>
+                            <View style={[styles.addIconCircle, { backgroundColor: theme.primaryLight }]}>
+                              <Text style={[styles.addIconText, { color: theme.primary }]}>+</Text>
+                            </View>
+                            <Text style={[styles.addFridgeTitle, { color: theme.textPrimary }]}>냉장고 추가</Text>
+                            <Text style={[styles.addFridgeDesc, { color: theme.textMuted }]}>새로운 냉장고 타입을 설정하고 관리를 시작하세요 (최대 3대)</Text>
+                          </TouchableOpacity>
+
+                          {onScanQr && (
+                            <>
+                              <View style={[styles.addFridgeDivider, { backgroundColor: theme.borderLight }]} />
+                              <TouchableOpacity
+                                style={styles.qrJoinRow}
+                                activeOpacity={0.7}
+                                onPress={onScanQr}
+                              >
+                                <Ionicons name="scan-outline" size={18} color={theme.primary} />
+                                <Text style={[styles.qrJoinText, { color: theme.primary }]}>QR로 공유 냉장고 참여하기</Text>
+                              </TouchableOpacity>
+                            </>
+                          )}
+                        </View>
                       </View>
                     );
                   }
@@ -2829,13 +2830,31 @@ const styles = StyleSheet.create({
     borderWidth: 2.5,
     borderStyle: 'dashed',
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'stretch',
     padding: 24,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.05,
     shadowRadius: 20,
     elevation: 4,
+  },
+  addFridgeMainArea: {
+    alignItems: 'center',
+  },
+  addFridgeDivider: {
+    height: 1,
+    width: '100%',
+    marginVertical: 20,
+  },
+  qrJoinRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  qrJoinText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   addIconCircle: {
     width: 64,
@@ -3569,10 +3588,6 @@ const styles = StyleSheet.create({
   settingsActionText: {
     fontSize: 14,
     fontWeight: '600',
-  },
-  fridgeSettingButton: {
-    padding: 8,
-    borderRadius: 10,
   },
   modalOverlay: {
     flex: 1,
