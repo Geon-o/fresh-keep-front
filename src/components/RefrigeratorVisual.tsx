@@ -657,19 +657,32 @@ export default function RefrigeratorVisual({
     setAddIngredientTarget(target);
   };
 
-  // 특정 냉장고의 칸 요약 뱃지 계산
-  const getCompartmentSummary = (fridgeId: string, compartmentId: string) => {
+  // 특정 칸에 든 식재료를 "이름 개수"로 유리질감 패널 안에 나열한다. 많아지면 패널 안에서 세로 스크롤.
+  const renderDoorIngredientPreview = (fridgeId: string, compartmentId: string) => {
     const compIngredients = ingredients.filter(
       item => item.fridgeId === fridgeId && item.location === compartmentId
     );
-    if (compIngredients.length === 0) {
-      return '비어 있음';
-    }
-    const firstItem = compIngredients[0];
-    if (compIngredients.length === 1) {
-      return firstItem.name;
-    }
-    return `${firstItem.name} 외 ${compIngredients.length - 1}개`;
+
+    return (
+      <View style={[styles.doorGlassPanel, { backgroundColor: theme.glassBg, borderColor: theme.glassBorder }]}>
+        {compIngredients.length === 0 ? (
+          <Text style={[styles.doorGlassEmptyText, { color: theme.textMuted }]}>비어 있음</Text>
+        ) : (
+          <ScrollView style={styles.doorGlassScroll} nestedScrollEnabled showsVerticalScrollIndicator={false} contentContainerStyle={styles.doorGlassListContent}>
+            {compIngredients.map(item => (
+              <View key={item.id} style={styles.doorGlassItemRow}>
+                <Text style={[styles.doorGlassItemName, { color: theme.fridgeLabel }]} numberOfLines={1} ellipsizeMode="tail">
+                  {item.name}
+                </Text>
+                <Text style={[styles.doorGlassItemQty, { color: theme.fridgeLabel }]} numberOfLines={1}>
+                  {item.quantity}{item.unit}
+                </Text>
+              </View>
+            ))}
+          </ScrollView>
+        )}
+      </View>
+    );
   };
 
   // 특정 구획의 D-Day 경고/만료 상태 계산
@@ -722,7 +735,7 @@ export default function RefrigeratorVisual({
         ]}
       >
         <Text style={styles.doorAlertBadgeText}>
-          {isExpired ? '⚠️ ' : ''}{labelText}
+          {labelText}
         </Text>
       </View>
     );
@@ -762,9 +775,7 @@ export default function RefrigeratorVisual({
           >
             {renderDoorAlertBadge(fridgeId, 'fridge_left')}
             <Text style={[styles.doorLabel, { color: theme.fridgeLabel }]}>냉장실</Text>
-            <Text style={[styles.doorCount, { color: theme.fridgeCountText, backgroundColor: theme.fridgeCountBg }]}>
-              {getCompartmentSummary(fridgeId, 'fridge_left')}
-            </Text>
+            {renderDoorIngredientPreview(fridgeId, 'fridge_left')}
             <View style={[styles.handle, styles.verticalHandleRight]} />
           </TouchableOpacity>
 
@@ -775,9 +786,7 @@ export default function RefrigeratorVisual({
           >
             {renderDoorAlertBadge(fridgeId, 'fridge_right')}
             <Text style={[styles.doorLabel, { color: theme.fridgeLabel }]}>냉장실</Text>
-            <Text style={[styles.doorCount, { color: theme.fridgeCountText, backgroundColor: theme.fridgeCountBg }]}>
-              {getCompartmentSummary(fridgeId, 'fridge_right')}
-            </Text>
+            {renderDoorIngredientPreview(fridgeId, 'fridge_right')}
             <View style={[styles.handle, styles.verticalHandleLeft]} />
           </TouchableOpacity>
         </View>
@@ -794,9 +803,7 @@ export default function RefrigeratorVisual({
           >
             {renderDoorAlertBadge(fridgeId, 'freezer_left')}
             <Text style={[styles.doorLabel, { color: theme.fridgeLabel }]}>냉동실</Text>
-            <Text style={[styles.doorCount, { color: theme.fridgeCountText, backgroundColor: theme.fridgeCountBg }]}>
-              {getCompartmentSummary(fridgeId, 'freezer_left')}
-            </Text>
+            {renderDoorIngredientPreview(fridgeId, 'freezer_left')}
             <View style={[styles.handle, styles.verticalHandleRight]} />
           </TouchableOpacity>
 
@@ -807,9 +814,7 @@ export default function RefrigeratorVisual({
           >
             {renderDoorAlertBadge(fridgeId, 'freezer_right')}
             <Text style={[styles.doorLabel, { color: theme.fridgeLabel }]}>냉동실</Text>
-            <Text style={[styles.doorCount, { color: theme.fridgeCountText, backgroundColor: theme.fridgeCountBg }]}>
-              {getCompartmentSummary(fridgeId, 'freezer_right')}
-            </Text>
+            {renderDoorIngredientPreview(fridgeId, 'freezer_right')}
             <View style={[styles.handle, styles.verticalHandleLeft]} />
           </TouchableOpacity>
         </View>
@@ -829,9 +834,7 @@ export default function RefrigeratorVisual({
           >
             {renderDoorAlertBadge(fridgeId, 'freezer')}
             <Text style={[styles.doorLabel, { color: theme.fridgeLabel }]}>냉동실</Text>
-            <Text style={[styles.doorCount, { color: theme.fridgeCountText, backgroundColor: theme.fridgeCountBg }]}>
-              {getCompartmentSummary(fridgeId, 'freezer')}
-            </Text>
+            {renderDoorIngredientPreview(fridgeId, 'freezer')}
             <View style={[styles.handle, styles.verticalHandleRight]} />
           </TouchableOpacity>
 
@@ -843,9 +846,7 @@ export default function RefrigeratorVisual({
           >
             {renderDoorAlertBadge(fridgeId, 'fridge')}
             <Text style={[styles.doorLabel, { color: theme.fridgeLabel }]}>냉장실</Text>
-            <Text style={[styles.doorCount, { color: theme.fridgeCountText, backgroundColor: theme.fridgeCountBg }]}>
-              {getCompartmentSummary(fridgeId, 'fridge')}
-            </Text>
+            {renderDoorIngredientPreview(fridgeId, 'fridge')}
             <View style={[styles.handle, styles.verticalHandleLeft]} />
           </TouchableOpacity>
         </View>
@@ -864,9 +865,7 @@ export default function RefrigeratorVisual({
         >
           {renderDoorAlertBadge(fridgeId, 'freezer')}
           <Text style={[styles.doorLabel, { color: theme.fridgeLabel }]}>냉동실</Text>
-          <Text style={[styles.doorCount, { color: theme.fridgeCountText, backgroundColor: theme.fridgeCountBg }]}>
-            {getCompartmentSummary(fridgeId, 'freezer')}
-          </Text>
+          {renderDoorIngredientPreview(fridgeId, 'freezer')}
           <View style={[styles.handle, styles.horizontalHandleBottom]} />
         </TouchableOpacity>
 
@@ -881,9 +880,7 @@ export default function RefrigeratorVisual({
         >
           {renderDoorAlertBadge(fridgeId, 'fridge')}
           <Text style={[styles.doorLabel, { color: theme.fridgeLabel }]}>냉장실</Text>
-          <Text style={[styles.doorCount, { color: theme.fridgeCountText, backgroundColor: theme.fridgeCountBg }]}>
-            {getCompartmentSummary(fridgeId, 'fridge')}
-          </Text>
+          {renderDoorIngredientPreview(fridgeId, 'fridge')}
           <View style={[styles.handle, styles.horizontalHandleTop]} />
         </TouchableOpacity>
       </View>
@@ -2926,20 +2923,52 @@ const styles = StyleSheet.create({
     backgroundColor: '#37474F',
   },
   doorLabel: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
     fontSize: 15,
     fontWeight: 'bold',
     color: '#37474F',
-    marginBottom: 4,
   },
-  doorCount: {
-    fontSize: 11,
-    color: '#757575',
-    fontWeight: '600',
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
+  doorGlassPanel: {
+    flex: 1,
+    alignSelf: 'stretch',
+    marginTop: 26,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
     overflow: 'hidden',
+  },
+  doorGlassEmptyText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  doorGlassScroll: {
+    flex: 1,
+    width: '100%',
+  },
+  doorGlassListContent: {
+    gap: 4,
+    paddingVertical: 2,
+  },
+  doorGlassItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
+  doorGlassItemName: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'left',
+  },
+  doorGlassItemQty: {
+    fontSize: 11,
+    fontWeight: '500',
+    textAlign: 'right',
   },
   handle: {
     position: 'absolute',
