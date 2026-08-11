@@ -18,7 +18,6 @@ interface CompartmentDetailProps {
   compartmentLabel: string;
   onBack: () => void;
   fridgeId: string;
-  autoOpenAddOnMount?: boolean;
   onNavigateCompartment?: (newId: string, newLabel: string) => void;
   onMoveIngredient?: (
     ingredientId: string,
@@ -87,7 +86,7 @@ export const CATEGORY_EMOJI: Record<IngredientCategory, string> = {
   etc: '',
 };
 
-const CATEGORIES: { key: IngredientCategory; label: string; emoji: string }[] = [
+export const CATEGORIES: { key: IngredientCategory; label: string; emoji: string }[] = [
   { key: 'vegetable', label: '채소', emoji: '🥬' },
   { key: 'meat', label: '육류', emoji: '🥩' },
   { key: 'seafood', label: '해물', emoji: '🐟' },
@@ -100,20 +99,20 @@ const CATEGORIES: { key: IngredientCategory; label: string; emoji: string }[] = 
   { key: 'etc', label: '기타', emoji: '' },
 ];
 
-const DEFAULT_UNITS = ['개', '팩', 'g', 'ml', '봉지'];
+export const DEFAULT_UNITS = ['개', '팩', 'g', 'ml', '봉지'];
 
-const EXPIRY_TYPE_LABELS: Record<ExpiryType, string> = {
+export const EXPIRY_TYPE_LABELS: Record<ExpiryType, string> = {
   SELL_BY: '유통기한',
   USE_BY: '소비기한',
 };
 
-const DEFAULT_INSIDE_SHELVES = [
+export const DEFAULT_INSIDE_SHELVES = [
   { id: 'shelf_1', label: '선반 1단' },
   { id: 'shelf_2', label: '선반 2단' },
   { id: 'shelf_3', label: '선반 3단' },
 ];
 
-const DEFAULT_DOOR_SHELVES = [
+export const DEFAULT_DOOR_SHELVES = [
   { id: 'pocket_1', label: '선반 1단' },
   { id: 'pocket_2', label: '선반 2단' },
 ];
@@ -355,7 +354,6 @@ export default function CompartmentDetail({
   compartmentLabel, 
   onBack, 
   fridgeId,
-  autoOpenAddOnMount,
   onNavigateCompartment,
   onMoveIngredient
 }: CompartmentDetailProps) {
@@ -1017,16 +1015,6 @@ export default function CompartmentDetail({
 
     setModalVisible(true);
   };
-
-  // 식재료 목록 탭의 + 버튼으로 진입한 경우, 선반 정보 로드가 끝나는 즉시 등록 폼을 바로 띄운다
-  const autoOpenAddTriggeredRef = useRef(false);
-  useEffect(() => {
-    if (!autoOpenAddOnMount || autoOpenAddTriggeredRef.current || isLoading) return;
-    const firstShelfId = insideShelves[0]?.id || doorShelves[0]?.id;
-    if (!firstShelfId) return;
-    autoOpenAddTriggeredRef.current = true;
-    handleOpenAddModal(firstShelfId);
-  }, [autoOpenAddOnMount, isLoading, insideShelves, doorShelves]);
 
   // 수정 모달 열기
   const handleOpenEditModal = (item: Ingredient) => {
@@ -1898,7 +1886,7 @@ export default function CompartmentDetail({
   );
 }
 
-function createStyles(theme: ThemeColors, isDark: boolean) {
+export function createStyles(theme: ThemeColors, isDark: boolean) {
   return StyleSheet.create({
     container: {
       flex: 1,

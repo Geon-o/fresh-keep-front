@@ -7,6 +7,7 @@ import * as Location from 'expo-location';
 import * as WebBrowser from 'expo-web-browser';
 import { FridgeType, Ingredient } from '../types';
 import { SAMPLE_INGREDIENTS, CATEGORY_EMOJI } from './CompartmentDetail';
+import AddIngredientModal from './AddIngredientModal';
 import { useAuth } from '../context/AuthContext';
 import { getFridgeLayout } from '../api/fridgeService';
 import { deserializeMemo, convertServerLocationToLocal } from '../utils/memoSerializer';
@@ -228,7 +229,7 @@ const SEASONAL_INGREDIENTS: SeasonalIngredient[] = [
 interface RefrigeratorVisualProps {
   mode?: 'home' | 'ingredients' | 'fridge';
   refrigerators: { id: string; type: FridgeType; name: string; uuid?: string; role?: 'OWNER' | 'MEMBER'; deletionRequested?: boolean; ownerName?: string; memberNames?: string[] }[];
-  onPressCompartment: (id: string, label: string, fridgeId: string, autoOpenAdd?: boolean) => void;
+  onPressCompartment: (id: string, label: string, fridgeId: string) => void;
   activeIndex: number;
   setActiveIndex: (index: number) => void;
   onOpenAddSelector: () => void;
@@ -386,6 +387,8 @@ export default function RefrigeratorVisual({
   // 식재료 목록 탭 + 버튼으로 여는 등록 위치(냉장고/보관실) 선택 모달
   const [addLocationPickerVisible, setAddLocationPickerVisible] = useState(false);
   const [addPickerFridgeId, setAddPickerFridgeId] = useState<string | null>(null);
+  // 위치 선택이 끝나면 이 화면(식재료 목록)을 벗어나지 않고 바로 등록 폼을 띄운다
+  const [addIngredientTarget, setAddIngredientTarget] = useState<{ fridgeId: string; compartmentId: string } | null>(null);
 
   const [fridgeCardWidth, setFridgeCardWidth] = useState(0);
 
@@ -426,6 +429,7 @@ export default function RefrigeratorVisual({
   // 식재료 목록 탭용 상태
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'expired' | 'imminent' | 'safe'>('all');
+  const [selectedFridgeFilter, setSelectedFridgeFilter] = useState<string>('all');
 
 
 
@@ -455,9 +459,8 @@ export default function RefrigeratorVisual({
     isFallback: false,
   });
 
-  // 식재료 실시간 로드 (서버 vs 로컬 분기)
-  useEffect(() => {
-    const loadIngredients = async () => {
+  // 식재료 실시간 로드 (서버 vs 로컬 분기). 등록 폼 저장 후 재호출할 수 있도록 useCallback으로 분리.
+  const loadIngredients = React.useCallback(async () => {
       try {
         if (isLoggedIn) {
           // 각 냉장고의 레이아웃을 서버에서 로드
@@ -505,9 +508,11 @@ export default function RefrigeratorVisual({
       } finally {
         setIngredientsLoaded(true);
       }
-    };
-    loadIngredients();
   }, [refrigerators, isLoggedIn]);
+
+  useEffect(() => {
+    loadIngredients();
+  }, [loadIngredients]);
 
   // 냉장고 목록 크기나 로그인 상태가 바뀌면 캐러셀 인덱스를 0으로 초기화하던 부분 수정:
   // @active_fridge_index 등 부모에서 넘어오는 activeIndex를 유지하기 위해 length가 유효한 범위라면 0으로 덮어쓰지 않도록 함.
@@ -588,11 +593,11 @@ export default function RefrigeratorVisual({
     setAddLocationPickerVisible(true);
   };
 
-  // 보관실 선택 완료: 해당 보관실로 진입하면서 식재료 등록 폼을 바로 띄운다
-  const handlePickAddCompartment = (compartmentId: string, label: string, fridgeId: string) => {
+  // 보관실 선택 완료: 이 화면(식재료 목록)을 벗어나지 않고 바로 등록 폼을 띄운다
+  const handlePickAddCompartment = (compartmentId: string, fridgeId: string) => {
     setAddLocationPickerVisible(false);
     setAddPickerFridgeId(null);
-    onPressCompartment(compartmentId, label, fridgeId, true);
+    setAddIngredientTarget({ fridgeId, compartmentId });
   };
 
   // 특정 냉장고의 칸 요약 뱃지 계산
@@ -870,6 +875,10 @@ export default function RefrigeratorVisual({
       if (selectedFilter === 'all') return true;
       const dday = getDDayInfo(item.expiryDate);
       return dday.status === selectedFilter;
+    })
+    .filter(item => {
+      if (selectedFridgeFilter === 'all') return true;
+      return item.fridgeId === selectedFridgeFilter;
     })
     .sort((a, b) => {
       const ddayA = getDDayInfo(a.expiryDate);
@@ -1411,7 +1420,7 @@ export default function RefrigeratorVisual({
                             <Text style={[styles.urgentListName, { color: theme.textPrimary }]} numberOfLines={1}>
                               {item.name}
                             </Text>
-                            <Text style={[styles.urgentListLocation, { color: theme.textMuted }]} numberOfLines={1}>
+                            <Text style={[styles.urgentListLocation, { color: theme.textSecondary }]} numberOfLines={1}>
                               {`${fridge ? fridge.name : '냉장고'} > ${locationLabel}`}
                             </Text>
                           </View>
@@ -1814,7 +1823,45 @@ export default function RefrigeratorVisual({
                 )}
               </View>
 
-              {/* 필터 칩 바 */}
+              {/* 냉장고 필터 칩 바 (냉장고가 2개 이상일 때만 표시) */}
+              {refrigerators.length > 1 && (
+                <View style={[styles.filterContainer, { marginBottom: 8 }]}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
+                    <TouchableOpacity
+                      style={[
+                        styles.filterChip,
+                        { backgroundColor: theme.surfaceTertiary, borderWidth: 1, borderColor: theme.borderLight },
+                        selectedFridgeFilter === 'all' && [styles.filterChipActive, { backgroundColor: theme.primary, borderColor: theme.primary }]
+                      ]}
+                      onPress={() => setSelectedFridgeFilter('all')}
+                    >
+                      <Text style={[styles.filterChipText, { color: theme.textSecondary }, selectedFridgeFilter === 'all' && { color: theme.primaryOnPrimary }]}>
+                        전체 냉장고
+                      </Text>
+                    </TouchableOpacity>
+                    {refrigerators.map(fridge => (
+                      <TouchableOpacity
+                        key={fridge.id}
+                        style={[
+                          styles.filterChip,
+                          { backgroundColor: theme.surfaceTertiary, borderWidth: 1, borderColor: theme.borderLight },
+                          selectedFridgeFilter === fridge.id && [styles.filterChipActive, { backgroundColor: theme.primary, borderColor: theme.primary }]
+                        ]}
+                        onPress={() => setSelectedFridgeFilter(fridge.id)}
+                      >
+                        <Text
+                          style={[styles.filterChipText, { color: theme.textSecondary }, selectedFridgeFilter === fridge.id && { color: theme.primaryOnPrimary }]}
+                          numberOfLines={1}
+                        >
+                          {fridge.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
+              {/* 상태 필터 칩 바 */}
               <View style={styles.filterContainer}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
                   <TouchableOpacity
@@ -1924,7 +1971,7 @@ export default function RefrigeratorVisual({
                             <Text style={[styles.ingCardName, { color: theme.textPrimary }]} numberOfLines={1}>
                               {item.name}
                             </Text>
-                            <Text style={[styles.ingCardLoc, { color: theme.textMuted }]}>
+                            <Text style={[styles.ingCardLoc, { color: theme.textSecondary }]}>
                               {`${fridge ? fridge.name : '냉장고'} > ${locationLabel}`}
                             </Text>
                             <Text style={[styles.ingCardQty, { color: theme.textSecondary }]}>
@@ -1988,7 +2035,7 @@ export default function RefrigeratorVisual({
               </TouchableOpacity>
             </View>
 
-            <View style={styles.settingsModalBody}>
+            <View style={styles.pickerModalBody}>
               {!addPickerFridgeId ? (
                 refrigerators.map(fridge => (
                   <TouchableOpacity
@@ -2012,7 +2059,7 @@ export default function RefrigeratorVisual({
                     key={comp.id}
                     style={[styles.settingsActionRow, { borderBottomWidth: 1, borderBottomColor: theme.borderLight }]}
                     activeOpacity={0.7}
-                    onPress={() => handlePickAddCompartment(comp.id, comp.label, addPickerFridgeId)}
+                    onPress={() => handlePickAddCompartment(comp.id, addPickerFridgeId!)}
                   >
                     <View style={styles.settingsActionLeft}>
                       <View style={[styles.settingsIconBadge, { backgroundColor: theme.primaryLight }]}>
@@ -2028,6 +2075,17 @@ export default function RefrigeratorVisual({
           </View>
         </View>
       </Modal>
+
+      {/* 위치 선택이 끝나면 화면 이동 없이 이 자리에서 바로 등록 폼을 띄운다 */}
+      {addIngredientTarget && (
+        <AddIngredientModal
+          visible={!!addIngredientTarget}
+          fridgeId={addIngredientTarget.fridgeId}
+          compartmentId={addIngredientTarget.compartmentId}
+          onClose={() => setAddIngredientTarget(null)}
+          onSaved={loadIngredients}
+        />
+      )}
 
       {/* 냉장고 관리 설정 바텀시트: 뒷배경 딤 처리는 슬라이드 애니메이션과 분리해서 순서대로 재생한다 */}
       <Modal
@@ -2482,6 +2540,7 @@ const styles = StyleSheet.create({
   },
   urgentListLocation: {
     fontSize: 10,
+    fontWeight: '600',
   },
   urgentListDDayBadge: {
     paddingHorizontal: 8,
@@ -3514,6 +3573,9 @@ const styles = StyleSheet.create({
     flex: 1,
     marginTop: 16,
     justifyContent: 'space-between',
+  },
+  pickerModalBody: {
+    marginTop: 16,
   },
   settingsTopSectionScroll: {
     flex: 1,
