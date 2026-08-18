@@ -61,32 +61,6 @@ export function ThemeAlertPortal() {
     ? config.buttons 
     : [{ text: '확인', onPress: () => {} }];
 
-  // 타이틀에 따른 어울리는 상태별 아이콘/색상 결정
-  const getHeaderStyle = () => {
-    const title = config.title;
-    if (title.includes('삭제') || title.includes('경고') || title.includes('실패') || title.includes('오류') || title.includes('만료')) {
-      return {
-        emoji: '⚠️',
-        color: theme.danger,
-        bg: theme.dangerLight,
-      };
-    }
-    if (title.includes('완료') || title.includes('성공') || title.includes('동기화 완료')) {
-      return {
-        emoji: '✅',
-        color: theme.success,
-        bg: theme.successLight,
-      };
-    }
-    return {
-      emoji: 'ℹ️',
-      color: theme.primary,
-      bg: theme.primaryLight,
-    };
-  };
-
-  const headerStyle = getHeaderStyle();
-
   return (
     <Modal
       transparent
@@ -96,11 +70,6 @@ export function ThemeAlertPortal() {
     >
       <View style={[styles.overlay, { backgroundColor: theme.overlay }]}>
         <View style={[styles.alertCard, { backgroundColor: theme.surface, shadowColor: theme.shadow }]}>
-          {/* 상태 표시 아이콘 배지 */}
-          <View style={[styles.iconContainer, { backgroundColor: headerStyle.bg }]}>
-            <Text style={[styles.iconText, { color: headerStyle.color }]}>{headerStyle.emoji}</Text>
-          </View>
-
           {/* 타이틀 및 메시지 */}
           <Text style={[styles.titleText, { color: theme.textPrimary }]}>{config.title}</Text>
           {config.message ? (
@@ -169,30 +138,19 @@ const styles = StyleSheet.create({
     // 안드로이드 그림자
     elevation: 8,
   },
-  iconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  iconText: {
-    fontSize: 28,
-  },
   titleText: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '400',
     color: '#0F172A', // Slate 900
     textAlign: 'center',
     marginBottom: 10,
-    lineHeight: 24,
+    lineHeight: 20,
   },
   messageText: {
     fontSize: 14,
     color: '#475569', // Slate 600
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 20,
     marginBottom: 24,
     paddingHorizontal: 8,
   },

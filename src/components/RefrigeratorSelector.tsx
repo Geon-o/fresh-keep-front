@@ -115,11 +115,6 @@ export default function RefrigeratorSelector({ onSelect, currentType }: Refriger
       >
         <View style={styles.warningModalOverlay}>
           <View style={[styles.warningModalContent, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
-            <View style={styles.warningHeader}>
-              <Ionicons name="warning" size={28} color={theme.danger} />
-              <Text style={[styles.warningTitle, { color: theme.textPrimary }]}>냉장고 형태 변경 주의</Text>
-            </View>
-
             <View style={styles.warningBody}>
               <Text style={[styles.warningText, { color: theme.textSecondary }]}>
                 냉장고의 타입을 변경하시면, <Text style={{ fontWeight: 'bold', color: theme.danger }}>현재 보관 중인 모든 식재료 데이터가 삭제</Text>되고 선택하신 구조의 새로운 냉장고로 배치됩니다.
@@ -291,16 +286,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 20,
     elevation: 5,
-  },
-  warningHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 16,
-  },
-  warningTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
   },
   warningBody: {
     gap: 12,

@@ -1244,8 +1244,8 @@ export default function CompartmentDetail({
       if (check) performRemove();
     } else {
       Alert.alert(
-        '식재료 삭제 🗑️',
         `[${name}] 식재료를 보관실에서 삭제하시겠습니까?`,
+        undefined,
         [
           { text: '취소', style: 'cancel' },
           { text: '삭제', style: 'destructive', onPress: performRemove }
@@ -1317,8 +1317,8 @@ export default function CompartmentDetail({
         if (check) performDelete();
       } else {
         Alert.alert(
-          '선반 삭제 경고 ⚠️',
           `[${label}]에 보관 중인 식재료가 존재합니다. 선반을 삭제하시면 보관 중인 식재료도 함께 삭제됩니다. 계속하시겠습니까?`,
+          undefined,
           [
             { text: '취소', style: 'cancel' },
             { text: '삭제', style: 'destructive', onPress: performDelete }
@@ -1368,8 +1368,8 @@ export default function CompartmentDetail({
           if (check) performDisable();
         } else {
           Alert.alert(
-            '문쪽 보관실 비활성화 경고 ⚠️',
             '문쪽 보관실을 비활성화하면 보관 중인 문쪽 식재료와 선반 구성이 모두 삭제됩니다. 계속하시겠습니까?',
+            undefined,
             [
               { text: '취소', style: 'cancel' },
               { text: '비활성화', style: 'destructive', onPress: performDisable }

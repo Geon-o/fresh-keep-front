@@ -582,8 +582,8 @@ export default function RefrigeratorVisual({
       if (window.confirm(`[${item.name}] 식재료를 삭제하시겠습니까?`)) performRemove();
     } else {
       Alert.alert(
-        '식재료 삭제 🗑️',
         `[${item.name}] 식재료를 삭제하시겠습니까?`,
+        undefined,
         [
           { text: '취소', style: 'cancel' },
           { text: '삭제', style: 'destructive', onPress: performRemove },

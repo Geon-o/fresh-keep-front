@@ -258,14 +258,16 @@ export default function AddIngredientModal({ visible, fridgeId, compartmentId, s
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{isEdit ? '식재료 수정' : '식재료 등록'}</Text>
-            <TouchableOpacity
-              style={[styles.modalCloseButton, isSaving && { opacity: 0.5 }]}
-              onPress={handleClose}
-              disabled={isSaving}
-            >
-              <Text style={styles.modalCloseText}>✕</Text>
-            </TouchableOpacity>
+            <View style={styles.modalHeaderTopRow}>
+              <Text style={styles.modalTitle}>{isEdit ? '식재료 수정' : '식재료 등록'}</Text>
+              <TouchableOpacity
+                style={[styles.modalCloseButton, isSaving && { opacity: 0.5 }]}
+                onPress={handleClose}
+                disabled={isSaving}
+              >
+                <Text style={styles.modalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {isPreparing ? (

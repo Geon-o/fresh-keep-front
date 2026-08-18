@@ -528,10 +528,10 @@ export default function Index() {
     };
 
     Alert.alert(
-      isOwner ? '냉장고 삭제 ❌' : '냉장고 나가기',
       isOwner
         ? `[${activeFridge.name}]와 보관 중인 모든 식재료 데이터가 함께 영구 삭제됩니다. 함께 쓰는 멤버가 있다면 먼저 동의를 요청합니다. 삭제하시겠습니까?`
         : `[${activeFridge.name}]에서 나가시겠습니까? 나가도 그동안 등록한 식재료는 그대로 남습니다.`,
+      undefined,
       [
         { text: '취소', style: 'cancel' },
         { text: isOwner ? '삭제' : '나가기', style: 'destructive', onPress: performDelete }
