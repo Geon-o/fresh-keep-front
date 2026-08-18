@@ -45,6 +45,12 @@
         {
           "color": "#BBDEFB"
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "식재료 등록 시 제품 바코드를 스캔하려면 카메라 접근 권한이 필요합니다."
+        }
       ]
     ],
     "experiments": {
