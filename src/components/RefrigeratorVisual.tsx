@@ -10,6 +10,7 @@ import { SAMPLE_INGREDIENTS, CATEGORY_EMOJI, DEFAULT_INSIDE_SHELVES, DEFAULT_DOO
 import AddIngredientModal from './AddIngredientModal';
 import { useAuth } from '../context/AuthContext';
 import { getFridgeLayout, getCompartmentShelves, CompartmentShelfInfo, getFridgeHistory, IngredientHistoryEntry } from '../api/fridgeService';
+import { deleteIngredient } from '../api/ingredientService';
 import { deserializeMemo, convertServerLocationToLocal } from '../utils/memoSerializer';
 import { rebuildAllNotifications } from '../utils/ingredientNotifications';
 import { useTheme } from '../context/ThemeContext';
@@ -225,7 +226,8 @@ const SEASONAL_INGREDIENTS: SeasonalIngredient[] = [
 interface RefrigeratorVisualProps {
   mode?: 'home' | 'ingredients' | 'fridge';
   refrigerators: { id: string; type: FridgeType; name: string; uuid?: string; role?: 'OWNER' | 'MEMBER'; deletionRequested?: boolean; ownerName?: string; memberNames?: string[] }[];
-  onPressCompartment: (id: string, label: string, fridgeId: string) => void;
+  // subLocation을 넘기면 이동한 화면에서 해당 선반을 바로 펼쳐서 보여준다.
+  onPressCompartment: (id: string, label: string, fridgeId: string, subLocation?: string) => void;
   activeIndex: number;
   setActiveIndex: (index: number) => void;
   onOpenAddSelector: () => void;
@@ -433,6 +435,8 @@ export default function RefrigeratorVisual({
   const [addPickerShelvesLoading, setAddPickerShelvesLoading] = useState(false);
   // 위치 선택이 끝나면 이 화면(식재료 목록)을 벗어나지 않고 바로 등록 폼을 띄운다
   const [addIngredientTarget, setAddIngredientTarget] = useState<{ fridgeId: string; compartmentId: string; shelfId: string; serverCompartmentId: number | null } | null>(null);
+  // 식재료 목록 카드의 수정 버튼으로 여는 수정 폼 (같은 모달을 수정 모드로 재사용)
+  const [editIngredientTarget, setEditIngredientTarget] = useState<Ingredient | null>(null);
 
   const [fridgeCardWidth, setFridgeCardWidth] = useState(0);
 
@@ -553,6 +557,40 @@ export default function RefrigeratorVisual({
         setIngredientsLoaded(true);
       }
   }, [refrigerators, isLoggedIn]);
+
+  // 식재료 목록 카드의 X 아이콘: 확인 후 즉시 삭제 (수정 모달 없이 바로 처리)
+  const handleDeleteIngredient = (item: Ingredient) => {
+    const performRemove = async () => {
+      try {
+        if (isLoggedIn) {
+          await deleteIngredient(Number(item.id));
+        } else {
+          const ingredientsStr = await AsyncStorage.getItem('@ingredients');
+          const allIngredients: Ingredient[] = ingredientsStr ? JSON.parse(ingredientsStr) : [];
+          const updated = allIngredients.filter(ing => ing.id !== item.id);
+          await AsyncStorage.setItem('@ingredients', JSON.stringify(updated));
+          rebuildAllNotifications(updated);
+        }
+        loadIngredients();
+      } catch (e) {
+        console.error('Failed to delete ingredient', e);
+        Alert.alert('오류 ⚠️', '식재료 삭제에 실패했습니다.');
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`[${item.name}] 식재료를 삭제하시겠습니까?`)) performRemove();
+    } else {
+      Alert.alert(
+        '식재료 삭제 🗑️',
+        `[${item.name}] 식재료를 삭제하시겠습니까?`,
+        [
+          { text: '취소', style: 'cancel' },
+          { text: '삭제', style: 'destructive', onPress: performRemove },
+        ]
+      );
+    }
+  };
 
   useEffect(() => {
     loadIngredients();
@@ -1473,7 +1511,7 @@ export default function RefrigeratorVisual({
                           }
                         ]}
                         activeOpacity={0.8}
-                        onPress={() => onPressCompartment(item.location, locationLabel, item.fridgeId || '')}
+                        onPress={() => onPressCompartment(item.location, locationLabel, item.fridgeId || '', item.subLocation)}
                       >
                         <View style={styles.urgentListLeft}>
                           <View style={[styles.urgentListEmojiBg, { backgroundColor: theme.surfaceTertiary }]}>
@@ -2010,7 +2048,7 @@ export default function RefrigeratorVisual({
               {filteredIngredients.length > 0 ? (
                 <ScrollView
                   style={styles.ingListContainer}
-                  contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100, gap: 12 }}
+                  contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100, gap: 8 }}
                   showsVerticalScrollIndicator={false}
                 >
                   {filteredIngredients.map(item => {
@@ -2024,27 +2062,44 @@ export default function RefrigeratorVisual({
                         key={item.id}
                         style={[styles.ingCard, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}
                         activeOpacity={0.8}
-                        onPress={() => onPressCompartment(item.location, locationLabel, item.fridgeId || '')}
+                        onPress={() => onPressCompartment(item.location, locationLabel, item.fridgeId || '', item.subLocation)}
                       >
-                        <View style={styles.ingCardLeft}>
+                        {/* 상단 줄: 만료 배지(좌, 최우선 정보) — 수정/삭제(우) */}
+                        <View style={styles.ingCardTopRow}>
+                          <View style={[styles.urgentDDayBadge, { backgroundColor: dday.color + '12', borderColor: dday.color }]}>
+                            <Text style={[styles.urgentDDayText, { color: dday.color }]}>{dday.text}</Text>
+                          </View>
+                          <View style={styles.ingCardTopRowIcons}>
+                            <TouchableOpacity
+                              style={styles.ingCardTopRowIconButton}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              onPress={() => setEditIngredientTarget(item)}
+                            >
+                              <Ionicons name="pencil-outline" size={16} color={theme.textMuted} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.ingCardTopRowIconButton}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              onPress={() => handleDeleteIngredient(item)}
+                            >
+                              <Ionicons name="trash-outline" size={16} color={theme.danger} />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+
+                        <View style={styles.ingCardMainRow}>
                           <View style={[styles.ingCardEmojiBg, { backgroundColor: theme.surfaceTertiary }]}>
                             <Text style={{ fontSize: 22 }}>{emoji}</Text>
                           </View>
+
                           <View style={styles.ingCardInfo}>
                             <Text style={[styles.ingCardName, { color: theme.textPrimary }]} numberOfLines={1}>
                               {item.name}
                             </Text>
-                            <Text style={[styles.ingCardLoc, { color: theme.textSecondary }]}>
+                            <Text style={[styles.ingCardLocBottom, { color: theme.textTertiary }]} numberOfLines={1}>
                               {`${fridge ? fridge.name : '냉장고'} > ${getLocationDisplayLabel(locationLabel, item.subLocation)}`}
+                              <Text style={[styles.ingCardQtyValue, { color: theme.textSecondary }]}> · {item.quantity}{item.unit}</Text>
                             </Text>
-                            <Text style={[styles.ingCardQty, { color: theme.textSecondary }]}>
-                              수량: {item.quantity} {item.unit}
-                            </Text>
-                          </View>
-                        </View>
-                        <View style={styles.ingCardRight}>
-                          <View style={[styles.urgentDDayBadge, { backgroundColor: dday.color + '12', borderColor: dday.color }]}>
-                            <Text style={[styles.urgentDDayText, { color: dday.color }]}>{dday.text}</Text>
                           </View>
                         </View>
                       </TouchableOpacity>
@@ -2270,6 +2325,16 @@ export default function RefrigeratorVisual({
           shelfId={addIngredientTarget.shelfId}
           serverCompartmentId={addIngredientTarget.serverCompartmentId}
           onClose={() => setAddIngredientTarget(null)}
+          onSaved={loadIngredients}
+        />
+      )}
+
+      {/* 식재료 목록 카드의 수정 버튼: 화면 이동 없이 같은 모달을 수정 모드로 띄운다 */}
+      {editIngredientTarget && (
+        <AddIngredientModal
+          visible={!!editIngredientTarget}
+          editIngredient={editIngredientTarget}
+          onClose={() => setEditIngredientTarget(null)}
           onSaved={loadIngredients}
         />
       )}
@@ -2783,10 +2848,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   urgentDDayBadge: {
+    height: 22,
     paddingHorizontal: 8,
-    paddingVertical: 3,
     borderRadius: 8,
     borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   urgentDDayText: {
     fontSize: 10,
@@ -3366,18 +3433,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   ingCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     borderRadius: 18,
     borderWidth: 1,
     padding: 14,
+    paddingTop: 10,
+    position: 'relative',
   },
-  ingCardLeft: {
+  ingCardMainRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    flex: 1,
   },
   ingCardEmojiBg: {
     width: 48,
@@ -3388,24 +3453,39 @@ const styles = StyleSheet.create({
   },
   ingCardInfo: {
     flex: 1,
-    gap: 2,
+    gap: 4,
   },
   ingCardName: {
-    fontSize: 14,
+    flex: 1,
+    fontSize: 18,
     fontWeight: 'bold',
   },
-  ingCardLoc: {
+  ingCardLocBottom: {
     fontSize: 11,
     fontWeight: '600',
-  },
-  ingCardQty: {
-    fontSize: 11,
-    fontWeight: '500',
     marginTop: 2,
   },
-  ingCardRight: {
+  ingCardQtyValue: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  ingCardTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 14,
+  },
+  ingCardTopRowIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  ingCardTopRowIconButton: {
+    width: 22,
+    height: 22,
     justifyContent: 'center',
-    alignItems: 'flex-end',
+    alignItems: 'center',
   },
   emptyStateContainer: {
     flex: 1,

@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ingredient, IngredientCategory, ExpiryType } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { addIngredient } from '../api/ingredientService';
+import { addIngredient, updateIngredient } from '../api/ingredientService';
 import { getCustomUnits, addCustomUnit } from '../api/unitService';
 import { serializeMemo } from '../utils/memoSerializer';
 import { rebuildAllNotifications } from '../utils/ingredientNotifications';
@@ -12,18 +12,20 @@ import { createStyles, CATEGORIES, DEFAULT_UNITS, EXPIRY_TYPE_LABELS } from './C
 
 interface AddIngredientModalProps {
   visible: boolean;
-  fridgeId: string;
-  compartmentId: string;
-  // 목록 화면의 선택 단계(냉장고 → 칸 → 선반/문쪽)에서 이미 정해진 값을 그대로 받는다.
-  shelfId: string;
-  serverCompartmentId: number | null;
+  // 등록 모드에서만 필요 (목록 화면의 선택 단계에서 이미 정해진 값).
+  fridgeId?: string;
+  compartmentId?: string;
+  shelfId?: string;
+  serverCompartmentId?: number | null;
+  // 지정하면 수정 모드로 동작 (기존 값으로 폼을 채우고, 저장 시 등록 대신 수정 API를 호출).
+  editIngredient?: Ingredient;
   onClose: () => void;
   onSaved: () => void;
 }
 
-// 식재료 목록 탭의 + 버튼 흐름 전용: 냉장고/칸/선반을 고른 뒤 등록 폼을 이 화면(목록 화면) 위에 바로 띄운다.
+// 식재료 목록 탭의 + 버튼(등록) / 카드 수정 버튼(수정) 흐름 전용: 이 화면 위에 바로 폼을 띄운다.
 // CompartmentDetail로 이동하지 않는다.
-export default function AddIngredientModal({ visible, fridgeId, compartmentId, shelfId, serverCompartmentId, onClose, onSaved }: AddIngredientModalProps) {
+export default function AddIngredientModal({ visible, fridgeId, compartmentId, shelfId, serverCompartmentId, editIngredient, onClose, onSaved }: AddIngredientModalProps) {
   const { isLoggedIn } = useAuth();
   const { theme, isDark } = useTheme();
   const styles = React.useMemo(() => createStyles(theme, isDark), [theme, isDark]);
@@ -47,6 +49,8 @@ export default function AddIngredientModal({ visible, fridgeId, compartmentId, s
   const [unitCustomInputValue, setUnitCustomInputValue] = useState('');
   const [expiryTypeDropdownOpen, setExpiryTypeDropdownOpen] = useState(false);
   const unitOptions = Array.from(new Set([...DEFAULT_UNITS, ...customUnits]));
+  const isEdit = !!editIngredient;
+  const effectiveShelfId = editIngredient?.subLocation || shelfId || '';
 
   const getTodayString = () => {
     const d = new Date();
@@ -62,13 +66,23 @@ export default function AddIngredientModal({ visible, fridgeId, compartmentId, s
   useEffect(() => {
     if (!visible) return;
 
-    setFormName('');
-    setFormCategory('etc');
-    setFormQuantity(1);
-    setFormUnit('개');
-    setFormExpiryDate(getTodayString());
-    setFormExpiryType('SELL_BY');
-    setFormMemo('');
+    if (editIngredient) {
+      setFormName(editIngredient.name);
+      setFormCategory(editIngredient.category);
+      setFormQuantity(editIngredient.quantity);
+      setFormUnit(editIngredient.unit);
+      setFormExpiryDate(editIngredient.expiryDate);
+      setFormExpiryType(editIngredient.expiryType || 'SELL_BY');
+      setFormMemo(editIngredient.memo || '');
+    } else {
+      setFormName('');
+      setFormCategory('etc');
+      setFormQuantity(1);
+      setFormUnit('개');
+      setFormExpiryDate(getTodayString());
+      setFormExpiryType('SELL_BY');
+      setFormMemo('');
+    }
     setCategoryDropdownOpen(false);
     setUnitDropdownOpen(false);
     setUnitCustomInputOpen(false);
@@ -92,7 +106,7 @@ export default function AddIngredientModal({ visible, fridgeId, compartmentId, s
       }
     };
     prepare();
-  }, [visible, isLoggedIn]);
+  }, [visible, isLoggedIn, editIngredient?.id]);
 
   const toggleCategoryDropdown = () => {
     setUnitDropdownOpen(false);
@@ -153,9 +167,39 @@ export default function AddIngredientModal({ visible, fridgeId, compartmentId, s
     isSavingRef.current = true;
     setIsSaving(true);
     try {
-      const memoContent = serializeMemo(formCategory, shelfId, formMemo);
+      const memoContent = serializeMemo(formCategory, effectiveShelfId, formMemo);
 
-      if (isLoggedIn) {
+      if (isEdit && editIngredient) {
+        if (isLoggedIn) {
+          await updateIngredient(Number(editIngredient.id), {
+            name: formName.trim(),
+            quantity: Number(formQuantity),
+            unit: formUnit,
+            expirationDate: formExpiryDate,
+            expirationType: formExpiryType,
+            memo: memoContent,
+          });
+        } else {
+          const ingredientsStr = await AsyncStorage.getItem('@ingredients');
+          const allIngredients: Ingredient[] = ingredientsStr ? JSON.parse(ingredientsStr) : [];
+          const updated = allIngredients.map(item =>
+            item.id === editIngredient.id
+              ? {
+                  ...item,
+                  name: formName.trim(),
+                  category: formCategory,
+                  expiryDate: formExpiryDate,
+                  expiryType: formExpiryType,
+                  quantity: formQuantity,
+                  unit: formUnit,
+                  memo: formMemo.trim() || undefined,
+                }
+              : item
+          );
+          await AsyncStorage.setItem('@ingredients', JSON.stringify(updated));
+          rebuildAllNotifications(updated);
+        }
+      } else if (isLoggedIn) {
         if (!serverCompartmentId) {
           throw new Error('서버 구획 ID를 로드하지 못했습니다.');
         }
@@ -172,8 +216,8 @@ export default function AddIngredientModal({ visible, fridgeId, compartmentId, s
         const newIngredient: Ingredient = {
           id: `ing_${Date.now()}`,
           name: formName.trim(),
-          location: compartmentId,
-          subLocation: shelfId as any,
+          location: compartmentId!,
+          subLocation: effectiveShelfId as any,
           category: formCategory,
           expiryDate: formExpiryDate,
           expiryType: formExpiryType,
@@ -214,7 +258,7 @@ export default function AddIngredientModal({ visible, fridgeId, compartmentId, s
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>식재료 등록</Text>
+            <Text style={styles.modalTitle}>{isEdit ? '식재료 수정' : '식재료 등록'}</Text>
             <TouchableOpacity
               style={[styles.modalCloseButton, isSaving && { opacity: 0.5 }]}
               onPress={handleClose}
@@ -410,10 +454,10 @@ export default function AddIngredientModal({ visible, fridgeId, compartmentId, s
                   {isSaving ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <ActivityIndicator size="small" color="#FFFFFF" />
-                      <Text style={styles.buttonTextSave}>등록 중...</Text>
+                      <Text style={styles.buttonTextSave}>{isEdit ? '저장 중...' : '등록 중...'}</Text>
                     </View>
                   ) : (
-                    <Text style={styles.buttonTextSave}>등록</Text>
+                    <Text style={styles.buttonTextSave}>{isEdit ? '수정 완료' : '등록'}</Text>
                   )}
                 </TouchableOpacity>
               </View>

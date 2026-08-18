@@ -62,7 +62,7 @@ export default function Index() {
   // 3. 로컬 모드 냉장고 목록 상태
   const [localRefrigerators, setLocalRefrigerators] = useState<{ id: string; type: FridgeType; name: string }[]>([]);
   const [isLocalLoading, setIsLocalLoading] = useState(true);
-  const [activeCompartment, setActiveCompartment] = useState<{ id: string; label: string; fridgeId: string } | null>(null);
+  const [activeCompartment, setActiveCompartment] = useState<{ id: string; label: string; fridgeId: string; focusShelfId?: string } | null>(null);
 
   // 하드웨어 뒤로가기(BackHandler) 처리
   const activeTabRef = useRef(activeTab);
@@ -597,14 +597,14 @@ export default function Index() {
     setSelectorVisible(true);
   };
 
-  const handlePressCompartment = async (id: string, label: string, fridgeId: string) => {
+  const handlePressCompartment = async (id: string, label: string, fridgeId: string, subLocation?: string) => {
     // 사용자가 현재 보고 있던 냉장고 인덱스를 로컬에 영구 저장하여 보관실 뒤로가기 혹은 새로고침 시 즉시 동기화
     try {
       await AsyncStorage.setItem('@active_fridge_index', String(activeIndex));
     } catch (e) {
       console.error(e);
     }
-    setActiveCompartment({ id, label, fridgeId });
+    setActiveCompartment({ id, label, fridgeId, focusShelfId: subLocation });
   };
 
   // 식재료 보관실/선반 간 드래그 앤 드롭 이동 API 연동 및 상태 동기화
@@ -705,6 +705,7 @@ export default function Index() {
             compartmentLabel={activeCompartment.label}
             onBack={() => setActiveCompartment(null)}
             fridgeId={activeCompartment.fridgeId}
+            initialFocusShelfId={activeCompartment.focusShelfId}
             isSharedFridge={(refrigerators.find(f => f.id === activeCompartment.fridgeId) as any)?.memberNames?.length > 1}
             onNavigateCompartment={(newId, newLabel) => {
               setActiveCompartment({

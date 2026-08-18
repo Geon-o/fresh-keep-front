@@ -18,6 +18,8 @@ interface CompartmentDetailProps {
   compartmentLabel: string;
   onBack: () => void;
   fridgeId: string;
+  // 식재료 목록에서 특정 재료를 눌러 진입했을 때, 그 재료가 있는 선반을 자동으로 펼쳐서 보여준다.
+  initialFocusShelfId?: string;
   // 함께 쓰는 사람이 있는 냉장고일 때만 등록/수정자 정보를 보여준다
   isSharedFridge?: boolean;
   onNavigateCompartment?: (newId: string, newLabel: string) => void;
@@ -354,8 +356,9 @@ const DraggableBadge = ({
 export default function CompartmentDetail({ 
   compartmentId, 
   compartmentLabel, 
-  onBack, 
+  onBack,
   fridgeId,
+  initialFocusShelfId,
   isSharedFridge,
   onNavigateCompartment,
   onMoveIngredient
@@ -985,6 +988,19 @@ export default function CompartmentDetail({
       measureShelves();
     });
   };
+
+  // 식재료 목록에서 특정 재료를 눌러 들어왔을 때, 그 재료가 있는 선반을 자동으로 펼쳐서 보여준다
+  // (문쪽 보관실 선반이면 드로어도 함께 연다). 최초 진입 시 한 번만 적용.
+  const focusShelfAppliedRef = useRef(false);
+  useEffect(() => {
+    if (isLoading || !initialFocusShelfId || focusShelfAppliedRef.current) return;
+    focusShelfAppliedRef.current = true;
+
+    setExpandedShelfIds(prev => new Set(prev).add(initialFocusShelfId));
+    if (initialFocusShelfId.startsWith('pocket')) {
+      openDoorDrawer();
+    }
+  }, [isLoading, initialFocusShelfId]);
 
   // 오늘 날짜 구하는 YYYY-MM-DD 헬퍼
   const getTodayString = () => {
