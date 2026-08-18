@@ -1450,61 +1450,51 @@ export default function RefrigeratorVisual({
 
             {urgentIngredients.length > 0 ? (
               <View style={styles.urgentListContainer}>
-                {urgentIngredients.slice(0, 5).map(item => {
-                  const dday = getDDayInfo(item.expiryDate);
-                  const emoji = CATEGORY_EMOJI[item.category] || '📦';
-                  const fridge = refrigerators.find(r => r.id === item.fridgeId);
-                  const locationLabel = getCompartmentLabel(item.location);
+                <ScrollView
+                  nestedScrollEnabled={true}
+                  showsVerticalScrollIndicator={true}
+                  contentContainerStyle={{ gap: 8 }}
+                >
+                  {urgentIngredients.map(item => {
+                    const dday = getDDayInfo(item.expiryDate);
+                    const emoji = CATEGORY_EMOJI[item.category] || '📦';
+                    const fridge = refrigerators.find(r => r.id === item.fridgeId);
+                    const locationLabel = getCompartmentLabel(item.location);
 
-                  return (
-                    <TouchableOpacity
-                      key={item.id}
-                      style={[
-                        styles.urgentListItem,
-                        {
-                          backgroundColor: theme.surface,
-                          borderColor: theme.borderLight,
-                          shadowColor: theme.shadow,
-                        }
-                      ]}
-                      activeOpacity={0.8}
-                      onPress={() => onPressCompartment(item.location, locationLabel, item.fridgeId || '')}
-                    >
-                      <View style={styles.urgentListLeft}>
-                        <View style={[styles.urgentListEmojiBg, { backgroundColor: theme.surfaceTertiary }]}>
-                          <Text style={styles.urgentListEmoji}>{emoji}</Text>
+                    return (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={[
+                          styles.urgentListItem,
+                          {
+                            backgroundColor: theme.surface,
+                            borderColor: theme.borderLight,
+                            shadowColor: theme.shadow,
+                          }
+                        ]}
+                        activeOpacity={0.8}
+                        onPress={() => onPressCompartment(item.location, locationLabel, item.fridgeId || '')}
+                      >
+                        <View style={styles.urgentListLeft}>
+                          <View style={[styles.urgentListEmojiBg, { backgroundColor: theme.surfaceTertiary }]}>
+                            <Text style={styles.urgentListEmoji}>{emoji}</Text>
+                          </View>
+                          <View style={styles.urgentListInfo}>
+                            <Text style={[styles.urgentListName, { color: theme.textPrimary }]} numberOfLines={1}>
+                              {item.name}
+                            </Text>
+                            <Text style={[styles.urgentListLocation, { color: theme.textSecondary }]} numberOfLines={1}>
+                              {`${fridge ? fridge.name : '냉장고'} > ${getLocationDisplayLabel(locationLabel, item.subLocation)}`}
+                            </Text>
+                          </View>
                         </View>
-                        <View style={styles.urgentListInfo}>
-                          <Text style={[styles.urgentListName, { color: theme.textPrimary }]} numberOfLines={1}>
-                            {item.name}
-                          </Text>
-                          <Text style={[styles.urgentListLocation, { color: theme.textSecondary }]} numberOfLines={1}>
-                            {`${fridge ? fridge.name : '냉장고'} > ${getLocationDisplayLabel(locationLabel, item.subLocation)}`}
-                          </Text>
+                        <View style={[styles.urgentListDDayBadge, { backgroundColor: dday.color + '12', borderColor: dday.color }]}>
+                          <Text style={[styles.urgentListDDayText, { color: dday.color }]}>{dday.text}</Text>
                         </View>
-                      </View>
-                      <View style={[styles.urgentListDDayBadge, { backgroundColor: dday.color + '12', borderColor: dday.color }]}>
-                        <Text style={[styles.urgentListDDayText, { color: dday.color }]}>{dday.text}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-
-                {urgentIngredients.length > 5 && (
-                  <TouchableOpacity
-                    style={styles.seeMoreRow}
-                    activeOpacity={0.7}
-                    onPress={() => {
-                      setSelectedFilter('all');
-                      onChangeTab?.('ingredients');
-                    }}
-                  >
-                    <Text style={[styles.seeMoreText, { color: theme.primary }]}>
-                      {urgentIngredients.length - 5}개 더보기
-                    </Text>
-                    <Ionicons name="chevron-forward" size={14} color={theme.primary} />
-                  </TouchableOpacity>
-                )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
               </View>
             ) : (
               <View style={[styles.emptyUrgentCard, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
@@ -1676,39 +1666,45 @@ export default function RefrigeratorVisual({
             </View>
 
             <View style={styles.seasonalListContainer}>
-              {seasonalIngredients.map((item, idx) => (
-                <TouchableOpacity
-                  key={`seasonal_${idx}`}
-                  style={[
-                    styles.seasonalRowItem,
-                    {
-                      backgroundColor: theme.surface,
-                      borderColor: theme.borderLight,
-                      shadowColor: theme.shadow,
-                    }
-                  ]}
-                  activeOpacity={0.8}
-                  onPress={() => handleOpenYoutube(item.searchQuery, item.name)}
-                >
-                  <View style={styles.seasonalRowLeft}>
-                    <View style={[styles.seasonalRowEmojiBg, { backgroundColor: theme.surfaceTertiary }]}>
-                      <Text style={styles.seasonalRowEmoji}>{item.emoji}</Text>
+              <ScrollView
+                nestedScrollEnabled={true}
+                showsVerticalScrollIndicator={true}
+                contentContainerStyle={{ gap: 8 }}
+              >
+                {seasonalIngredients.map((item, idx) => (
+                  <TouchableOpacity
+                    key={`seasonal_${idx}`}
+                    style={[
+                      styles.seasonalRowItem,
+                      {
+                        backgroundColor: theme.surface,
+                        borderColor: theme.borderLight,
+                        shadowColor: theme.shadow,
+                      }
+                    ]}
+                    activeOpacity={0.8}
+                    onPress={() => handleOpenYoutube(item.searchQuery, item.name)}
+                  >
+                    <View style={styles.seasonalRowLeft}>
+                      <View style={[styles.seasonalRowEmojiBg, { backgroundColor: theme.surfaceTertiary }]}>
+                        <Text style={styles.seasonalRowEmoji}>{item.emoji}</Text>
+                      </View>
+                      <View style={styles.seasonalRowInfo}>
+                        <Text style={[styles.seasonalRowName, { color: theme.textPrimary }]} numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                        <Text style={[styles.seasonalRowRecommend, { color: theme.textSecondary }]} numberOfLines={1}>
+                          추천: {item.recommendDish}
+                        </Text>
+                      </View>
                     </View>
-                    <View style={styles.seasonalRowInfo}>
-                      <Text style={[styles.seasonalRowName, { color: theme.textPrimary }]} numberOfLines={1}>
-                        {item.name}
-                      </Text>
-                      <Text style={[styles.seasonalRowRecommend, { color: theme.textSecondary }]} numberOfLines={1}>
-                        추천: {item.recommendDish}
-                      </Text>
+                    <View style={[styles.youtubeRowButton, { backgroundColor: '#FF0000' }]}>
+                      <Ionicons name="logo-youtube" size={12} color="#FFFFFF" />
+                      <Text style={styles.youtubeRowText}>영상 보기</Text>
                     </View>
-                  </View>
-                  <View style={[styles.youtubeRowButton, { backgroundColor: '#FF0000' }]}>
-                    <Ionicons name="logo-youtube" size={12} color="#FFFFFF" />
-                    <Text style={styles.youtubeRowText}>영상 보기</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
           </View>
 
@@ -2697,18 +2693,7 @@ const styles = StyleSheet.create({
   },
   urgentListContainer: {
     paddingHorizontal: 20,
-    gap: 8,
-  },
-  seeMoreRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 12,
-  },
-  seeMoreText: {
-    fontSize: 13,
-    fontWeight: '700',
+    maxHeight: 220,
   },
   urgentListItem: {
     flexDirection: 'row',
@@ -2972,11 +2957,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
     padding: 16,
-    borderWidth: 0.5,
+    borderWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.35)',
+    borderLeftColor: 'rgba(255, 255, 255, 0.18)',
+    borderBottomColor: 'rgba(0, 0, 0, 0.16)',
+    borderRightColor: 'rgba(0, 0, 0, 0.1)',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
     elevation: 1,
   },
   fridgeColor: {
@@ -3003,16 +2992,18 @@ const styles = StyleSheet.create({
   },
   doorLabel: {
     position: 'absolute',
-    top: 10,
-    left: 10,
-    fontSize: 15,
-    fontWeight: 'bold',
+    top: 12,
+    left: 12,
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: -0.2,
     color: '#37474F',
   },
   doorGlassPanel: {
     flex: 1,
     alignSelf: 'stretch',
-    marginTop: 26,
+    marginTop: 24,
+    marginHorizontal: 8,
     borderRadius: 14,
     borderWidth: 1,
     padding: 8,
@@ -3030,18 +3021,18 @@ const styles = StyleSheet.create({
   },
   doorGlassListContent: {
     gap: 4,
-    paddingVertical: 2,
+    paddingVertical: 4,
   },
   doorGlassItemRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 6,
+    gap: 8,
   },
   doorGlassItemName: {
     flex: 1,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '500',
     textAlign: 'left',
   },
   doorGlassItemQty: {
@@ -3054,12 +3045,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5', // 밝은 크롬/알루미늄 색상
     borderRadius: 3,
     borderWidth: 1,
-    borderColor: '#B0BEC5', // 메탈릭 외곽선
+    borderTopColor: '#FFFFFF',
+    borderLeftColor: '#FFFFFF',
+    borderBottomColor: '#90A4AE',
+    borderRightColor: '#90A4AE',
     shadowColor: '#000000',
     shadowOffset: { width: 1, height: 1 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.15,
     shadowRadius: 2,
-    elevation: 1,
+    elevation: 2,
   },
   verticalHandleLeft: {
     width: 8,
@@ -3087,8 +3081,8 @@ const styles = StyleSheet.create({
   },
   doorAlertBadge: {
     position: 'absolute',
-    top: 10,
-    right: 10,
+    top: 12,
+    right: 12,
     paddingHorizontal: 7,
     paddingVertical: 3,
     borderRadius: 8,
@@ -3448,7 +3442,7 @@ const styles = StyleSheet.create({
   },
   seasonalListContainer: {
     paddingHorizontal: 20,
-    gap: 8,
+    maxHeight: 220,
   },
   seasonalRowItem: {
     flexDirection: 'row',

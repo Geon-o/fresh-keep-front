@@ -110,8 +110,8 @@ export const darkColors: typeof lightColors = {
   primaryOnPrimary: '#000000', // 다크모드 프라이머리 버튼 위 블랙 텍스트
 
   // 프리미엄 UI 확장 토큰
-  glassBg: 'rgba(10, 10, 10, 0.72)',
-  glassBorder: 'rgba(255, 255, 255, 0.08)',
+  glassBg: 'rgba(255, 255, 255, 0.06)',
+  glassBorder: 'rgba(255, 255, 255, 0.18)',
   cardGradientStart: '#000000', // pure black
   cardGradientEnd: '#1A1A1A',   // neutral dark grey
   glowDanger: 'rgba(248, 113, 113, 0.55)',
