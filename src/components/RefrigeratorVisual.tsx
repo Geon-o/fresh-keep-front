@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef } from 'react';
 import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions, TextInput, Platform, ActivityIndicator, Linking, Alert, Modal, Animated, PanResponder } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Circle } from 'react-native-svg';
 
 import * as Location from 'expo-location';
 import * as WebBrowser from 'expo-web-browser';
@@ -1335,13 +1334,6 @@ export default function RefrigeratorVisual({
               {greeting}
             </Text>
           </View>
-          <View style={styles.headerRight}>
-            {totalExpired > 0 && (
-              <View style={[styles.headerBadge, { backgroundColor: theme.ddayExpired }]}>
-                <Text style={styles.headerBadgeText}>🚨 {totalExpired}</Text>
-              </View>
-            )}
-          </View>
         </View>
       )}
 
@@ -1353,129 +1345,95 @@ export default function RefrigeratorVisual({
         >
           {/* 식재료 신선도 요약 대시보드 */}
           {(() => {
-            const totalCount = totalExpired + totalImminent + totalSafe;
-
-            const friendlyTitle = totalCount === 0
-              ? `보관 중인 식재료가 없어요\n첫 식재료를 등록해 볼까요? 🍎`
-              : totalExpired > 0 
-                ? `만료된 식재료\n${totalExpired}개를 먼저 드세요 🚨` 
-                : totalImminent > 0 
-                  ? `소비 임박 식재료가\n${totalImminent}개 기다리고 있어요 ⚠️` 
-                  : `모든 식재료가\n신선하게 보관 중이에요 🍃`;
+            // 아래 만료/임박/안전 통계와 겹치지 않도록, 상단에는 "앞으로 7일간 며칠에 몇 개가
+            // 도래하는지"를 보여주는 미니 타임라인을 둔다 (이미 만료된 것은 통계 블록에서 강조되므로 제외).
+            const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
+            const weeklyBuckets = Array.from({ length: 7 }, (_, i) => {
+              const date = new Date();
+              date.setHours(0, 0, 0, 0);
+              date.setDate(date.getDate() + i);
+              return {
+                label: i === 0 ? '오늘' : WEEKDAY_LABELS[date.getDay()],
+                count: 0,
+                isNear: i <= 3,
+              };
+            });
+            ingredients.forEach(item => {
+              const days = getDDayInfo(item.expiryDate).days;
+              if (days >= 0 && days <= 6) {
+                weeklyBuckets[days].count += 1;
+              }
+            });
+            const maxCount = Math.max(1, ...weeklyBuckets.map(b => b.count));
 
             return (
               <View style={[styles.mainDashboardCard, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
-                <View style={styles.dashboardBodyRow}>
-                  {/* 좌측: 타이틀 및 필터 칩 */}
-                  <View style={styles.dashboardLeftCol}>
-                    <Text style={[styles.tossFriendlyTitle, { color: theme.textPrimary }]}>
-                      {friendlyTitle}
-                    </Text>
-                    
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.statusChipRow}
-                    >
-                      {/* 만료 칩 */}
-                      <TouchableOpacity 
-                        style={[styles.statusChip, { 
-                          borderColor: theme.ddayExpired + '30',
-                          backgroundColor: selectedFilter === 'expired' ? theme.ddayExpired + '15' : theme.surfaceTertiary 
-                        }]}
-                        activeOpacity={0.7}
-                        onPress={() => {
-                          setSelectedFilter('expired');
-                          onChangeTab?.('ingredients');
-                        }}
-                      >
-                        <Text style={[styles.statusChipText, { color: theme.ddayExpired }]}>
-                          만료 {totalExpired}
+                <View style={styles.weeklyTimelineRow}>
+                  {weeklyBuckets.map((bucket, i) => {
+                    const barColor = bucket.isNear ? theme.ddayImminent : theme.ddaySafe;
+                    return (
+                      <View key={i} style={styles.weeklyDayColumn}>
+                        <Text style={[styles.weeklyDayCount, { color: bucket.count > 0 ? theme.textPrimary : theme.textMuted }]}>
+                          {bucket.count > 0 ? bucket.count : ''}
                         </Text>
-                      </TouchableOpacity>
+                        <View style={styles.weeklyDayBar}>
+                          <View
+                            style={[
+                              styles.weeklyDayBarFill,
+                              {
+                                height: bucket.count > 0 ? `${Math.max(14, (bucket.count / maxCount) * 100)}%` : 4,
+                                backgroundColor: bucket.count > 0 ? barColor : theme.borderLight,
+                              },
+                            ]}
+                          />
+                        </View>
+                        <Text style={[styles.weeklyDayLabel, { color: theme.textTertiary }]}>{bucket.label}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
 
-                      {/* 임박 칩 */}
-                      <TouchableOpacity 
-                        style={[styles.statusChip, { 
-                          borderColor: theme.ddayImminent + '40',
-                          backgroundColor: selectedFilter === 'imminent' ? theme.ddayImminent + '15' : theme.surfaceTertiary 
-                        }]}
-                        activeOpacity={0.7}
-                        onPress={() => {
-                          setSelectedFilter('imminent');
-                          onChangeTab?.('ingredients');
-                        }}
-                      >
-                        <Text style={[styles.statusChipText, { color: theme.ddayImminent === '#EAB308' ? '#CA8A04' : theme.ddayImminent }]}>
-                          임박 {totalImminent}
-                        </Text>
-                      </TouchableOpacity>
+                {/* 만료/임박/안전 각각 개수를 큼직하게 부각 (도넛 대신 숫자 자체가 주인공) */}
+                <View style={styles.statBlockRow}>
+                  <TouchableOpacity
+                    style={[styles.statBlock, selectedFilter === 'expired' && { backgroundColor: theme.ddayExpired + '12' }]}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      setSelectedFilter('expired');
+                      onChangeTab?.('ingredients');
+                    }}
+                  >
+                    <Text style={[styles.statBlockValue, { color: theme.ddayExpired }]}>{totalExpired}</Text>
+                    <Text style={[styles.statBlockLabel, { color: theme.textSecondary }]}>만료</Text>
+                  </TouchableOpacity>
 
-                      {/* 안전 칩 */}
-                      <TouchableOpacity 
-                        style={[styles.statusChip, { 
-                          borderColor: theme.ddaySafe + '30',
-                          backgroundColor: selectedFilter === 'safe' ? theme.ddaySafe + '15' : theme.surfaceTertiary 
-                        }]}
-                        activeOpacity={0.7}
-                        onPress={() => {
-                          setSelectedFilter('safe');
-                          onChangeTab?.('ingredients');
-                        }}
-                      >
-                        <Text style={[styles.statusChipText, { color: theme.ddaySafe }]}>
-                          안전 {totalSafe}
-                        </Text>
-                      </TouchableOpacity>
-                    </ScrollView>
-                  </View>
+                  <View style={[styles.statBlockDivider, { backgroundColor: theme.borderLight }]} />
 
-                  {/* 우측: 미니 도넛 게이지 차트 — 만료/임박/안전 개수 비율만큼 색깔별로만 표시 (가운데는 비워둠) */}
-                  <View style={styles.donutChartContainer}>
-                    {(() => {
-                      const r = 35;
-                      const circumference = 2 * Math.PI * r;
-                      const expiredLen = totalCount > 0 ? circumference * (totalExpired / totalCount) : 0;
-                      const imminentLen = totalCount > 0 ? circumference * (totalImminent / totalCount) : 0;
-                      const safeLen = totalCount > 0 ? circumference * (totalSafe / totalCount) : 0;
+                  <TouchableOpacity
+                    style={[styles.statBlock, selectedFilter === 'imminent' && { backgroundColor: theme.ddayImminent + '12' }]}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      setSelectedFilter('imminent');
+                      onChangeTab?.('ingredients');
+                    }}
+                  >
+                    <Text style={[styles.statBlockValue, { color: theme.ddayImminent === '#EAB308' ? '#CA8A04' : theme.ddayImminent }]}>{totalImminent}</Text>
+                    <Text style={[styles.statBlockLabel, { color: theme.textSecondary }]}>임박</Text>
+                  </TouchableOpacity>
 
-                      return (
-                        <Svg width={86} height={86} style={{ transform: [{ rotate: '-90deg' }] }}>
-                          <Circle cx={43} cy={43} r={r} stroke={theme.borderLight} strokeWidth={6} fill="none" />
-                          {totalExpired > 0 && (
-                            <Circle
-                              cx={43} cy={43} r={r}
-                              stroke={theme.ddayExpired}
-                              strokeWidth={6}
-                              fill="none"
-                              strokeDasharray={`${expiredLen} ${circumference - expiredLen}`}
-                              strokeDashoffset={0}
-                            />
-                          )}
-                          {totalImminent > 0 && (
-                            <Circle
-                              cx={43} cy={43} r={r}
-                              stroke={theme.ddayImminent}
-                              strokeWidth={6}
-                              fill="none"
-                              strokeDasharray={`${imminentLen} ${circumference - imminentLen}`}
-                              strokeDashoffset={-expiredLen}
-                            />
-                          )}
-                          {totalSafe > 0 && (
-                            <Circle
-                              cx={43} cy={43} r={r}
-                              stroke={theme.ddaySafe}
-                              strokeWidth={6}
-                              fill="none"
-                              strokeDasharray={`${safeLen} ${circumference - safeLen}`}
-                              strokeDashoffset={-(expiredLen + imminentLen)}
-                            />
-                          )}
-                        </Svg>
-                      );
-                    })()}
-                  </View>
+                  <View style={[styles.statBlockDivider, { backgroundColor: theme.borderLight }]} />
+
+                  <TouchableOpacity
+                    style={[styles.statBlock, selectedFilter === 'safe' && { backgroundColor: theme.ddaySafe + '12' }]}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      setSelectedFilter('safe');
+                      onChangeTab?.('ingredients');
+                    }}
+                  >
+                    <Text style={[styles.statBlockValue, { color: theme.ddaySafe }]}>{totalSafe}</Text>
+                    <Text style={[styles.statBlockLabel, { color: theme.textSecondary }]}>안전</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             );
@@ -1492,51 +1450,61 @@ export default function RefrigeratorVisual({
 
             {urgentIngredients.length > 0 ? (
               <View style={styles.urgentListContainer}>
-                <ScrollView
-                  nestedScrollEnabled={true}
-                  showsVerticalScrollIndicator={true}
-                  contentContainerStyle={{ gap: 8 }}
-                >
-                  {urgentIngredients.map(item => {
-                    const dday = getDDayInfo(item.expiryDate);
-                    const emoji = CATEGORY_EMOJI[item.category] || '📦';
-                    const fridge = refrigerators.find(r => r.id === item.fridgeId);
-                    const locationLabel = getCompartmentLabel(item.location);
+                {urgentIngredients.slice(0, 5).map(item => {
+                  const dday = getDDayInfo(item.expiryDate);
+                  const emoji = CATEGORY_EMOJI[item.category] || '📦';
+                  const fridge = refrigerators.find(r => r.id === item.fridgeId);
+                  const locationLabel = getCompartmentLabel(item.location);
 
-                    return (
-                      <TouchableOpacity
-                        key={item.id}
-                        style={[
-                          styles.urgentListItem, 
-                          { 
-                            backgroundColor: theme.surface, 
-                            borderColor: theme.borderLight, 
-                            shadowColor: theme.shadow,
-                          }
-                        ]}
-                        activeOpacity={0.8}
-                        onPress={() => onPressCompartment(item.location, locationLabel, item.fridgeId || '')}
-                      >
-                        <View style={styles.urgentListLeft}>
-                          <View style={[styles.urgentListEmojiBg, { backgroundColor: theme.surfaceTertiary }]}>
-                            <Text style={styles.urgentListEmoji}>{emoji}</Text>
-                          </View>
-                          <View style={styles.urgentListInfo}>
-                            <Text style={[styles.urgentListName, { color: theme.textPrimary }]} numberOfLines={1}>
-                              {item.name}
-                            </Text>
-                            <Text style={[styles.urgentListLocation, { color: theme.textSecondary }]} numberOfLines={1}>
-                              {`${fridge ? fridge.name : '냉장고'} > ${getLocationDisplayLabel(locationLabel, item.subLocation)}`}
-                            </Text>
-                          </View>
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={[
+                        styles.urgentListItem,
+                        {
+                          backgroundColor: theme.surface,
+                          borderColor: theme.borderLight,
+                          shadowColor: theme.shadow,
+                        }
+                      ]}
+                      activeOpacity={0.8}
+                      onPress={() => onPressCompartment(item.location, locationLabel, item.fridgeId || '')}
+                    >
+                      <View style={styles.urgentListLeft}>
+                        <View style={[styles.urgentListEmojiBg, { backgroundColor: theme.surfaceTertiary }]}>
+                          <Text style={styles.urgentListEmoji}>{emoji}</Text>
                         </View>
-                        <View style={[styles.urgentListDDayBadge, { backgroundColor: dday.color + '12', borderColor: dday.color }]}>
-                          <Text style={[styles.urgentListDDayText, { color: dday.color }]}>{dday.text}</Text>
+                        <View style={styles.urgentListInfo}>
+                          <Text style={[styles.urgentListName, { color: theme.textPrimary }]} numberOfLines={1}>
+                            {item.name}
+                          </Text>
+                          <Text style={[styles.urgentListLocation, { color: theme.textSecondary }]} numberOfLines={1}>
+                            {`${fridge ? fridge.name : '냉장고'} > ${getLocationDisplayLabel(locationLabel, item.subLocation)}`}
+                          </Text>
                         </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
+                      </View>
+                      <View style={[styles.urgentListDDayBadge, { backgroundColor: dday.color + '12', borderColor: dday.color }]}>
+                        <Text style={[styles.urgentListDDayText, { color: dday.color }]}>{dday.text}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+
+                {urgentIngredients.length > 5 && (
+                  <TouchableOpacity
+                    style={styles.seeMoreRow}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      setSelectedFilter('all');
+                      onChangeTab?.('ingredients');
+                    }}
+                  >
+                    <Text style={[styles.seeMoreText, { color: theme.primary }]}>
+                      {urgentIngredients.length - 5}개 더보기
+                    </Text>
+                    <Ionicons name="chevron-forward" size={14} color={theme.primary} />
+                  </TouchableOpacity>
+                )}
               </View>
             ) : (
               <View style={[styles.emptyUrgentCard, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
@@ -1708,45 +1676,39 @@ export default function RefrigeratorVisual({
             </View>
 
             <View style={styles.seasonalListContainer}>
-              <ScrollView
-                nestedScrollEnabled={true}
-                showsVerticalScrollIndicator={true}
-                contentContainerStyle={{ gap: 8 }}
-              >
-                {seasonalIngredients.map((item, idx) => (
-                  <TouchableOpacity
-                    key={`seasonal_${idx}`}
-                    style={[
-                      styles.seasonalRowItem,
-                      {
-                        backgroundColor: theme.surface,
-                        borderColor: theme.borderLight,
-                        shadowColor: theme.shadow,
-                      }
-                    ]}
-                    activeOpacity={0.8}
-                    onPress={() => handleOpenYoutube(item.searchQuery, item.name)}
-                  >
-                    <View style={styles.seasonalRowLeft}>
-                      <View style={[styles.seasonalRowEmojiBg, { backgroundColor: theme.surfaceTertiary }]}>
-                        <Text style={styles.seasonalRowEmoji}>{item.emoji}</Text>
-                      </View>
-                      <View style={styles.seasonalRowInfo}>
-                        <Text style={[styles.seasonalRowName, { color: theme.textPrimary }]} numberOfLines={1}>
-                          {item.name}
-                        </Text>
-                        <Text style={[styles.seasonalRowRecommend, { color: theme.textSecondary }]} numberOfLines={1}>
-                          추천: {item.recommendDish}
-                        </Text>
-                      </View>
+              {seasonalIngredients.map((item, idx) => (
+                <TouchableOpacity
+                  key={`seasonal_${idx}`}
+                  style={[
+                    styles.seasonalRowItem,
+                    {
+                      backgroundColor: theme.surface,
+                      borderColor: theme.borderLight,
+                      shadowColor: theme.shadow,
+                    }
+                  ]}
+                  activeOpacity={0.8}
+                  onPress={() => handleOpenYoutube(item.searchQuery, item.name)}
+                >
+                  <View style={styles.seasonalRowLeft}>
+                    <View style={[styles.seasonalRowEmojiBg, { backgroundColor: theme.surfaceTertiary }]}>
+                      <Text style={styles.seasonalRowEmoji}>{item.emoji}</Text>
                     </View>
-                    <View style={[styles.youtubeRowButton, { backgroundColor: '#FF0000' }]}>
-                      <Ionicons name="logo-youtube" size={12} color="#FFFFFF" />
-                      <Text style={styles.youtubeRowText}>영상 보기</Text>
+                    <View style={styles.seasonalRowInfo}>
+                      <Text style={[styles.seasonalRowName, { color: theme.textPrimary }]} numberOfLines={1}>
+                        {item.name}
+                      </Text>
+                      <Text style={[styles.seasonalRowRecommend, { color: theme.textSecondary }]} numberOfLines={1}>
+                        추천: {item.recommendDish}
+                      </Text>
                     </View>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+                  </View>
+                  <View style={[styles.youtubeRowButton, { backgroundColor: '#FF0000' }]}>
+                    <Ionicons name="logo-youtube" size={12} color="#FFFFFF" />
+                    <Text style={styles.youtubeRowText}>영상 보기</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
 
@@ -2661,20 +2623,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: -0.3,
   },
-  headerRight: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  headerBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
   dashboardScrollView: {
     flex: 1,
   },
@@ -2749,7 +2697,18 @@ const styles = StyleSheet.create({
   },
   urgentListContainer: {
     paddingHorizontal: 20,
-    maxHeight: 220,
+    gap: 8,
+  },
+  seeMoreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 12,
+  },
+  seeMoreText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   urgentListItem: {
     flexDirection: 'row',
@@ -3489,7 +3448,7 @@ const styles = StyleSheet.create({
   },
   seasonalListContainer: {
     paddingHorizontal: 20,
-    maxHeight: 220,
+    gap: 8,
   },
   seasonalRowItem: {
     flexDirection: 'row',
@@ -3754,44 +3713,57 @@ const styles = StyleSheet.create({
   dashboardHeader: {
     marginBottom: 4,
   },
-  dashboardBodyRow: {
+  weeklyTimelineRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 4,
+    alignItems: 'flex-end',
   },
-  dashboardLeftCol: {
+  weeklyDayColumn: {
     flex: 1,
-    paddingRight: 12,
+    alignItems: 'center',
   },
-  tossFriendlyTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    lineHeight: 19,
-    letterSpacing: -0.5,
+  weeklyDayCount: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginBottom: 4,
+    height: 14,
   },
-  statusChipRow: {
+  weeklyDayBar: {
+    width: 6,
+    height: 36,
+    justifyContent: 'flex-end',
+  },
+  weeklyDayBarFill: {
+    width: 6,
+    borderRadius: 3,
+  },
+  weeklyDayLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 6,
+  },
+  statBlockRow: {
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
     marginTop: 16,
   },
-  statusChip: {
-    flexDirection: 'row',
+  statBlock: {
+    flex: 1,
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 24,
-    borderWidth: 1,
+    paddingVertical: 12,
+    borderRadius: 14,
   },
-  statusChipText: {
-    fontSize: 15,
-    fontWeight: 'bold',
+  statBlockValue: {
+    fontSize: 28,
+    fontWeight: '800',
   },
-  donutChartContainer: {
-    width: 86,
-    height: 86,
-    justifyContent: 'center',
-    alignItems: 'center',
+  statBlockLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  statBlockDivider: {
+    width: 1,
+    height: 32,
   },
   settingsModalContent: {
     width: '90%',
