@@ -20,7 +20,9 @@ interface AddIngredientModalProps {
   // 지정하면 수정 모드로 동작 (기존 값으로 폼을 채우고, 저장 시 등록 대신 수정 API를 호출).
   editIngredient?: Ingredient;
   onClose: () => void;
-  onSaved: () => void;
+  // 수정 성공 시엔 갱신된 식재료를 넘겨 부모가 전체 재조회 없이 로컬 상태만 갱신할 수 있게 한다.
+  // 등록 성공 시엔 인자 없이 호출 (부모가 목록을 다시 불러옴).
+  onSaved: (updatedIngredient?: Ingredient) => void;
 }
 
 // 식재료 목록 탭의 + 버튼(등록) / 카드 수정 버튼(수정) 흐름 전용: 이 화면 위에 바로 폼을 띄운다.
@@ -168,10 +170,11 @@ export default function AddIngredientModal({ visible, fridgeId, compartmentId, s
     setIsSaving(true);
     try {
       const memoContent = serializeMemo(formCategory, effectiveShelfId, formMemo);
+      let savedIngredient: Ingredient | undefined;
 
       if (isEdit && editIngredient) {
         if (isLoggedIn) {
-          await updateIngredient(Number(editIngredient.id), {
+          const updatedIng = await updateIngredient(Number(editIngredient.id), {
             name: formName.trim(),
             quantity: Number(formQuantity),
             unit: formUnit,
@@ -179,6 +182,18 @@ export default function AddIngredientModal({ visible, fridgeId, compartmentId, s
             expirationType: formExpiryType,
             memo: memoContent,
           });
+          savedIngredient = {
+            ...editIngredient,
+            name: updatedIng.name,
+            category: formCategory,
+            expiryDate: updatedIng.expirationDate,
+            expiryType: updatedIng.expirationType || formExpiryType,
+            quantity: updatedIng.quantity,
+            unit: updatedIng.unit,
+            memo: formMemo.trim() || undefined,
+            updatedByName: updatedIng.updatedByName,
+            updatedAt: updatedIng.updatedAt,
+          };
         } else {
           const ingredientsStr = await AsyncStorage.getItem('@ingredients');
           const allIngredients: Ingredient[] = ingredientsStr ? JSON.parse(ingredientsStr) : [];
@@ -198,6 +213,7 @@ export default function AddIngredientModal({ visible, fridgeId, compartmentId, s
           );
           await AsyncStorage.setItem('@ingredients', JSON.stringify(updated));
           rebuildAllNotifications(updated);
+          savedIngredient = updated.find(item => item.id === editIngredient.id);
         }
       } else if (isLoggedIn) {
         if (!serverCompartmentId) {
@@ -233,7 +249,7 @@ export default function AddIngredientModal({ visible, fridgeId, compartmentId, s
         rebuildAllNotifications(updated);
       }
 
-      onSaved();
+      onSaved(savedIngredient);
       onClose();
     } catch (e) {
       console.error('Failed to save ingredient', e);

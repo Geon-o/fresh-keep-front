@@ -558,6 +558,16 @@ export default function RefrigeratorVisual({
       }
   }, [refrigerators, isLoggedIn]);
 
+  // AddIngredientModal 저장 완료 콜백: 수정된 식재료가 오면 전체 재조회 없이 로컬 상태만 갱신,
+  // 등록(신규)이면 인자가 없으므로 목록을 다시 불러온다.
+  const handleIngredientSaved = (updated?: Ingredient) => {
+    if (updated) {
+      setIngredients(prev => prev.map(item => item.id === updated.id ? updated : item));
+    } else {
+      loadIngredients();
+    }
+  };
+
   // 식재료 목록 카드의 X 아이콘: 확인 후 즉시 삭제 (수정 모달 없이 바로 처리)
   const handleDeleteIngredient = (item: Ingredient) => {
     const performRemove = async () => {
@@ -2325,7 +2335,7 @@ export default function RefrigeratorVisual({
           shelfId={addIngredientTarget.shelfId}
           serverCompartmentId={addIngredientTarget.serverCompartmentId}
           onClose={() => setAddIngredientTarget(null)}
-          onSaved={loadIngredients}
+          onSaved={handleIngredientSaved}
         />
       )}
 
@@ -2335,7 +2345,7 @@ export default function RefrigeratorVisual({
           visible={!!editIngredientTarget}
           editIngredient={editIngredientTarget}
           onClose={() => setEditIngredientTarget(null)}
-          onSaved={loadIngredients}
+          onSaved={handleIngredientSaved}
         />
       )}
 
