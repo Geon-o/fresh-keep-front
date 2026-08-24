@@ -1,7 +1,10 @@
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { client } from '../api/client';
 import { requestNotificationPermission } from './ingredientNotifications';
+
+const SHARE_NOTIFICATIONS_ENABLED_KEY = '@share_notifications_enabled';
 
 /**
  * 냉장고 공유(초대/수락)처럼 "이 기기가 다른 사람과 관계를 맺는" 시점에만 호출한다.
@@ -23,5 +26,39 @@ export async function registerPushToken(): Promise<void> {
   } catch (e) {
     // 푸시 토큰 등록 실패가 공유 기능 자체를 막으면 안 되므로 조용히 무시한다.
     console.error('Failed to register push token', e);
+  }
+}
+
+/**
+ * 공유 냉장고 관련(삭제 요청 등) 알림의 사용자 on/off 설정을 조회합니다. 기본값은 true입니다.
+ */
+export async function isShareNotificationsEnabled(): Promise<boolean> {
+  try {
+    const raw = await AsyncStorage.getItem(SHARE_NOTIFICATIONS_ENABLED_KEY);
+    return raw === null ? true : raw === 'true';
+  } catch (e) {
+    return true;
+  }
+}
+
+/**
+ * 공유 냉장고 알림을 끄면 서버에 등록된 푸시 토큰을 지워 더 이상 푸시가 오지 않게 하고,
+ * 다시 켜면 registerPushToken으로 재등록한다.
+ */
+export async function setShareNotificationsEnabled(enabled: boolean): Promise<void> {
+  try {
+    await AsyncStorage.setItem(SHARE_NOTIFICATIONS_ENABLED_KEY, String(enabled));
+  } catch (e) {
+    console.error('Failed to save share notification setting', e);
+  }
+  if (enabled) {
+    await registerPushToken();
+    return;
+  }
+  if (Constants.appOwnership === 'expo') return;
+  try {
+    await client.patch('/api/users/me/push-token', { expoPushToken: null });
+  } catch (e) {
+    console.error('Failed to clear push token', e);
   }
 }

@@ -1,10 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Switch, Linking } from 'react-native';
+import React from 'react';
+import { StyleSheet, View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import * as Notifications from 'expo-notifications';
 import { useTheme } from '../context/ThemeContext';
-import { isNotificationsEnabled, setNotificationsEnabled, requestNotificationPermission } from '../utils/ingredientNotifications';
 
 interface SettingsViewProps {
   isLoggedIn: boolean;
@@ -18,26 +16,6 @@ export default function SettingsView({
 }: SettingsViewProps) {
   const router = useRouter();
   const { themeMode, isDark } = useTheme();
-  const [notificationsOn, setNotificationsOn] = useState(true);
-
-  useEffect(() => {
-    isNotificationsEnabled().then(setNotificationsOn);
-  }, []);
-
-  // 만료/임박 알림 토글: 켤 때 OS 권한이 거부된 상태면 설정 앱으로 안내한다
-  // (iOS/Android 모두 한 번 거부되면 앱 내 재요청 다이얼로그가 다시 뜨지 않는 경우가 많음).
-  const handleToggleNotifications = async (next: boolean) => {
-    if (next) {
-      const { status } = await Notifications.getPermissionsAsync();
-      if (status === 'denied') {
-        Linking.openSettings();
-        return;
-      }
-      await requestNotificationPermission();
-    }
-    await setNotificationsEnabled(next);
-    setNotificationsOn(next);
-  };
 
   // 2026 Toss-style Color Tokens
   const backgroundColor = isDark ? '#101012' : '#F3F4F6';
@@ -120,16 +98,20 @@ export default function SettingsView({
 
           <View style={[styles.divider, { backgroundColor: dividerColor }]} />
 
-          {/* 만료/임박 알림 */}
-          <View style={styles.listRow}>
+          {/* 알림 설정 */}
+          <TouchableOpacity
+            style={styles.listRow}
+            activeOpacity={0.7}
+            onPress={() => router.push('/settings/notifications')}
+          >
             <View style={styles.listRowLeft}>
               <View style={[styles.iconWrapper, { backgroundColor: isDark ? '#2A2A2D' : '#F3F4F6' }]}>
                 <Ionicons name="notifications-outline" size={18} color={iconColor} />
               </View>
-              <Text style={[styles.listRowText, { color: titleColor }]}>만료/임박 알림</Text>
+              <Text style={[styles.listRowText, { color: titleColor }]}>알림</Text>
             </View>
-            <Switch value={notificationsOn} onValueChange={handleToggleNotifications} />
-          </View>
+            <Ionicons name="chevron-forward" size={16} color={descColor} />
+          </TouchableOpacity>
         </View>
       </View>
 

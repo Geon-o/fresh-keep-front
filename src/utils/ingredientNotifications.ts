@@ -4,7 +4,10 @@ import { Ingredient } from '../types';
 
 const SCHEDULED_IDS_KEY = '@notification_scheduled_ids';
 const ENABLED_KEY = '@notifications_enabled';
-const NOTIFY_HOURS = [8, 16]; // 오전 8시, 오후 4시 하루 두 번
+const NOTIFY_HOUR_KEY = '@notification_hour';
+const NOTIFY_MINUTE_KEY = '@notification_minute';
+const DEFAULT_NOTIFY_HOUR = 8; // 오전 8시
+const DEFAULT_NOTIFY_MINUTE = 0;
 
 type DigestType = 'imminent' | 'expired';
 
@@ -15,9 +18,9 @@ interface DigestGroup {
 }
 
 // 'YYYY-MM-DD' 문자열이 가리키는 날짜의 특정 시각 Date 객체를 만든다.
-function atHour(dateStr: string, hour: number): Date {
+function atTime(dateStr: string, hour: number, minute: number): Date {
   const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(y, m - 1, d, hour, 0, 0, 0);
+  return new Date(y, m - 1, d, hour, minute, 0, 0);
 }
 
 // 'YYYY-MM-DD' 문자열에 일수를 더한 'YYYY-MM-DD' 문자열을 반환한다.
@@ -45,17 +48,33 @@ function buildDigestContent(type: DigestType, names: string[]) {
 }
 
 /**
- * 알림 권한을 요청합니다. 이미 허용/거부된 상태면 시스템 다이얼로그 없이 현재 상태를 반환합니다.
+ * 알림 권한을 요청합니다. OS가 다시 물어볼 수 있는 상태(canAskAgain)일 때만 네이티브 허용 다이얼로그를 띄우고,
+ * 이미 완전히 거부되어 OS가 다이얼로그를 다시 띄워주지 않는 상태(canAskAgain: false)면 요청 없이 false를 반환합니다.
+ * 이 경우엔 앱이 할 수 있는 게 없고, 사용자가 직접 기기 설정에서 켜야 합니다 (getNotificationPermissionState 참고).
  */
 export async function requestNotificationPermission(): Promise<boolean> {
   try {
-    const { status: existing } = await Notifications.getPermissionsAsync();
-    if (existing === 'granted') return true;
-    const { status } = await Notifications.requestPermissionsAsync();
-    return status === 'granted';
+    const existing = await Notifications.getPermissionsAsync();
+    if (existing.granted) return true;
+    if (!existing.canAskAgain) return false;
+    const { granted } = await Notifications.requestPermissionsAsync();
+    return granted;
   } catch (e) {
     console.error('Failed to request notification permission', e);
     return false;
+  }
+}
+
+/**
+ * 현재 알림 권한 상태를 조회합니다. canAskAgain이 false면 OS가 더 이상 앱 내 다이얼로그를
+ * 띄워주지 않는 상태이므로, 이때만 "기기 설정으로 이동" 안내가 의미가 있습니다.
+ */
+export async function getNotificationPermissionState(): Promise<{ granted: boolean; canAskAgain: boolean }> {
+  try {
+    const { granted, canAskAgain } = await Notifications.getPermissionsAsync();
+    return { granted, canAskAgain };
+  } catch (e) {
+    return { granted: false, canAskAgain: true };
   }
 }
 
@@ -83,14 +102,55 @@ export async function setNotificationsEnabled(enabled: boolean): Promise<void> {
 }
 
 /**
+ * 만료/임박 알림을 보낼 시각(0~23시)을 조회합니다. 기본값은 오전 8시입니다.
+ */
+export async function getNotificationHour(): Promise<number> {
+  try {
+    const raw = await AsyncStorage.getItem(NOTIFY_HOUR_KEY);
+    return raw === null ? DEFAULT_NOTIFY_HOUR : Number(raw);
+  } catch (e) {
+    return DEFAULT_NOTIFY_HOUR;
+  }
+}
+
+/**
+ * 만료/임박 알림을 보낼 시각(0~23시)을 저장합니다. 실제 예약에는 다음 rebuildAllNotifications
+ * 호출(식재료 등록/수정/삭제, 앱 재실행 시 목록 로드 등) 때 반영됩니다.
+ */
+export async function setNotificationHour(hour: number): Promise<void> {
+  await AsyncStorage.setItem(NOTIFY_HOUR_KEY, String(hour));
+}
+
+/**
+ * 만료/임박 알림을 보낼 분(0~59, 10분 단위)을 조회합니다. 기본값은 0분입니다.
+ */
+export async function getNotificationMinute(): Promise<number> {
+  try {
+    const raw = await AsyncStorage.getItem(NOTIFY_MINUTE_KEY);
+    return raw === null ? DEFAULT_NOTIFY_MINUTE : Number(raw);
+  } catch (e) {
+    return DEFAULT_NOTIFY_MINUTE;
+  }
+}
+
+/**
+ * 만료/임박 알림을 보낼 분을 저장합니다. hour와 마찬가지로 다음 rebuildAllNotifications 호출 때 반영됩니다.
+ */
+export async function setNotificationMinute(minute: number): Promise<void> {
+  await AsyncStorage.setItem(NOTIFY_MINUTE_KEY, String(minute));
+}
+
+/**
  * 전체 식재료 목록을 기준으로 알림 예약을 처음부터 다시 만듭니다.
  * 같은 날짜에 임박(D-1)하거나 만료(D-day)되는 식재료들을 하나의 알림으로 합쳐서
- * 그 날짜의 오전 8시·오후 4시, 하루 두 번만 보냅니다(식재료 개수와 무관하게 알림 수가 늘지 않음).
+ * 사용자가 설정한 시각에 하루 한 번만 보냅니다(식재료 개수와 무관하게 알림 수가 늘지 않음).
  * 이 앱의 알림은 전부 이 함수가 관리하므로, 호출할 때마다 이전 예약을 전부 취소하고 새로 채웁니다.
  */
 export async function rebuildAllNotifications(ingredients: Ingredient[]): Promise<void> {
   try {
     if (!(await isNotificationsEnabled())) return;
+    const notifyHour = await getNotificationHour();
+    const notifyMinute = await getNotificationMinute();
 
     // 이전 예약은 권한 여부와 무관하게 항상 정리한다 (취소는 권한이 필요 없음).
     const prevIdsRaw = await AsyncStorage.getItem(SCHEDULED_IDS_KEY);
@@ -119,11 +179,9 @@ export async function rebuildAllNotifications(ingredients: Ingredient[]): Promis
     const now = Date.now();
     const dueEntries: { group: DigestGroup; triggerDate: Date }[] = [];
     for (const group of groups.values()) {
-      for (const hour of NOTIFY_HOURS) {
-        const triggerDate = atHour(group.date, hour);
-        if (triggerDate.getTime() <= now) continue;
-        dueEntries.push({ group, triggerDate });
-      }
+      const triggerDate = atTime(group.date, notifyHour, notifyMinute);
+      if (triggerDate.getTime() <= now) continue;
+      dueEntries.push({ group, triggerDate });
     }
 
     // 실제로 예약할 알림이 있을 때만 권한을 요청한다 — 앱 실행 즉시가 아니라

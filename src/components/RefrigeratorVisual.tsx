@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions, TextInput, Platform, ActivityIndicator, Linking, Alert, Modal, Animated, PanResponder } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 
 import * as Location from 'expo-location';
 import * as WebBrowser from 'expo-web-browser';
@@ -629,9 +630,13 @@ export default function RefrigeratorVisual({
     }
   };
 
-  useEffect(() => {
-    loadIngredients();
-  }, [loadIngredients]);
+  // 마운트 시뿐 아니라, 알림 시간 설정 등 다른 화면에 다녀와서 이 화면으로 돌아올 때도
+  // 다시 불러와야 그 사이 바뀐 설정(알림 시간 등)이 바로 반영된다.
+  useFocusEffect(
+    React.useCallback(() => {
+      loadIngredients();
+    }, [loadIngredients])
+  );
 
   // 냉장고 목록 크기나 로그인 상태가 바뀌면 캐러셀 인덱스를 0으로 초기화하던 부분 수정:
   // @active_fridge_index 등 부모에서 넘어오는 activeIndex를 유지하기 위해 length가 유효한 범위라면 0으로 덮어쓰지 않도록 함.
