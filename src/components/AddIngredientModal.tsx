@@ -464,13 +464,25 @@ export default function AddIngredientModal({ visible, fridgeId, compartmentId, s
                   )}
                 </View>
 
-                <View style={styles.formGroup}>
-                  <TouchableOpacity style={styles.comboTriggerBorderless} activeOpacity={0.7} onPress={toggleExpiryTypeDropdown}>
-                    <Text style={styles.comboTriggerBorderlessText}>{EXPIRY_TYPE_LABELS[formExpiryType]}</Text>
-                    <Text style={styles.comboArrow}>{expiryTypeDropdownOpen ? '▴' : '▾'}</Text>
-                  </TouchableOpacity>
+                <View style={[styles.formGroup, { zIndex: expiryTypeDropdownOpen ? 20 : 1, elevation: expiryTypeDropdownOpen ? 8 : 0 }]}>
+                  <Text style={styles.formLabel}>유통기한</Text>
+                  <View style={styles.dateTypeRow}>
+                    <TouchableOpacity style={styles.dateTypeSegment} activeOpacity={0.7} onPress={toggleExpiryTypeDropdown}>
+                      <Text style={styles.comboTriggerBorderlessText}>{EXPIRY_TYPE_LABELS[formExpiryType]}</Text>
+                      <Text style={styles.comboArrow}>{expiryTypeDropdownOpen ? '▴' : '▾'}</Text>
+                    </TouchableOpacity>
+                    <View style={styles.dateTypeDivider} />
+                    <TextInput
+                      style={styles.dateTypeInput}
+                      value={formExpiryDate}
+                      onChangeText={setFormExpiryDate}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor="#90A4AE"
+                      keyboardType="numeric"
+                    />
+                  </View>
                   {expiryTypeDropdownOpen && (
-                    <View style={styles.comboDropdown}>
+                    <View style={styles.dateTypeDropdownOverlay}>
                       {(Object.keys(EXPIRY_TYPE_LABELS) as ExpiryType[]).map(type => (
                         <TouchableOpacity
                           key={type}
@@ -485,18 +497,6 @@ export default function AddIngredientModal({ visible, fridgeId, compartmentId, s
                       ))}
                     </View>
                   )}
-                </View>
-
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>날짜</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={formExpiryDate}
-                    onChangeText={setFormExpiryDate}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor="#90A4AE"
-                    keyboardType="numeric"
-                  />
                   <View style={styles.presetRow}>
                     <TouchableOpacity style={styles.presetButton} onPress={() => setFormExpiryDate(addDaysToToday(3))}>
                       <Text style={styles.presetButtonText}>+3일</Text>

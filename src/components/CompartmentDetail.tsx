@@ -1779,18 +1779,30 @@ export default function CompartmentDetail({
                 )}
               </View>
 
-              {/* 기한 종류 (테두리 없는 콤보박스) */}
-              <View style={styles.formGroup}>
-                <TouchableOpacity
-                  style={styles.comboTriggerBorderless}
-                  activeOpacity={0.7}
-                  onPress={toggleExpiryTypeDropdown}
-                >
-                  <Text style={styles.comboTriggerBorderlessText}>{EXPIRY_TYPE_LABELS[formExpiryType]}</Text>
-                  <Text style={styles.comboArrow}>{expiryTypeDropdownOpen ? '▴' : '▾'}</Text>
-                </TouchableOpacity>
+              {/* 기한 종류 + 날짜 (한 박스로 결합, 드롭다운은 아래로 밀지 않고 위에 덮어씌운다) */}
+              <View style={[styles.formGroup, { zIndex: expiryTypeDropdownOpen ? 20 : 1, elevation: expiryTypeDropdownOpen ? 8 : 0 }]}>
+                <Text style={styles.formLabel}>유통기한</Text>
+                <View style={styles.dateTypeRow}>
+                  <TouchableOpacity
+                    style={styles.dateTypeSegment}
+                    activeOpacity={0.7}
+                    onPress={toggleExpiryTypeDropdown}
+                  >
+                    <Text style={styles.comboTriggerBorderlessText}>{EXPIRY_TYPE_LABELS[formExpiryType]}</Text>
+                    <Text style={styles.comboArrow}>{expiryTypeDropdownOpen ? '▴' : '▾'}</Text>
+                  </TouchableOpacity>
+                  <View style={styles.dateTypeDivider} />
+                  <TextInput
+                    style={styles.dateTypeInput}
+                    value={formExpiryDate}
+                    onChangeText={setFormExpiryDate}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor="#90A4AE"
+                    keyboardType="numeric"
+                  />
+                </View>
                 {expiryTypeDropdownOpen && (
-                  <View style={styles.comboDropdown}>
+                  <View style={styles.dateTypeDropdownOverlay}>
                     {(Object.keys(EXPIRY_TYPE_LABELS) as ExpiryType[]).map(type => (
                       <TouchableOpacity
                         key={type}
@@ -1805,19 +1817,6 @@ export default function CompartmentDetail({
                     ))}
                   </View>
                 )}
-              </View>
-
-              {/* 날짜 */}
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>날짜</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formExpiryDate}
-                  onChangeText={setFormExpiryDate}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor="#90A4AE"
-                  keyboardType="numeric"
-                />
                 {/* 퀵 선택 */}
                 <View style={styles.presetRow}>
                   <TouchableOpacity
@@ -1867,12 +1866,12 @@ export default function CompartmentDetail({
             <View style={styles.modalFooter}>
               {modalMode === 'edit' && selectedIngredientId && (
                 <TouchableOpacity
-                  style={[styles.footerButton, styles.buttonDelete, isSaving && { opacity: 0.5 }]}
+                  style={[styles.buttonDelete, isSaving && { opacity: 0.5 }]}
                   onPress={() => handleConfirmRemoveIngredientDirect(selectedIngredientId, formName)}
                   activeOpacity={0.7}
                   disabled={isSaving}
                 >
-                  <Text style={styles.buttonTextDelete}>삭제</Text>
+                  <Ionicons name="trash-outline" size={18} color={theme.danger} />
                 </TouchableOpacity>
               )}
               <TouchableOpacity
@@ -2343,6 +2342,50 @@ export function createStyles(theme: ThemeColors, isDark: boolean) {
       color: theme.primaryText,
       fontWeight: 'bold',
     },
+    dateTypeRow: {
+      flexDirection: 'row',
+      alignItems: 'stretch',
+      borderWidth: 1.5,
+      borderColor: theme.borderLight,
+      borderRadius: 10,
+      backgroundColor: theme.surfaceSecondary,
+      overflow: 'hidden',
+    },
+    dateTypeSegment: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      gap: 4,
+    },
+    dateTypeDivider: {
+      width: 1.5,
+      backgroundColor: theme.borderLight,
+    },
+    dateTypeInput: {
+      flex: 1,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      fontSize: 14,
+      color: theme.textPrimary,
+    },
+    dateTypeDropdownOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      borderWidth: 1.5,
+      borderColor: theme.borderLight,
+      borderRadius: 10,
+      backgroundColor: theme.surface,
+      overflow: 'hidden',
+      zIndex: 20,
+      elevation: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+    },
     comboAddNewRow: {
       paddingVertical: 10,
       paddingHorizontal: 12,
@@ -2463,7 +2506,13 @@ export function createStyles(theme: ThemeColors, isDark: boolean) {
       backgroundColor: theme.surfaceTertiary,
     },
     buttonDelete: {
-      backgroundColor: theme.danger,
+      width: 40,
+      height: 40,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.danger,
+      justifyContent: 'center',
+      alignItems: 'center',
       marginRight: 'auto',
     },
     buttonSave: {
@@ -2473,11 +2522,6 @@ export function createStyles(theme: ThemeColors, isDark: boolean) {
       fontSize: 13,
       fontWeight: 'bold',
       color: theme.textSecondary,
-    },
-    buttonTextDelete: {
-      fontSize: 13,
-      fontWeight: 'bold',
-      color: theme.primaryOnPrimary,
     },
     buttonTextSave: {
       fontSize: 13,

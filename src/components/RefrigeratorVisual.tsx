@@ -401,13 +401,16 @@ export default function RefrigeratorVisual({
     }
   };
 
-  // 이력 한 줄 요약 텍스트 (액션 종류별로 문구가 다르다)
+  // 이력 한 줄 요약 텍스트 (액션 종류별로 문구가 다르다).
+  // summary가 이미 자연어 문장이므로 그대로 보여주고, 옛 데이터처럼 summary가 없을 때만 기존 형식으로 대체한다.
   const getHistoryLabel = (entry: IngredientHistoryEntry) => {
     switch (entry.actionType) {
       case 'CREATED':
-        return `"${entry.ingredientName}" 등록`;
+        return entry.summary || `"${entry.ingredientName}" 등록`;
+      case 'DELETED':
+        return entry.summary || `"${entry.ingredientName}" 삭제`;
       case 'UPDATED':
-        return `"${entry.ingredientName}" 수정${entry.summary ? ` · ${entry.summary}` : ''}`;
+        return entry.summary || `"${entry.ingredientName}" 수정`;
       case 'NAME_CHANGED':
         return `냉장고 이름 변경${entry.summary ? ` · ${entry.summary}` : ''}`;
       case 'TYPE_CHANGED':
@@ -712,16 +715,17 @@ export default function RefrigeratorVisual({
     }
     setAssignTargetIngredient(null);
     setAddPickerFridgeId(null);
+    setAddPickerCompartmentId(null);
+    setAddPickerShelves(null);
     setAddLocationPickerVisible(true);
   };
 
   // 위치를 나중에 정하고 싶을 때: 냉장고까지만 정하고 칸/선반은 건너뛴 채 바로 등록 폼으로 넘어간다
   const handleSkipLocationPicker = (fridgeId: string) => {
     const target = { fridgeId, serverCompartmentId: null };
+    // 나머지 피커 상태는 다음에 열 때(handleOpenAddLocationPicker 등) 다시 초기화되므로 여기서는 건드리지 않는다.
+    // 닫히는 fade 애니메이션 도중 내용이 초기 화면으로 바뀌어 보이는 깜빡임을 피하기 위함.
     setAddLocationPickerVisible(false);
-    setAddPickerFridgeId(null);
-    setAddPickerCompartmentId(null);
-    setAddPickerShelves(null);
     setAddIngredientTarget(target);
   };
 
@@ -731,6 +735,8 @@ export default function RefrigeratorVisual({
     if (!item.fridgeId) return;
     setAssignTargetIngredient(item);
     setAddPickerFridgeId(item.fridgeId);
+    setAddPickerCompartmentId(null);
+    setAddPickerShelves(null);
     setAddLocationPickerVisible(true);
   };
 
@@ -788,10 +794,8 @@ export default function RefrigeratorVisual({
       shelfId,
       serverCompartmentId: addPickerShelves?.serverCompartmentId ?? null,
     };
+    // 나머지 피커 상태는 다음에 열 때 다시 초기화되므로 여기서는 건드리지 않는다 (닫히는 fade 도중 깜빡임 방지).
     setAddLocationPickerVisible(false);
-    setAddPickerFridgeId(null);
-    setAddPickerCompartmentId(null);
-    setAddPickerShelves(null);
     setAddIngredientTarget(target);
   };
 
@@ -800,10 +804,6 @@ export default function RefrigeratorVisual({
   const finalizeAssignLocation = async (item: Ingredient, compartmentId: string, shelfId: string) => {
     const serverCompartmentId = addPickerShelves?.serverCompartmentId ?? null;
     setAddLocationPickerVisible(false);
-    setAddPickerFridgeId(null);
-    setAddPickerCompartmentId(null);
-    setAddPickerShelves(null);
-    setAssignTargetIngredient(null);
     try {
       if (isLoggedIn) {
         if (!serverCompartmentId) {
@@ -2288,13 +2288,16 @@ export default function RefrigeratorVisual({
                 </View>
               )}
 
-          {/* 식재료 바로 등록 플로팅 버튼 */}
+          {/* 식재료 바로 등록 플로팅 버튼 (아웃라인 고스트 스타일) */}
           <TouchableOpacity
-            style={[styles.addIngredientFab, { backgroundColor: theme.primary, shadowColor: theme.primary }]}
+            style={[
+              styles.addIngredientFab,
+              { backgroundColor: theme.surface, borderWidth: 2, borderColor: theme.primary, shadowColor: theme.shadow },
+            ]}
             activeOpacity={0.85}
             onPress={handleOpenAddLocationPicker}
           >
-            <Ionicons name="add" size={28} color={theme.primaryOnPrimary} />
+            <Ionicons name="add" size={28} color={theme.primaryText} />
           </TouchableOpacity>
         </View>
       )}
@@ -2304,13 +2307,7 @@ export default function RefrigeratorVisual({
         visible={addLocationPickerVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => {
-          setAddLocationPickerVisible(false);
-          setAddPickerFridgeId(null);
-          setAddPickerCompartmentId(null);
-          setAddPickerShelves(null);
-          setAssignTargetIngredient(null);
-        }}
+        onRequestClose={() => setAddLocationPickerVisible(false)}
       >
         <View style={[styles.modalOverlay, { backgroundColor: theme.modalOverlay }]}>
           <View style={[styles.settingsModalContent, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
@@ -2339,13 +2336,7 @@ export default function RefrigeratorVisual({
                   </Text>
                 </View>
                 <TouchableOpacity
-                  onPress={() => {
-                    setAddLocationPickerVisible(false);
-                    setAddPickerFridgeId(null);
-                    setAddPickerCompartmentId(null);
-                    setAddPickerShelves(null);
-                    setAssignTargetIngredient(null);
-                  }}
+                  onPress={() => setAddLocationPickerVisible(false)}
                   style={styles.modalCloseButton}
                 >
                   <Ionicons name="close" size={24} color={theme.textSecondary} />
