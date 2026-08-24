@@ -10,8 +10,8 @@ import { SAMPLE_INGREDIENTS, CATEGORY_EMOJI, DEFAULT_INSIDE_SHELVES, DEFAULT_DOO
 import AddIngredientModal from './AddIngredientModal';
 import { useAuth } from '../context/AuthContext';
 import { getFridgeLayout, getCompartmentShelves, CompartmentShelfInfo, getFridgeHistory, IngredientHistoryEntry } from '../api/fridgeService';
-import { deleteIngredient } from '../api/ingredientService';
-import { deserializeMemo, convertServerLocationToLocal } from '../utils/memoSerializer';
+import { deleteIngredient, updateIngredient } from '../api/ingredientService';
+import { deserializeMemo, convertServerLocationToLocal, serializeMemo } from '../utils/memoSerializer';
 import { rebuildAllNotifications } from '../utils/ingredientNotifications';
 import { useTheme } from '../context/ThemeContext';
 // 영문 행정구역명 한글 변환 매핑 딕셔너리
@@ -434,9 +434,13 @@ export default function RefrigeratorVisual({
   const [addPickerShelves, setAddPickerShelves] = useState<CompartmentShelfInfo | null>(null);
   const [addPickerShelvesLoading, setAddPickerShelvesLoading] = useState(false);
   // 위치 선택이 끝나면 이 화면(식재료 목록)을 벗어나지 않고 바로 등록 폼을 띄운다
-  const [addIngredientTarget, setAddIngredientTarget] = useState<{ fridgeId: string; compartmentId: string; shelfId: string; serverCompartmentId: number | null } | null>(null);
+  // compartmentId/shelfId가 없으면 "위치 미정" 등록 (나중에 위치 지정 가능)
+  const [addIngredientTarget, setAddIngredientTarget] = useState<{ fridgeId: string; compartmentId?: string; shelfId?: string; serverCompartmentId: number | null } | null>(null);
   // 식재료 목록 카드의 수정 버튼으로 여는 수정 폼 (같은 모달을 수정 모드로 재사용)
   const [editIngredientTarget, setEditIngredientTarget] = useState<Ingredient | null>(null);
+  // "위치 미정" 식재료에 나중에 위치를 지정할 때: 같은 위치 선택 모달을 재사용하되,
+  // 완료 시 새 등록이 아니라 이 식재료에 구획을 지정하는 것으로 처리한다.
+  const [assignTargetIngredient, setAssignTargetIngredient] = useState<Ingredient | null>(null);
 
   const [fridgeCardWidth, setFridgeCardWidth] = useState(0);
 
@@ -517,16 +521,36 @@ export default function RefrigeratorVisual({
           const allIngredients: Ingredient[] = [];
 
           layouts.forEach((layout, index) => {
-            if (!layout || !Array.isArray(layout.compartments)) return;
+            if (!layout) return;
             const fridge = refrigerators[index];
-            layout.compartments.forEach(comp => {
-              comp.ingredients.forEach(ing => {
+            if (Array.isArray(layout.compartments)) {
+              layout.compartments.forEach(comp => {
+                comp.ingredients.forEach(ing => {
+                  const deserialized = deserializeMemo(ing.memo);
+                  allIngredients.push({
+                    id: String(ing.id),
+                    name: ing.name,
+                    location: convertServerLocationToLocal(comp.storageType, comp.name),
+                    subLocation: deserialized.subLocation as any,
+                    category: deserialized.category,
+                    expiryDate: ing.expirationDate,
+                    quantity: ing.quantity,
+                    unit: ing.unit,
+                    memo: deserialized.memo || undefined,
+                    fridgeId: fridge.id,
+                  });
+                });
+              });
+            }
+            // 구획 미지정("위치 미정") 식재료
+            if (Array.isArray(layout.unassignedIngredients)) {
+              layout.unassignedIngredients.forEach(ing => {
                 const deserialized = deserializeMemo(ing.memo);
                 allIngredients.push({
                   id: String(ing.id),
                   name: ing.name,
-                  location: convertServerLocationToLocal(comp.storageType, comp.name),
-                  subLocation: deserialized.subLocation as any,
+                  location: undefined,
+                  subLocation: undefined,
                   category: deserialized.category,
                   expiryDate: ing.expirationDate,
                   quantity: ing.quantity,
@@ -535,7 +559,7 @@ export default function RefrigeratorVisual({
                   fridgeId: fridge.id,
                 });
               });
-            });
+            }
           });
           setIngredients(allIngredients);
           rebuildAllNotifications(allIngredients);
@@ -679,13 +703,34 @@ export default function RefrigeratorVisual({
     ];
   };
 
-  // 식재료 목록 탭의 + 버튼: 등록할 냉장고/보관실을 바로 고를 수 있는 모달을 연다
+  // 식재료 목록 탭의 + 버튼: 등록할 냉장고부터 고르게 한다 (냉장고가 1개뿐이어도 항상 이 단계를 보여줘서
+  // "어느 냉장고에 등록되는지"가 명확하도록 한다).
   const handleOpenAddLocationPicker = () => {
     if (refrigerators.length === 0) {
       onOpenAddSelector();
       return;
     }
-    setAddPickerFridgeId(refrigerators.length === 1 ? refrigerators[0].id : null);
+    setAssignTargetIngredient(null);
+    setAddPickerFridgeId(null);
+    setAddLocationPickerVisible(true);
+  };
+
+  // 위치를 나중에 정하고 싶을 때: 냉장고까지만 정하고 칸/선반은 건너뛴 채 바로 등록 폼으로 넘어간다
+  const handleSkipLocationPicker = (fridgeId: string) => {
+    const target = { fridgeId, serverCompartmentId: null };
+    setAddLocationPickerVisible(false);
+    setAddPickerFridgeId(null);
+    setAddPickerCompartmentId(null);
+    setAddPickerShelves(null);
+    setAddIngredientTarget(target);
+  };
+
+  // 식재료의 위치를 (재)지정: 이미 소속 냉장고가 정해져 있으므로 냉장고 선택 단계는 건너뛰고 칸부터 고른다.
+  // "위치 미정" 항목의 최초 지정과 이미 위치가 있는 항목의 위치 변경 양쪽에 쓰인다.
+  const handleOpenAssignLocationPicker = (item: Ingredient) => {
+    if (!item.fridgeId) return;
+    setAssignTargetIngredient(item);
+    setAddPickerFridgeId(item.fridgeId);
     setAddLocationPickerVisible(true);
   };
 
@@ -730,9 +775,13 @@ export default function RefrigeratorVisual({
     }
   };
 
-  // 선반 선택 완료: 이 화면(식재료 목록)을 벗어나지 않고 바로 등록 폼을 띄운다
+  // 선반 선택 완료: 기존 식재료의 위치를 (재)지정하는 중이면 그쪽으로, 아니면 신규 등록 폼으로
   const handlePickAddShelf = (shelfId: string) => {
     if (!addPickerFridgeId || !addPickerCompartmentId) return;
+    if (assignTargetIngredient) {
+      finalizeAssignLocation(assignTargetIngredient, addPickerCompartmentId, shelfId);
+      return;
+    }
     const target = {
       fridgeId: addPickerFridgeId,
       compartmentId: addPickerCompartmentId,
@@ -744,6 +793,40 @@ export default function RefrigeratorVisual({
     setAddPickerCompartmentId(null);
     setAddPickerShelves(null);
     setAddIngredientTarget(target);
+  };
+
+  // 식재료에 구획/선반을 (재)지정한다. 등록(POST)이 아니라 수정(PATCH)이므로
+  // AddIngredientModal이 아니라 여기서 직접 처리하고 로컬 상태만 갱신한다.
+  const finalizeAssignLocation = async (item: Ingredient, compartmentId: string, shelfId: string) => {
+    const serverCompartmentId = addPickerShelves?.serverCompartmentId ?? null;
+    setAddLocationPickerVisible(false);
+    setAddPickerFridgeId(null);
+    setAddPickerCompartmentId(null);
+    setAddPickerShelves(null);
+    setAssignTargetIngredient(null);
+    try {
+      if (isLoggedIn) {
+        if (!serverCompartmentId) {
+          throw new Error('서버 구획 ID를 로드하지 못했습니다.');
+        }
+        const memoContent = serializeMemo(item.category, shelfId, item.memo || '');
+        await updateIngredient(Number(item.id), { compartmentId: serverCompartmentId, memo: memoContent });
+      } else {
+        const ingredientsStr = await AsyncStorage.getItem('@ingredients');
+        const allIngredients: Ingredient[] = ingredientsStr ? JSON.parse(ingredientsStr) : [];
+        const updated = allIngredients.map(ing =>
+          ing.id === item.id ? { ...ing, location: compartmentId, subLocation: shelfId as any } : ing
+        );
+        await AsyncStorage.setItem('@ingredients', JSON.stringify(updated));
+        rebuildAllNotifications(updated);
+      }
+      setIngredients(prev => prev.map(ing =>
+        ing.id === item.id ? { ...ing, location: compartmentId, subLocation: shelfId as any } : ing
+      ));
+    } catch (e) {
+      console.error('Failed to assign location', e);
+      Alert.alert('오류 ⚠️', '위치를 지정하지 못했습니다.');
+    }
   };
 
   // 특정 칸에 든 식재료를 "이름 개수"로 유리질감 패널 안에 나열한다. 많아지면 패널 안에서 세로 스크롤.
@@ -1507,7 +1590,8 @@ export default function RefrigeratorVisual({
                     const dday = getDDayInfo(item.expiryDate);
                     const emoji = CATEGORY_EMOJI[item.category] || '📦';
                     const fridge = refrigerators.find(r => r.id === item.fridgeId);
-                    const locationLabel = getCompartmentLabel(item.location);
+                    const isUnassigned = !item.location;
+                    const locationLabel = isUnassigned ? '위치 미정' : getCompartmentLabel(item.location!);
 
                     return (
                       <TouchableOpacity
@@ -1516,23 +1600,54 @@ export default function RefrigeratorVisual({
                           styles.urgentListItem,
                           {
                             backgroundColor: theme.surface,
-                            borderColor: theme.borderLight,
+                            borderColor: isUnassigned ? theme.primaryBorder : theme.borderLight,
+                            borderWidth: isUnassigned ? 1.5 : 1,
                             shadowColor: theme.shadow,
                           }
                         ]}
                         activeOpacity={0.8}
-                        onPress={() => onPressCompartment(item.location, locationLabel, item.fridgeId || '', item.subLocation)}
+                        onPress={() => isUnassigned
+                          ? handleOpenAssignLocationPicker(item)
+                          : onPressCompartment(item.location!, locationLabel, item.fridgeId || '', item.subLocation)}
                       >
                         <View style={styles.urgentListLeft}>
                           <View style={[styles.urgentListEmojiBg, { backgroundColor: theme.surfaceTertiary }]}>
                             <Text style={styles.urgentListEmoji}>{emoji}</Text>
                           </View>
                           <View style={styles.urgentListInfo}>
-                            <Text style={[styles.urgentListName, { color: theme.textPrimary }]} numberOfLines={1}>
-                              {item.name}
-                            </Text>
-                            <Text style={[styles.urgentListLocation, { color: theme.textSecondary }]} numberOfLines={1}>
-                              {`${fridge ? fridge.name : '냉장고'} > ${getLocationDisplayLabel(locationLabel, item.subLocation)}`}
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <Text style={[styles.urgentListName, { color: theme.textPrimary, flexShrink: 1 }]} numberOfLines={1}>
+                                {item.name}
+                              </Text>
+                              {isUnassigned && (
+                                <View
+                                  style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    gap: 3,
+                                    backgroundColor: theme.primaryLight,
+                                    borderWidth: 1,
+                                    borderColor: theme.primaryBorder,
+                                    borderRadius: 6,
+                                    paddingHorizontal: 6,
+                                    paddingVertical: 2,
+                                  }}
+                                >
+                                  <Ionicons name="alert-circle" size={11} color={theme.primaryText} />
+                                  <Text style={{ fontSize: 10, fontWeight: '700', color: theme.primaryText }}>위치 미정</Text>
+                                </View>
+                              )}
+                            </View>
+                            <Text
+                              style={[
+                                styles.urgentListLocation,
+                                { color: isUnassigned ? theme.primaryText : theme.textSecondary },
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {isUnassigned
+                                ? `${fridge ? fridge.name : '냉장고'} · 탭해서 위치 지정하기`
+                                : `${fridge ? fridge.name : '냉장고'} > ${getLocationDisplayLabel(locationLabel, item.subLocation)}`}
                             </Text>
                           </View>
                         </View>
@@ -2065,14 +2180,24 @@ export default function RefrigeratorVisual({
                     const dday = getDDayInfo(item.expiryDate);
                     const emoji = CATEGORY_EMOJI[item.category] || '📦';
                     const fridge = refrigerators.find(r => r.id === item.fridgeId);
-                    const locationLabel = getCompartmentLabel(item.location);
+                    const isUnassigned = !item.location;
+                    const locationLabel = isUnassigned ? '위치 미정' : getCompartmentLabel(item.location!);
 
                     return (
                       <TouchableOpacity
                         key={item.id}
-                        style={[styles.ingCard, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}
+                        style={[
+                          styles.ingCard,
+                          {
+                            backgroundColor: theme.surface,
+                            borderColor: isUnassigned ? theme.primaryBorder : theme.borderLight,
+                            borderWidth: isUnassigned ? 1.5 : 1,
+                          },
+                        ]}
                         activeOpacity={0.8}
-                        onPress={() => onPressCompartment(item.location, locationLabel, item.fridgeId || '', item.subLocation)}
+                        onPress={() => isUnassigned
+                          ? handleOpenAssignLocationPicker(item)
+                          : onPressCompartment(item.location!, locationLabel, item.fridgeId || '', item.subLocation)}
                       >
                         {/* 상단 줄: 만료 배지(좌, 최우선 정보) — 수정/삭제(우) */}
                         <View style={styles.ingCardTopRow}>
@@ -2080,6 +2205,13 @@ export default function RefrigeratorVisual({
                             <Text style={[styles.urgentDDayText, { color: dday.color }]}>{dday.text}</Text>
                           </View>
                           <View style={styles.ingCardTopRowIcons}>
+                            <TouchableOpacity
+                              style={styles.ingCardTopRowIconButton}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              onPress={() => handleOpenAssignLocationPicker(item)}
+                            >
+                              <Ionicons name="location-outline" size={16} color={theme.textMuted} />
+                            </TouchableOpacity>
                             <TouchableOpacity
                               style={styles.ingCardTopRowIconButton}
                               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -2103,11 +2235,39 @@ export default function RefrigeratorVisual({
                           </View>
 
                           <View style={styles.ingCardInfo}>
-                            <Text style={[styles.ingCardName, { color: theme.textPrimary }]} numberOfLines={1}>
-                              {item.name}
-                            </Text>
-                            <Text style={[styles.ingCardLocBottom, { color: theme.textTertiary }]} numberOfLines={1}>
-                              {`${fridge ? fridge.name : '냉장고'} > ${getLocationDisplayLabel(locationLabel, item.subLocation)}`}
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <Text style={[styles.ingCardName, { color: theme.textPrimary, flexShrink: 1 }]} numberOfLines={1}>
+                                {item.name}
+                              </Text>
+                              {isUnassigned && (
+                                <View
+                                  style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    gap: 3,
+                                    backgroundColor: theme.primaryLight,
+                                    borderWidth: 1,
+                                    borderColor: theme.primaryBorder,
+                                    borderRadius: 6,
+                                    paddingHorizontal: 6,
+                                    paddingVertical: 2,
+                                  }}
+                                >
+                                  <Ionicons name="alert-circle" size={11} color={theme.primaryText} />
+                                  <Text style={{ fontSize: 10, fontWeight: '700', color: theme.primaryText }}>위치 미정</Text>
+                                </View>
+                              )}
+                            </View>
+                            <Text
+                              style={[
+                                styles.ingCardLocBottom,
+                                { color: isUnassigned ? theme.primaryText : theme.textTertiary },
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {isUnassigned
+                                ? `${fridge ? fridge.name : '냉장고'} · 탭해서 위치 지정하기`
+                                : `${fridge ? fridge.name : '냉장고'} > ${getLocationDisplayLabel(locationLabel, item.subLocation)}`}
                               <Text style={[styles.ingCardQtyValue, { color: theme.textSecondary }]}> · {item.quantity}{item.unit}</Text>
                             </Text>
                           </View>
@@ -2149,12 +2309,13 @@ export default function RefrigeratorVisual({
           setAddPickerFridgeId(null);
           setAddPickerCompartmentId(null);
           setAddPickerShelves(null);
+          setAssignTargetIngredient(null);
         }}
       >
         <View style={[styles.modalOverlay, { backgroundColor: theme.modalOverlay }]}>
           <View style={[styles.settingsModalContent, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
             <View>
-              {(addPickerCompartmentId || (addPickerFridgeId && refrigerators.length > 1)) && (
+              {(addPickerCompartmentId || (!assignTargetIngredient && addPickerFridgeId)) && (
                 <TouchableOpacity
                   onPress={() => {
                     if (addPickerCompartmentId) {
@@ -2172,7 +2333,9 @@ export default function RefrigeratorVisual({
               <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Text style={[styles.modalTitleText, { color: theme.textPrimary }]}>
-                    {addPickerCompartmentId ? '어느 칸에 등록할까요?' : addPickerFridgeId ? '어디에 등록할까요?' : '냉장고를 선택해주세요'}
+                    {assignTargetIngredient
+                      ? (addPickerCompartmentId ? '어느 칸에 넣을까요?' : '어디에 넣을까요?')
+                      : (addPickerCompartmentId ? '어느 칸에 등록할까요?' : addPickerFridgeId ? '어디에 등록할까요?' : '냉장고를 선택해주세요')}
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -2181,6 +2344,7 @@ export default function RefrigeratorVisual({
                     setAddPickerFridgeId(null);
                     setAddPickerCompartmentId(null);
                     setAddPickerShelves(null);
+                    setAssignTargetIngredient(null);
                   }}
                   style={styles.modalCloseButton}
                 >
@@ -2239,20 +2403,33 @@ export default function RefrigeratorVisual({
                 )
               ) : !addPickerFridgeId ? (
                 refrigerators.map(fridge => (
-                  <TouchableOpacity
-                    key={fridge.id}
-                    style={[styles.settingsActionRow, { borderBottomWidth: 1, borderBottomColor: theme.borderLight }]}
-                    activeOpacity={0.7}
-                    onPress={() => setAddPickerFridgeId(fridge.id)}
-                  >
-                    <View style={styles.settingsActionLeft}>
-                      <View style={[styles.settingsIconBadge, { backgroundColor: theme.primaryLight }]}>
-                        <Ionicons name="cube-outline" size={18} color={theme.primary} />
+                  <View key={fridge.id} style={{ borderBottomWidth: 1, borderBottomColor: theme.borderLight }}>
+                    <TouchableOpacity
+                      style={styles.settingsActionRow}
+                      activeOpacity={0.7}
+                      onPress={() => setAddPickerFridgeId(fridge.id)}
+                    >
+                      <View style={styles.settingsActionLeft}>
+                        <View style={[styles.settingsIconBadge, { backgroundColor: theme.primaryLight }]}>
+                          <Ionicons name="cube-outline" size={18} color={theme.primary} />
+                        </View>
+                        <Text style={[styles.settingsActionText, { color: theme.textSecondary }]}>{fridge.name}</Text>
                       </View>
-                      <Text style={[styles.settingsActionText, { color: theme.textSecondary }]}>{fridge.name}</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
-                  </TouchableOpacity>
+                      <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+                    </TouchableOpacity>
+                    {/* 이 냉장고를 골랐지만 칸/선반은 아직 정하고 싶지 않을 때 */}
+                    {!assignTargetIngredient && (
+                      <TouchableOpacity
+                        style={{ paddingLeft: 56, paddingRight: 16, paddingBottom: 12 }}
+                        activeOpacity={0.7}
+                        onPress={() => handleSkipLocationPicker(fridge.id)}
+                      >
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: theme.primaryText }}>
+                          이 냉장고에 등록하고 위치는 나중에 정할게요
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 ))
               ) : (
                 getCompartmentsForType(refrigerators.find(f => f.id === addPickerFridgeId)!.type).map(comp => (
@@ -2868,6 +3045,8 @@ const styles = StyleSheet.create({
   urgentDDayText: {
     fontSize: 10,
     fontWeight: 'bold',
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   emptyUrgentCard: {
     marginHorizontal: 20,

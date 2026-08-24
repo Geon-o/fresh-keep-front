@@ -2,7 +2,9 @@ import { client } from './client';
 import { ServerIngredient } from './fridgeService';
 
 export interface AddIngredientRequest {
-  compartmentId: number;
+  fridgeId: number;
+  // 없으면 "위치 미정" 상태로 등록된다.
+  compartmentId?: number;
   name: string;
   quantity: number;
   unit: string;

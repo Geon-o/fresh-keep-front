@@ -262,11 +262,16 @@ export default function AddIngredientModal({ visible, fridgeId, compartmentId, s
           savedIngredient = updated.find(item => item.id === editIngredient.id);
         }
       } else if (isLoggedIn) {
-        if (!serverCompartmentId) {
+        if (!fridgeId) {
+          throw new Error('냉장고 ID를 로드하지 못했습니다.');
+        }
+        // compartmentId가 지정된 경우에만 서버 구획 ID가 필수 (없으면 "위치 미정" 등록)
+        if (compartmentId && !serverCompartmentId) {
           throw new Error('서버 구획 ID를 로드하지 못했습니다.');
         }
         await addIngredient({
-          compartmentId: serverCompartmentId,
+          fridgeId: Number(fridgeId),
+          compartmentId: serverCompartmentId || undefined,
           name: formName.trim(),
           quantity: Number(formQuantity),
           unit: formUnit,
@@ -278,8 +283,8 @@ export default function AddIngredientModal({ visible, fridgeId, compartmentId, s
         const newIngredient: Ingredient = {
           id: `ing_${Date.now()}`,
           name: formName.trim(),
-          location: compartmentId!,
-          subLocation: effectiveShelfId as any,
+          location: compartmentId,
+          subLocation: (effectiveShelfId || undefined) as any,
           category: formCategory,
           expiryDate: formExpiryDate,
           expiryType: formExpiryType,

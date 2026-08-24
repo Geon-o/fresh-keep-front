@@ -48,6 +48,8 @@ export interface ServerFridgeLayout {
   fridgeName: string;
   type: 'FOUR_DOOR' | 'SIDE_BY_SIDE' | 'TWO_DOOR';
   compartments: ServerCompartment[];
+  // 구획을 아직 정하지 않은 채 등록된 식재료("위치 미정")
+  unassignedIngredients?: ServerIngredient[];
 }
 
 // UI용 FridgeType과 백엔드 문자열 포맷 상호 변환 유틸

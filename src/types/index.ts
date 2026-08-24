@@ -20,7 +20,7 @@ export type ExpiryType = 'SELL_BY' | 'USE_BY';
 export interface Ingredient {
   id: string;
   name: string;
-  location: string; // e.g. 'fridge_left', 'freezer_left', etc.
+  location?: string; // e.g. 'fridge_left', 'freezer_left', etc. 없으면 "위치 미정" 상태.
   subLocation?: 'shelf_1' | 'shelf_2' | 'shelf_3' | 'pocket_1' | 'pocket_2';
   category: IngredientCategory;
   expiryDate: string; // YYYY-MM-DD

@@ -1113,6 +1113,7 @@ export default function CompartmentDetail({
             throw new Error('서버 구획 ID를 로드하지 못했습니다.');
           }
           const savedIng = await addIngredient({
+            fridgeId: Number(fridgeId),
             compartmentId: serverCompartmentId,
             name: formName.trim(),
             quantity: Number(formQuantity),
