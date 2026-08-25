@@ -517,7 +517,12 @@ export default function RefrigeratorVisual({
 
   // useFocusEffect가 짧은 간격으로 여러 번 발동해도(설정 화면 몇 개를 연달아 오갈 때 등) 매번
   // 서버를 다시 부르지 않도록, 마지막으로 불러온 시각을 기록해 일정 시간 안이면 건너뛴다.
+  // 단, refrigerators/isLoggedIn이 바뀌어 loadIngredients 자체가 새로 만들어진 경우(예: 앱 시작 시
+  // 빈 배열로 한 번 불렸다가 실제 냉장고 목록이 막 도착한 경우)는 "이전과 다른 로드"이므로
+  // 시간과 무관하게 즉시 다시 불러온다 — 그렇지 않으면 그 첫 빈 로드의 타임스탬프에 발목 잡혀서
+  // 실제 데이터가 도착했는데도 최대 15초간 미리보기가 빈 채로 남는 문제가 생긴다.
   const lastLoadedAtRef = useRef(0);
+  const lastLoadedFnRef = useRef<(() => Promise<void>) | null>(null);
   const FOCUS_RELOAD_STALE_MS = 15000;
 
   // 식재료 실시간 로드 (서버 vs 로컬 분기). 등록 폼 저장 후 재호출할 수 있도록 useCallback으로 분리.
@@ -640,7 +645,10 @@ export default function RefrigeratorVisual({
   // 다시 불러와야 그 사이 바뀐 설정(알림 시간 등)이 바로 반영된다.
   useFocusEffect(
     React.useCallback(() => {
-      if (Date.now() - lastLoadedAtRef.current < FOCUS_RELOAD_STALE_MS) return;
+      const isSameLoad = lastLoadedFnRef.current === loadIngredients;
+      const isStale = Date.now() - lastLoadedAtRef.current >= FOCUS_RELOAD_STALE_MS;
+      if (isSameLoad && !isStale) return;
+      lastLoadedFnRef.current = loadIngredients;
       loadIngredients();
     }, [loadIngredients])
   );
