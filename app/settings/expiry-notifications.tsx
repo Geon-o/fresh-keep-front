@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import { useTheme } from '../../src/context/ThemeContext';
+import { useAuth } from '../../src/context/AuthContext';
 import {
   isNotificationsEnabled,
   setNotificationsEnabled,
@@ -13,7 +14,9 @@ import {
   setNotificationHour,
   getNotificationMinute,
   setNotificationMinute,
+  rebuildAllNotifications,
 } from '../../src/utils/ingredientNotifications';
+import { loadAllIngredients } from '../../src/utils/loadIngredients';
 
 type Period = 'AM' | 'PM';
 
@@ -119,6 +122,7 @@ const MINUTE_LABELS = MINUTE_VALUES.map(m => `${String(m).padStart(2, '0')}분`)
 export default function ExpiryNotificationSettingsScreen() {
   const router = useRouter();
   const { isDark } = useTheme();
+  const { isLoggedIn } = useAuth();
   const [expiryOn, setExpiryOn] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [periodIndex, setPeriodIndex] = useState(0); // 0: 오전, 1: 오후
@@ -179,12 +183,14 @@ export default function ExpiryNotificationSettingsScreen() {
     setExpiryOn(next);
   };
 
-  // 이 화면이 스택 최상단(홈 화면 위)에 떠 있는 동안은 홈 화면의 토스트가 가려서 안 보이므로,
-  // 이 화면 안에서 직접 토스트를 띄운다. 휠을 스크롤/탭할 때마다 바로 띄우면 값이 계속 바뀌는 동안
-  // 토스트가 너무 자주 뜨므로, 사용자가 조작을 멈추고 0.8초 지난 뒤 최종 값으로 한 번만 띄운다.
+  // 휠을 스크롤/탭할 때마다 바로 재예약하면 값이 계속 바뀌는 동안 매번 전체 식재료를 다시 불러오게 되므로,
+  // 사용자가 조작을 멈추고 0.8초 지난 뒤 최종 값 기준으로 딱 한 번만 즉시 재예약하고 토스트를 띄운다.
+  // (이 화면이 홈 화면 위에 떠 있는 동안은 홈 화면의 토스트가 가려서 안 보이므로 여기서 직접 띄운다.)
   const notifyTimeSet = (nextPeriodIndex: number, nextHourIndex: number, nextMinuteIndex: number) => {
     if (pendingToastRef.current) clearTimeout(pendingToastRef.current);
-    pendingToastRef.current = setTimeout(() => {
+    pendingToastRef.current = setTimeout(async () => {
+      const ingredients = await loadAllIngredients(isLoggedIn).catch(() => []);
+      await rebuildAllNotifications(ingredients);
       const periodLabel = nextPeriodIndex === 0 ? '오전' : '오후';
       const minuteLabel = MINUTE_LABELS[nextMinuteIndex];
       showToast(`${periodLabel} ${nextHourIndex + 1}시 ${minuteLabel}에 알림이 설정됐어요`);

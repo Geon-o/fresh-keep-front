@@ -96,9 +96,17 @@ export async function isNotificationsEnabled(): Promise<boolean> {
 export async function setNotificationsEnabled(enabled: boolean): Promise<void> {
   await AsyncStorage.setItem(ENABLED_KEY, String(enabled));
   if (!enabled) {
-    await Notifications.cancelAllScheduledNotificationsAsync();
-    await AsyncStorage.setItem(SCHEDULED_IDS_KEY, JSON.stringify([]));
+    await cancelAllScheduledNotifications();
   }
+}
+
+/**
+ * 이 앱이 예약해둔 알림을 전부 취소합니다. 알림 시간을 바꿀 때처럼, 예전 설정으로 이미 잡혀 있던
+ * 알림이 다음 rebuildAllNotifications 전까지 그대로 남아 엉뚱한 시각에 울리는 걸 막기 위해 쓴다.
+ */
+export async function cancelAllScheduledNotifications(): Promise<void> {
+  await Notifications.cancelAllScheduledNotificationsAsync();
+  await AsyncStorage.setItem(SCHEDULED_IDS_KEY, JSON.stringify([]));
 }
 
 /**
