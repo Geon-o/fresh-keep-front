@@ -2242,21 +2242,21 @@ export default function RefrigeratorVisual({
                               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                               onPress={() => handleOpenAssignLocationPicker(item)}
                             >
-                              <Ionicons name="location-outline" size={16} color={theme.textMuted} />
+                              <Ionicons name="location-outline" size={20} color={isDark ? '#FFFFFF' : theme.textMuted} />
                             </TouchableOpacity>
                             <TouchableOpacity
                               style={styles.ingCardTopRowIconButton}
                               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                               onPress={() => setEditIngredientTarget(item)}
                             >
-                              <Ionicons name="pencil-outline" size={16} color={theme.textMuted} />
+                              <Ionicons name="pencil-outline" size={20} color={isDark ? '#FFFFFF' : theme.textMuted} />
                             </TouchableOpacity>
                             <TouchableOpacity
                               style={styles.ingCardTopRowIconButton}
                               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                               onPress={() => handleDeleteIngredient(item)}
                             >
-                              <Ionicons name="trash-outline" size={16} color={theme.danger} />
+                              <Ionicons name="trash-outline" size={20} color={theme.danger} />
                             </TouchableOpacity>
                           </View>
                         </View>
@@ -3691,11 +3691,11 @@ const styles = StyleSheet.create({
   ingCardTopRowIcons: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 6,
   },
   ingCardTopRowIconButton: {
-    width: 22,
-    height: 22,
+    width: 30,
+    height: 30,
     justifyContent: 'center',
     alignItems: 'center',
   },
