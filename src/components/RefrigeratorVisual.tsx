@@ -416,6 +416,8 @@ export default function RefrigeratorVisual({
         return `냉장고 이름 변경${entry.summary ? ` · ${entry.summary}` : ''}`;
       case 'TYPE_CHANGED':
         return `냉장고 타입 변경${entry.summary ? ` · ${entry.summary}` : ''}`;
+      case 'NICKNAME_CHANGED':
+        return entry.summary || '닉네임 변경';
       default:
         return entry.summary || '';
     }

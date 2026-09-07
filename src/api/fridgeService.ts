@@ -128,8 +128,8 @@ export async function getFridgeLayout(fridgeId: number): Promise<ServerFridgeLay
 
 export interface IngredientHistoryEntry {
   id: number;
-  actionType: 'CREATED' | 'UPDATED' | 'DELETED' | 'NAME_CHANGED' | 'TYPE_CHANGED';
-  // CREATED/UPDATED/DELETED일 때는 식재료명, NAME_CHANGED/TYPE_CHANGED일 때는 변경 후 냉장고명이 온다
+  actionType: 'CREATED' | 'UPDATED' | 'DELETED' | 'NAME_CHANGED' | 'TYPE_CHANGED' | 'NICKNAME_CHANGED';
+  // CREATED/UPDATED/DELETED일 때는 식재료명, NAME_CHANGED/TYPE_CHANGED/NICKNAME_CHANGED일 때는 변경 후 냉장고명이 온다
   ingredientName: string;
   actorName?: string;
   // 자연어 문장(예: "사과를 등록했어요.") 그대로 온다. 여러 필드가 한 번에 바뀌면 줄바꿈으로 이어져 있다.

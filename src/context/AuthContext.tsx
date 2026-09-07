@@ -235,6 +235,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const response = await client.patch<UserProfile>('/api/users/me', { name });
     if (response.data && typeof response.data === 'object') {
       setUser(response.data);
+      queryClient.invalidateQueries({ queryKey: ['fridges'] });
       return true;
     }
     return false;
