@@ -36,6 +36,26 @@ export interface Ingredient {
   updatedAt?: string;
 }
 
+export type MemoType = 'TEXT' | 'CHECKLIST';
+
+export interface ChecklistItem {
+  id: string;
+  text: string;
+  checked: boolean;
+}
+
+export interface Memo {
+  id: number;
+  fridgeId: number;
+  authorUserId: number;
+  authorName?: string;
+  type: MemoType;
+  content: string; // TEXT는 평문, CHECKLIST는 ChecklistItem[]을 JSON.stringify한 문자열
+  mine: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Recipe {
   id: string;
   title: string;

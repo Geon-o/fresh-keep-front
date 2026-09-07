@@ -1,17 +1,19 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions, TextInput, Platform, ActivityIndicator, Linking, Alert, Modal, Animated, PanResponder, DeviceEventEmitter } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions, TextInput, Platform, ActivityIndicator, Linking, Alert, Modal, Animated, PanResponder, DeviceEventEmitter, KeyboardAvoidingView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { useQueryClient } from '@tanstack/react-query';
 
 import * as Location from 'expo-location';
 import * as WebBrowser from 'expo-web-browser';
-import { FridgeType, Ingredient } from '../types';
+import { FridgeType, Ingredient, Memo, MemoType, ChecklistItem } from '../types';
 import { SAMPLE_INGREDIENTS, CATEGORY_EMOJI, DEFAULT_INSIDE_SHELVES, DEFAULT_DOOR_SHELVES } from './CompartmentDetail';
 import AddIngredientModal from './AddIngredientModal';
 import { useAuth } from '../context/AuthContext';
 import { getFridgeLayout, getCompartmentShelves, CompartmentShelfInfo, getFridgeHistory, IngredientHistoryEntry } from '../api/fridgeService';
 import { deleteIngredient, updateIngredient } from '../api/ingredientService';
+import { getMemos, createMemo, updateMemo, deleteMemo, toggleMemoItem, markMemosRead } from '../api/memoService';
 import { deserializeMemo, convertServerLocationToLocal, serializeMemo } from '../utils/memoSerializer';
 import { rebuildAllNotifications } from '../utils/ingredientNotifications';
 import { useTheme } from '../context/ThemeContext';
@@ -226,7 +228,7 @@ const SEASONAL_INGREDIENTS: SeasonalIngredient[] = [
 
 interface RefrigeratorVisualProps {
   mode?: 'home' | 'ingredients' | 'fridge';
-  refrigerators: { id: string; type: FridgeType; name: string; uuid?: string; role?: 'OWNER' | 'MEMBER'; deletionRequested?: boolean; ownerName?: string; memberNames?: string[] }[];
+  refrigerators: { id: string; type: FridgeType; name: string; uuid?: string; role?: 'OWNER' | 'MEMBER'; deletionRequested?: boolean; ownerName?: string; memberNames?: string[]; hasUnreadMemo?: boolean }[];
   // subLocation을 넘기면 이동한 화면에서 해당 선반을 바로 펼쳐서 보여준다.
   onPressCompartment: (id: string, label: string, fridgeId: string, subLocation?: string) => void;
   activeIndex: number;
@@ -262,6 +264,7 @@ export default function RefrigeratorVisual({
 }: RefrigeratorVisualProps) {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const { isLoggedIn, user } = useAuth();
+  const queryClient = useQueryClient();
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [ingredientsLoaded, setIngredientsLoaded] = useState(false);
   const { theme, isDark } = useTheme();
@@ -399,6 +402,200 @@ export default function RefrigeratorVisual({
       setHistoryEntries([]);
     } finally {
       setHistoryLoading(false);
+    }
+  };
+
+  // 냉장고 메모 목록 / 작성·수정 모달
+  const [memoListVisible, setMemoListVisible] = useState(false);
+  const [memoListFridgeId, setMemoListFridgeId] = useState<string | null>(null);
+  const [memoLoading, setMemoLoading] = useState(false);
+  const [memoEntries, setMemoEntries] = useState<Memo[]>([]);
+  const [memoDetail, setMemoDetail] = useState<Memo | null>(null);
+  const [memoComposerVisible, setMemoComposerVisible] = useState(false);
+  const [memoComposerEditingId, setMemoComposerEditingId] = useState<number | null>(null);
+  const [memoComposerType, setMemoComposerType] = useState<MemoType>('TEXT');
+  const [memoComposerText, setMemoComposerText] = useState('');
+  const [memoComposerItems, setMemoComposerItems] = useState<ChecklistItem[]>([]);
+  const [memoSaving, setMemoSaving] = useState(false);
+  const MEMO_CONTENT_MAX = 1000;
+  // 실제 포스트잇처럼 메모마다 색이 다르게 보이도록 순환시키는 팔레트.
+  const MEMO_NOTE_COLORS = ['#FFF3B0', '#FFD6E8', '#C9F2C7', '#BEE3F8', '#FFDAB9', '#E0C3FC'];
+
+  // 한 줄에 3개씩 4줄(총 12개)만 딱 보이고, 그 이상은 이 높이 안에서 세로 스크롤되게 한다.
+  // 타일이 정사각형(aspectRatio: 1)이라 폭만 알면 높이가 그대로 나온다 — settingsModalContent의
+  // width:'90%'/padding:20 을 그대로 반영해 실제 타일 폭을 역산한다.
+  const MEMO_GRID_COLUMNS = 3;
+  const MEMO_GRID_VISIBLE_ROWS = 4;
+  const MEMO_GRID_GAP = 14;
+  const memoModalContentWidth = screenWidth * 0.9 - 40;
+  const memoTileWidth = (memoModalContentWidth - MEMO_GRID_GAP * (MEMO_GRID_COLUMNS - 1)) / MEMO_GRID_COLUMNS;
+  const memoGridVisibleHeight = memoTileWidth * MEMO_GRID_VISIBLE_ROWS + MEMO_GRID_GAP * (MEMO_GRID_VISIBLE_ROWS - 1);
+
+  // 메모지 미리보기를 줄노트처럼 보이게: 타일 높이(=폭, 정사각형) 안에 들어가는 만큼만 줄을 긋는다.
+  const MEMO_TILE_LINE_HEIGHT = 14;
+  const memoTilePreviewLines = Math.max(1, Math.floor((memoTileWidth - 16) / MEMO_TILE_LINE_HEIGHT));
+
+  const genChecklistItemId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+
+  // 체크리스트 작성 중 키보드의 "다음/완료"를 누르면 키보드를 닫는 대신, 마지막 항목이면 새
+  // 항목을 추가해서 바로 이어 입력하고, 중간 항목이면 다음 항목으로 포커스를 넘긴다.
+  const memoItemInputRefs = useRef<Map<string, TextInput | null>>(new Map());
+  const focusMemoItem = (itemId: string) => {
+    requestAnimationFrame(() => memoItemInputRefs.current.get(itemId)?.focus());
+  };
+  const handleChecklistItemSubmit = (index: number) => {
+    if (index === memoComposerItems.length - 1) {
+      const newItem: ChecklistItem = { id: genChecklistItemId(), text: '', checked: false };
+      setMemoComposerItems(prev => [...prev, newItem]);
+      focusMemoItem(newItem.id);
+    } else {
+      focusMemoItem(memoComposerItems[index + 1].id);
+    }
+  };
+
+  // 목록의 타일 색과 상세 모달 배경색이 항상 같은 메모끼리 일치하도록, 인덱스 기반 팔레트 순환을
+  // 목록 순서(memoEntries)에서 그 메모의 실제 위치로 찾아서 재사용한다.
+  const getMemoColor = (memo: Memo) => {
+    const idx = memoEntries.findIndex(m => m.id === memo.id);
+    return MEMO_NOTE_COLORS[(idx >= 0 ? idx : 0) % MEMO_NOTE_COLORS.length];
+  };
+
+  const openMemoList = async (fridgeId: string) => {
+    setMemoListFridgeId(fridgeId);
+    setMemoListVisible(true);
+    setMemoLoading(true);
+    try {
+      const entries = await getMemos(Number(fridgeId));
+      setMemoEntries(entries);
+      // 목록을 연 시점에 안읽음을 해제한다 — 메모 버튼의 빨간 점은 fridges 쿼리에 실려있으므로 함께 갱신.
+      await markMemosRead(Number(fridgeId)).catch(() => {});
+      queryClient.invalidateQueries({ queryKey: ['fridges'] });
+    } catch (e) {
+      console.error('Failed to load memos', e);
+      setMemoEntries([]);
+    } finally {
+      setMemoLoading(false);
+    }
+  };
+
+  // 메모 카드에 보여줄 제목/미리보기는 저장하지 않고 렌더 시점에 content에서 만든다.
+  const getMemoPreview = (memo: Memo): string => {
+    if (memo.type === 'TEXT') {
+      const firstLine = memo.content.split('\n')[0].trim();
+      return firstLine || memo.content;
+    }
+    try {
+      const items: ChecklistItem[] = JSON.parse(memo.content);
+      if (items.length === 0) return '체크리스트';
+      const rest = items.length > 1 ? ` 외 ${items.length - 1}개` : '';
+      return `${items[0].text}${rest}`;
+    } catch {
+      return '체크리스트';
+    }
+  };
+
+  const parseChecklist = (content: string): ChecklistItem[] => {
+    try {
+      const parsed = JSON.parse(content);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const openMemoComposer = (existing?: Memo) => {
+    if (existing) {
+      setMemoComposerEditingId(existing.id);
+      setMemoComposerType(existing.type);
+      if (existing.type === 'TEXT') {
+        setMemoComposerText(existing.content);
+        setMemoComposerItems([]);
+      } else {
+        setMemoComposerText('');
+        setMemoComposerItems(parseChecklist(existing.content));
+      }
+    } else {
+      setMemoComposerEditingId(null);
+      setMemoComposerType('TEXT');
+      setMemoComposerText('');
+      setMemoComposerItems([{ id: genChecklistItemId(), text: '', checked: false }]);
+    }
+    setMemoDetail(null);
+    setMemoComposerVisible(true);
+  };
+
+  const memoComposerSerialized = () =>
+    memoComposerType === 'TEXT'
+      ? memoComposerText
+      : JSON.stringify(memoComposerItems.filter(item => item.text.trim().length > 0));
+
+  const handleSaveMemo = async () => {
+    if (!memoListFridgeId) return;
+    const content = memoComposerSerialized();
+    if (!content.trim() || content === '[]') {
+      Alert.alert('알림 ⚠️', '메모 내용을 입력해주세요.');
+      return;
+    }
+    if (content.length > MEMO_CONTENT_MAX) {
+      Alert.alert('알림 ⚠️', `메모는 ${MEMO_CONTENT_MAX}자를 넘을 수 없습니다.`);
+      return;
+    }
+    setMemoSaving(true);
+    try {
+      if (memoComposerEditingId != null) {
+        await updateMemo(Number(memoListFridgeId), memoComposerEditingId, { content });
+      } else {
+        await createMemo(Number(memoListFridgeId), { type: memoComposerType, content });
+      }
+      setMemoComposerVisible(false);
+      const entries = await getMemos(Number(memoListFridgeId));
+      setMemoEntries(entries);
+    } catch (e) {
+      console.error('Failed to save memo', e);
+      Alert.alert('오류 ⚠️', '메모 저장에 실패했습니다.');
+    } finally {
+      setMemoSaving(false);
+    }
+  };
+
+  const handleDeleteMemo = (memo: Memo) => {
+    if (!memoListFridgeId) return;
+    const performDelete = async () => {
+      try {
+        await deleteMemo(Number(memoListFridgeId), memo.id);
+        setMemoDetail(null);
+        setMemoEntries(prev => prev.filter(m => m.id !== memo.id));
+      } catch (e) {
+        console.error('Failed to delete memo', e);
+        Alert.alert('오류 ⚠️', '메모 삭제에 실패했습니다.');
+      }
+    };
+    if (Platform.OS === 'web') {
+      if (window.confirm('이 메모를 삭제하시겠습니까?')) performDelete();
+    } else {
+      Alert.alert('이 메모를 삭제하시겠습니까?', undefined, [
+        { text: '취소', style: 'cancel' },
+        { text: '삭제', style: 'destructive', onPress: performDelete },
+      ]);
+    }
+  };
+
+  // 체크박스는 작성자가 아니어도 같은 냉장고 멤버면 누구나 누를 수 있다 (낙관적으로 먼저 반영).
+  const handleToggleMemoItem = async (memo: Memo, itemId: string) => {
+    if (!memoListFridgeId) return;
+    const items = parseChecklist(memo.content).map(item =>
+      item.id === itemId ? { ...item, checked: !item.checked } : item
+    );
+    const optimistic: Memo = { ...memo, content: JSON.stringify(items) };
+    setMemoEntries(prev => prev.map(m => (m.id === memo.id ? optimistic : m)));
+    setMemoDetail(prev => (prev && prev.id === memo.id ? optimistic : prev));
+    try {
+      await toggleMemoItem(Number(memoListFridgeId), memo.id, itemId);
+    } catch (e) {
+      console.error('Failed to toggle memo item', e);
+      // 실패 시 서버 상태로 되돌리기 위해 목록을 다시 불러온다.
+      const entries = await getMemos(Number(memoListFridgeId)).catch(() => null);
+      if (entries) setMemoEntries(entries);
     }
   };
 
@@ -1996,6 +2193,31 @@ export default function RefrigeratorVisual({
                           <Ionicons name="settings-outline" size={16} color={theme.textSecondary} />
                         </TouchableOpacity>
 
+                        {isLoggedIn && (
+                          <View style={styles.fridgeMemoStickerWrapper}>
+                            <TouchableOpacity
+                              style={styles.fridgeMemoSticker}
+                              activeOpacity={0.75}
+                              onPress={() => openMemoList(fridge.id)}
+                            >
+                              {/* 메모 패드 특유의 노란 뜯는 커버 + 절취선(점선) + 줄노트 */}
+                              <View style={styles.fridgeMemoStickerCap} />
+                              <View style={styles.fridgeMemoStickerPerforation}>
+                                {Array.from({ length: 6 }).map((_, i) => (
+                                  <View key={i} style={styles.fridgeMemoStickerDot} />
+                                ))}
+                              </View>
+                              {[20, 27].map((top) => (
+                                <View key={top} style={[styles.fridgeMemoStickerLine, { top }]} />
+                              ))}
+                            </TouchableOpacity>
+                            {/* 빨간 점은 sticker의 overflow:hidden 때문에 잘려서 형제로 뺀다 */}
+                            {fridge.hasUnreadMemo && (
+                              <View style={[styles.fridgeCardMemoDot, { backgroundColor: theme.danger, borderColor: '#FFFDF0' }]} pointerEvents="none" />
+                            )}
+                          </View>
+                        )}
+
                         <View style={styles.fridgeNameContainer}>
                           <Text style={[styles.fridgeNameTitle, { color: theme.textPrimary }]}>{fridge.name}</Text>
                         </View>
@@ -2535,6 +2757,249 @@ export default function RefrigeratorVisual({
             )}
           </View>
         </View>
+      </Modal>
+
+      {/* 냉장고 메모 목록 */}
+      <Modal
+        visible={memoListVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMemoListVisible(false)}
+      >
+        <View style={[styles.modalOverlay, { backgroundColor: theme.modalOverlay }]}>
+          <View style={[styles.settingsModalContent, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
+              <Text style={[styles.modalTitleText, { color: theme.textPrimary }]}>메모</Text>
+              <TouchableOpacity onPress={() => setMemoListVisible(false)} style={styles.modalCloseButton}>
+                <Ionicons name="close" size={24} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {memoLoading ? (
+              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                <ActivityIndicator size="small" color={theme.primary} />
+              </View>
+            ) : (
+              <ScrollView style={[styles.pickerModalBody, { height: memoGridVisibleHeight }]} showsVerticalScrollIndicator={false}>
+                <View style={styles.memoGrid}>
+                  {memoEntries.map((memo, index) => (
+                    <View key={memo.id} style={styles.memoTileWrapper}>
+                      <TouchableOpacity
+                        style={[styles.memoTile, styles.memoTileWithText, { backgroundColor: MEMO_NOTE_COLORS[index % MEMO_NOTE_COLORS.length] }]}
+                        activeOpacity={0.7}
+                        onPress={() => setMemoDetail(memo)}
+                      >
+                        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+                          {Array.from({ length: memoTilePreviewLines }).map((_, lineIndex) => (
+                            <View
+                              key={lineIndex}
+                              style={[styles.memoTileLine, { top: 8 + (lineIndex + 1) * MEMO_TILE_LINE_HEIGHT }]}
+                            />
+                          ))}
+                        </View>
+                        <Text style={styles.memoTileText} numberOfLines={memoTilePreviewLines} allowFontScaling={false}>
+                          {getMemoPreview(memo)}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+
+                  <View style={styles.memoTileWrapper}>
+                    <TouchableOpacity
+                      style={[styles.memoTile, styles.memoAddTile, { borderColor: theme.primary, backgroundColor: theme.primaryLight }]}
+                      activeOpacity={0.7}
+                      onPress={() => openMemoComposer()}
+                    >
+                      <Ionicons name="add" size={26} color={theme.primary} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* 메모 상세 (확인 + 체크리스트 토글, mine이면 수정/삭제) */}
+      <Modal
+        visible={!!memoDetail}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMemoDetail(null)}
+      >
+        <View style={[styles.modalOverlay, { backgroundColor: theme.modalOverlay }]}>
+          <View style={[styles.settingsModalContent, { backgroundColor: memoDetail ? getMemoColor(memoDetail) : theme.surface, borderColor: 'rgba(0,0,0,0.1)' }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: 'rgba(0,0,0,0.1)' }]}>
+              <Text style={[styles.modalTitleText, { color: 'rgba(0,0,0,0.85)' }]}>
+                {memoDetail?.authorName ? `${memoDetail.authorName}님의 메모` : '메모'}
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                {memoDetail?.mine && (
+                  <>
+                    <TouchableOpacity onPress={() => openMemoComposer(memoDetail)} style={styles.modalCloseButton}>
+                      <Ionicons name="pencil-outline" size={19} color="rgba(0,0,0,0.6)" />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleDeleteMemo(memoDetail)} style={styles.modalCloseButton}>
+                      <Ionicons name="trash-outline" size={19} color="rgba(0,0,0,0.6)" />
+                    </TouchableOpacity>
+                  </>
+                )}
+                <TouchableOpacity onPress={() => setMemoDetail(null)} style={styles.modalCloseButton}>
+                  <Ionicons name="close" size={24} color="rgba(0,0,0,0.6)" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {memoDetail && (
+              <ScrollView style={styles.pickerModalBody} showsVerticalScrollIndicator={false}>
+                {memoDetail.type === 'TEXT' ? (
+                  <Text style={{ color: 'rgba(0,0,0,0.8)', fontSize: 15, lineHeight: 22, padding: 16 }}>
+                    {memoDetail.content}
+                  </Text>
+                ) : (
+                  parseChecklist(memoDetail.content).map(item => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.memoChecklistRow}
+                      activeOpacity={0.7}
+                      onPress={() => handleToggleMemoItem(memoDetail, item.id)}
+                    >
+                      <Ionicons
+                        name={item.checked ? 'checkbox' : 'square-outline'}
+                        size={20}
+                        color={item.checked ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0.45)'}
+                      />
+                      <Text
+                        style={[
+                          styles.memoChecklistText,
+                          { color: item.checked ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.8)' },
+                          item.checked && { textDecorationLine: 'line-through' },
+                        ]}
+                      >
+                        {item.text}
+                      </Text>
+                    </TouchableOpacity>
+                  ))
+                )}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* 메모 작성/수정 */}
+      <Modal
+        visible={memoComposerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMemoComposerVisible(false)}
+      >
+        <KeyboardAvoidingView
+          style={[styles.modalOverlay, { backgroundColor: theme.modalOverlay }]}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={[styles.settingsModalContent, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
+              <Text style={[styles.modalTitleText, { color: theme.textPrimary }]}>
+                {memoComposerEditingId != null ? '메모 수정' : '새 메모'}
+              </Text>
+              <TouchableOpacity onPress={() => setMemoComposerVisible(false)} style={styles.modalCloseButton}>
+                <Ionicons name="close" size={24} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {memoComposerEditingId == null && (
+              <View style={[styles.memoTypeSegmentRow, { borderColor: theme.borderLight, backgroundColor: theme.surfaceSecondary }]}>
+                <TouchableOpacity
+                  style={[styles.memoTypeSegment, memoComposerType === 'TEXT' && { backgroundColor: theme.primaryLight }]}
+                  onPress={() => setMemoComposerType('TEXT')}
+                >
+                  <Text style={{ color: memoComposerType === 'TEXT' ? theme.primary : theme.textSecondary, fontWeight: '600' }}>
+                    메모
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.memoTypeSegment, memoComposerType === 'CHECKLIST' && { backgroundColor: theme.primaryLight }]}
+                  onPress={() => setMemoComposerType('CHECKLIST')}
+                >
+                  <Text style={{ color: memoComposerType === 'CHECKLIST' ? theme.primary : theme.textSecondary, fontWeight: '600' }}>
+                    체크리스트
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <ScrollView style={styles.pickerModalBody} showsVerticalScrollIndicator={false}>
+              {memoComposerType === 'TEXT' ? (
+                <View style={{ padding: 16 }}>
+                  <TextInput
+                    style={[styles.memoTextInput, { color: theme.textPrimary, borderColor: theme.borderLight }]}
+                    value={memoComposerText}
+                    onChangeText={setMemoComposerText}
+                    placeholder="살 것, 남길 말을 적어보세요"
+                    placeholderTextColor={theme.textMuted}
+                    multiline
+                    maxLength={MEMO_CONTENT_MAX}
+                  />
+                  <Text style={{ color: theme.textMuted, fontSize: 12, textAlign: 'right', marginTop: 4 }}>
+                    {memoComposerText.length}/{MEMO_CONTENT_MAX}
+                  </Text>
+                </View>
+              ) : (
+                <View style={{ padding: 16 }}>
+                  {memoComposerItems.map((item, index) => (
+                    <View key={item.id} style={styles.memoChecklistEditRow}>
+                      <TextInput
+                        ref={(el) => {
+                          if (el) memoItemInputRefs.current.set(item.id, el);
+                          else memoItemInputRefs.current.delete(item.id);
+                        }}
+                        style={[styles.memoChecklistEditInput, { color: theme.textPrimary, borderColor: theme.borderLight }]}
+                        value={item.text}
+                        onChangeText={(text) =>
+                          setMemoComposerItems(prev => prev.map((it, i) => (i === index ? { ...it, text } : it)))
+                        }
+                        placeholder={`항목 ${index + 1}`}
+                        placeholderTextColor={theme.textMuted}
+                        returnKeyType="next"
+                        blurOnSubmit={false}
+                        onSubmitEditing={() => handleChecklistItemSubmit(index)}
+                      />
+                      <TouchableOpacity
+                        onPress={() => setMemoComposerItems(prev => prev.filter((_, i) => i !== index))}
+                        style={{ padding: 8 }}
+                      >
+                        <Ionicons name="close-circle" size={20} color={theme.textMuted} />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                  <TouchableOpacity
+                    style={styles.memoAddItemRow}
+                    onPress={() => setMemoComposerItems(prev => [...prev, { id: genChecklistItemId(), text: '', checked: false }])}
+                  >
+                    <Ionicons name="add" size={18} color={theme.primary} />
+                    <Text style={{ color: theme.primary, fontWeight: '600' }}>항목 추가</Text>
+                  </TouchableOpacity>
+                  <Text style={{ color: theme.textMuted, fontSize: 12, textAlign: 'right', marginTop: 4 }}>
+                    {memoComposerSerialized().length}/{MEMO_CONTENT_MAX}
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.memoSaveButton, { backgroundColor: theme.primary, opacity: memoSaving ? 0.6 : 1 }]}
+              onPress={handleSaveMemo}
+              disabled={memoSaving}
+            >
+              {memoSaving ? (
+                <ActivityIndicator size="small" color={theme.primaryOnPrimary} />
+              ) : (
+                <Text style={{ color: theme.primaryOnPrimary, fontWeight: '700', fontSize: 15 }}>저장</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* 위치 선택이 끝나면 화면 이동 없이 이 자리에서 바로 등록 폼을 띄운다 */}
@@ -3175,6 +3640,174 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
+  },
+  fridgeMemoStickerWrapper: {
+    position: 'absolute',
+    top: 14,
+    right: 54,
+    width: 32,
+    height: 32,
+    zIndex: 10,
+  },
+  fridgeMemoSticker: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#FFFDF0',
+    borderRadius: 4,
+    overflow: 'hidden',
+    transform: [{ rotate: '6deg' }],
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
+  },
+  // 메모 패드 위쪽의 노란 뜯는 커버. 아래쪽 모서리를 크게 둥글려서 아치형으로 보이게 한다.
+  fridgeMemoStickerCap: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 9,
+    backgroundColor: '#FFC107',
+  },
+  fridgeMemoStickerPerforation: {
+    position: 'absolute',
+    top: 13,
+    left: 2,
+    right: 2,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  fridgeMemoStickerDot: {
+    width: 2,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+  },
+  fridgeMemoStickerLine: {
+    position: 'absolute',
+    left: 4,
+    right: 4,
+    height: 1,
+    backgroundColor: 'rgba(0,0,0,0.18)',
+  },
+  fridgeCardMemoDot: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+  },
+  memoTypeSegmentRow: {
+    flexDirection: 'row',
+    borderWidth: 1.5,
+    borderRadius: 10,
+    margin: 16,
+    marginBottom: 0,
+    overflow: 'hidden',
+  },
+  memoTypeSegment: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  memoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 14,
+    paddingBottom: 8,
+  },
+  memoTileWrapper: {
+    width: '30%',
+  },
+  memoTile: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  memoAddTile: {
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  memoTileWithText: {
+    padding: 8,
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
+    overflow: 'hidden',
+  },
+  memoTileLine: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: 'rgba(0,0,0,0.15)',
+  },
+  memoTileText: {
+    fontSize: 11,
+    lineHeight: 14,
+    textAlign: 'left',
+    color: 'rgba(0,0,0,0.75)',
+    // Android는 폰트마다 위아래 여백(ascent/descent)을 다르게 얹어서(includeFontPadding)
+    // 같은 lineHeight를 줘도 기기별로 줄과 글자 위치가 미묘하게 어긋난다. 꺼서 일관되게 만든다.
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  },
+  memoChecklistRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  memoChecklistText: {
+    flex: 1,
+    fontSize: 15,
+  },
+  memoTextInput: {
+    borderWidth: 1.5,
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 15,
+    minHeight: 140,
+    textAlignVertical: 'top',
+  },
+  memoChecklistEditRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 8,
+  },
+  memoChecklistEditInput: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+  },
+  memoAddItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+  },
+  memoSaveButton: {
+    margin: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
   },
   pencilIconButton: {
     padding: 4,

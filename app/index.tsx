@@ -330,6 +330,7 @@ export default function Index() {
           deletionRequested: f.deletionRequested,
           ownerName: f.ownerName,
           memberNames: f.memberNames,
+          hasUnreadMemo: f.hasUnreadMemo,
         }))
       : localRefrigerators;
   }, [isLoggedIn, serverFridges, localRefrigerators]);

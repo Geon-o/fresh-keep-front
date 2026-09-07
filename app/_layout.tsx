@@ -59,7 +59,7 @@ function AppContent() {
   // 식재료 등록/수정/삭제는 fridges 쿼리가 아니라 각 화면이 자체적으로 불러오는 냉장고
   // 레이아웃 데이터라서, react-query 무효화 대신 DeviceEventEmitter로 알려 그 화면이 직접 다시 불러오게 한다.
   useEffect(() => {
-    const FRIDGE_PUSH_TYPES = ['fridge_deletion', 'fridge_share', 'nickname_changed'];
+    const FRIDGE_PUSH_TYPES = ['fridge_deletion', 'fridge_share', 'nickname_changed', 'memo_created'];
     const INGREDIENT_PUSH_TYPES = ['ingredient_changed'];
     const handlePushData = (data: Record<string, unknown> | undefined) => {
       const type = data?.type as string;

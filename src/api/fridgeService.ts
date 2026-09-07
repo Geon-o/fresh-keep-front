@@ -10,6 +10,7 @@ export interface ServerFridge {
   deletionRequested: boolean;
   ownerName?: string;
   memberNames: string[];
+  hasUnreadMemo: boolean;
 }
 
 export interface FridgeDeletionResult {
