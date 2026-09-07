@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, Modal, TouchableOpacity, Text, TextInput, Alert, Platform, ActivityIndicator, Animated, BackHandler, Image, DeviceEventEmitter } from 'react-native';
+import { StyleSheet, View, Modal, TouchableOpacity, Text, TextInput, Alert, Platform, ActivityIndicator, Animated, Easing, BackHandler, Image, DeviceEventEmitter } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Linking from 'expo-linking';
@@ -19,6 +19,7 @@ import { getFridges, createFridge, deleteFridge, updateFridge, convertTypeToFron
 import { registerPushToken } from '../src/utils/pushToken';
 import { updateIngredient } from '../src/api/ingredientService';
 import { useTheme } from '../src/context/ThemeContext';
+import SplashCheckerboard from '../src/components/SplashCheckerboard';
 
 export default function Index() {
   const { isLoggedIn, user, isLoading: isAuthLoading, authFailed, loginAnonymously } = useAuth();
@@ -261,6 +262,26 @@ export default function Index() {
 
   // 스플래시 오버레이를 띄울지 여부 (인증/로딩 중이거나 최소 시간이 지나지 않았을 때)
   const showSplashOverlay = isAuthLoading || isRefrigeratorsLoading || !isMinTimeElapsed;
+
+  // 스플래시가 꺼질 때 뚝 끊기지 않고 서서히 사라지도록 페이드 아웃한다. 뒤에 있는 실제
+  // 화면은 showSplashOverlay가 내려가는 시점(=데이터 로딩 완료 후)에 이미 렌더링돼 있으므로,
+  // 오버레이만 투명해지면 바로 그 화면이 드러난다.
+  const splashOpacity = useRef(new Animated.Value(1)).current;
+  const [isSplashMounted, setIsSplashMounted] = useState(true);
+  useEffect(() => {
+    if (showSplashOverlay) {
+      // 재로그인 등으로 로딩 상태가 다시 켜지면 스플래시도 다시 보이게 원복한다.
+      setIsSplashMounted(true);
+      splashOpacity.setValue(1);
+      return;
+    }
+    Animated.timing(splashOpacity, {
+      toValue: 0,
+      duration: 450,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => setIsSplashMounted(false));
+  }, [showSplashOverlay]);
 
   // 탭바 스프링 애니메이션 (햅틱 반응형 피드백)
   const homeTabScale = React.useRef(new Animated.Value(1.05)).current;
@@ -970,8 +991,12 @@ export default function Index() {
       </Modal>
 
       {/* 100% 신뢰성 있는 인앱 비주얼 스플래시 스크린 */}
-      {showSplashOverlay && (
-        <View style={[styles.splashOverlayContainer, { backgroundColor: splashTheme.background }]}>
+      {isSplashMounted && (
+        <Animated.View
+          pointerEvents={showSplashOverlay ? 'auto' : 'none'}
+          style={[styles.splashOverlayContainer, { backgroundColor: splashTheme.background, opacity: splashOpacity }]}
+        >
+          <SplashCheckerboard />
           <View style={styles.splashLogoContainer}>
             <Image
               source={require('../assets/images/mustache_static.png')}
@@ -982,7 +1007,7 @@ export default function Index() {
               신선함을 오래오래, 스마트 냉장고 관리
             </Text>
           </View>
-        </View>
+        </Animated.View>
       )}
       {/* 커스텀 토스트 오버레이 */}
       {toastVisible && (
