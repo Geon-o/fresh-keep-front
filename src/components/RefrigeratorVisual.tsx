@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions, TextInput, Platform, ActivityIndicator, Linking, Alert, Modal, Animated, PanResponder } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions, TextInput, Platform, ActivityIndicator, Linking, Alert, Modal, Animated, PanResponder, DeviceEventEmitter } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -654,6 +654,15 @@ export default function RefrigeratorVisual({
       loadIngredients();
     }, [loadIngredients])
   );
+
+  // 다른 멤버가 같은 냉장고에서 식재료를 등록/수정/삭제하면 서버가 보내는 푸시를
+  // _layout.tsx가 받아 이 이벤트로 알려준다. 화면을 나갔다 오지 않아도 바로 반영한다.
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('ingredientsChanged', () => {
+      loadIngredients();
+    });
+    return () => sub.remove();
+  }, [loadIngredients]);
 
   // 냉장고 목록 크기나 로그인 상태가 바뀌면 캐러셀 인덱스를 0으로 초기화하던 부분 수정:
   // @active_fridge_index 등 부모에서 넘어오는 activeIndex를 유지하기 위해 length가 유효한 범위라면 0으로 덮어쓰지 않도록 함.

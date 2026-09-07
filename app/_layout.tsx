@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { DeviceEventEmitter } from "react-native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -53,19 +54,27 @@ function AppContent() {
     SystemUI.setBackgroundColorAsync(theme.background).catch(() => {});
   }, [theme.background]);
 
-  // 냉장고 삭제 요청/동의/거절/철회, 새 멤버 합류 푸시가 도착하면, 앱을 재시작하지 않아도
-  // 그 자리에서 바로 냉장고 목록을 다시 불러오도록 연결한다.
+  // 냉장고 삭제 요청/동의/거절/철회, 새 멤버 합류, 닉네임 변경 푸시가 도착하면, 앱을 재시작하지
+  // 않아도 그 자리에서 바로 냉장고 목록(fridges 쿼리)을 다시 불러오도록 연결한다.
+  // 식재료 등록/수정/삭제는 fridges 쿼리가 아니라 각 화면이 자체적으로 불러오는 냉장고
+  // 레이아웃 데이터라서, react-query 무효화 대신 DeviceEventEmitter로 알려 그 화면이 직접 다시 불러오게 한다.
   useEffect(() => {
     const FRIDGE_PUSH_TYPES = ['fridge_deletion', 'fridge_share', 'nickname_changed'];
-    const receivedSub = Notifications.addNotificationReceivedListener((notification) => {
-      if (FRIDGE_PUSH_TYPES.includes(notification.request.content.data?.type as string)) {
+    const INGREDIENT_PUSH_TYPES = ['ingredient_changed'];
+    const handlePushData = (data: Record<string, unknown> | undefined) => {
+      const type = data?.type as string;
+      if (FRIDGE_PUSH_TYPES.includes(type)) {
         queryClient.invalidateQueries({ queryKey: ['fridges'] });
       }
+      if (INGREDIENT_PUSH_TYPES.includes(type)) {
+        DeviceEventEmitter.emit('ingredientsChanged');
+      }
+    };
+    const receivedSub = Notifications.addNotificationReceivedListener((notification) => {
+      handlePushData(notification.request.content.data);
     });
     const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
-      if (FRIDGE_PUSH_TYPES.includes(response.notification.request.content.data?.type as string)) {
-        queryClient.invalidateQueries({ queryKey: ['fridges'] });
-      }
+      handlePushData(response.notification.request.content.data);
     });
     return () => {
       receivedSub.remove();
