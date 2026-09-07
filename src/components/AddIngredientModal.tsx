@@ -68,6 +68,30 @@ export default function AddIngredientModal({ visible, fridgeId, compartmentId, s
     target.setDate(target.getDate() + days);
     return `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-${String(target.getDate()).padStart(2, '0')}`;
   };
+  // 숫자만 입력받아 YYYY-MM-DD 하이픈을 자동으로 넣어준다. 하이픈 바로 뒤를 지우면
+  // 하이픈만 사라지고 숫자가 남아 커서가 멈춘 것처럼 보이는 걸 막기 위해, 지워진 게
+  // 하이픈이면 그 앞 숫자까지 한 번에 지운다. 월/일 두 자리가 다 입력되면 1~12,
+  // 1~(그 달의 마지막 날)로 범위를 벗어난 값을 강제로 보정한다.
+  const formatExpiryDateInput = (prev: string, next: string) => {
+    if (next.length < prev.length && prev[next.length] === '-') {
+      next = next.slice(0, -1);
+    }
+    const digits = next.replace(/\D/g, '').slice(0, 8);
+    const yyyy = digits.slice(0, 4);
+    let mm = digits.slice(4, 6);
+    let dd = digits.slice(6, 8);
+
+    if (mm.length === 2) {
+      mm = String(Math.min(Math.max(Number(mm), 1), 12)).padStart(2, '0');
+    }
+    if (dd.length === 2 && mm.length === 2) {
+      const year = yyyy.length === 4 ? Number(yyyy) : new Date().getFullYear();
+      const lastDay = new Date(year, Number(mm), 0).getDate();
+      dd = String(Math.min(Math.max(Number(dd), 1), lastDay)).padStart(2, '0');
+    }
+
+    return [yyyy, mm, dd].filter(Boolean).join('-');
+  };
 
   // 등록 폼 필드만 초기값으로 되돌린다 (연속 등록 시 위치/단위 목록은 유지한 채 재사용).
   const resetAddForm = () => {
@@ -475,7 +499,7 @@ export default function AddIngredientModal({ visible, fridgeId, compartmentId, s
                     <TextInput
                       style={styles.dateTypeInput}
                       value={formExpiryDate}
-                      onChangeText={setFormExpiryDate}
+                      onChangeText={(text) => setFormExpiryDate(formatExpiryDateInput(formExpiryDate, text))}
                       placeholder="YYYY-MM-DD"
                       placeholderTextColor="#90A4AE"
                       keyboardType="numeric"
