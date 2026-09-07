@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, TouchableOpacity, View, Text, ScrollView, Platform, Alert, TextInput, Modal, ActivityIndicator, PanResponder, Dimensions, Animated, Easing, Switch } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +11,7 @@ import { addIngredient, updateIngredient, deleteIngredient } from '../api/ingred
 import { getCustomUnits, addCustomUnit } from '../api/unitService';
 import { serializeMemo, deserializeMemo } from '../utils/memoSerializer';
 import { rebuildAllNotifications } from '../utils/ingredientNotifications';
+import { guessCategory, saveCategoryOverride } from '../utils/categoryGuess';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../theme';
 
@@ -657,6 +659,7 @@ export default function CompartmentDetail({
   const [formQuantity, setFormQuantity] = useState(1);
   const [formUnit, setFormUnit] = useState('개');
   const [formExpiryDate, setFormExpiryDate] = useState('');
+  const [showExpiryDatePicker, setShowExpiryDatePicker] = useState(false);
   const [formExpiryType, setFormExpiryType] = useState<ExpiryType>('SELL_BY');
   const [formMemo, setFormMemo] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -670,6 +673,21 @@ export default function CompartmentDetail({
   const [customUnits, setCustomUnits] = useState<string[]>([]);
   const [expiryTypeDropdownOpen, setExpiryTypeDropdownOpen] = useState(false);
   const unitOptions = Array.from(new Set([...DEFAULT_UNITS, ...customUnits]));
+  // 사용자가 카테고리를 직접 고르면, 이름을 계속 타이핑해도 자동 추천이 덮어쓰지 않게 막는 플래그.
+  const [categoryManuallySet, setCategoryManuallySet] = useState(false);
+
+  // 등록 모드에서 이름이 바뀔 때마다 카테고리를 추정해서 채워준다. 사용자가 이미
+  // 카테고리를 직접 고른 뒤라면(categoryManuallySet) 덮어쓰지 않는다.
+  useEffect(() => {
+    if (modalMode !== 'add' || categoryManuallySet) return;
+    let cancelled = false;
+    guessCategory(formName).then((guessed) => {
+      if (!cancelled && guessed) setFormCategory(guessed);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [formName, modalMode, categoryManuallySet]);
 
   // 로그인 여부에 따라 커스텀 단위 목록을 서버/로컬에서 불러옴
   useEffect(() => {
@@ -1021,29 +1039,22 @@ export default function CompartmentDetail({
     return `${yyyy}-${mm}-${dd}`;
   };
 
-  // 숫자만 입력받아 YYYY-MM-DD 하이픈을 자동으로 넣어준다. 하이픈 바로 뒤를 지우면
-  // 하이픈만 사라지고 숫자가 남아 커서가 멈춘 것처럼 보이는 걸 막기 위해, 지워진 게
-  // 하이픈이면 그 앞 숫자까지 한 번에 지운다. 월/일 두 자리가 다 입력되면 1~12,
-  // 1~(그 달의 마지막 날)로 범위를 벗어난 값을 강제로 보정한다.
-  const formatExpiryDateInput = (prev: string, next: string) => {
-    if (next.length < prev.length && prev[next.length] === '-') {
-      next = next.slice(0, -1);
+  // 유통기한 날짜 피커용 변환 헬퍼. YYYY-MM-DD를 로컬 타임존 기준 Date로 안전하게
+  // 파싱한다 (new Date(문자열)은 UTC로 해석돼 시간대에 따라 하루가 밀릴 수 있다).
+  const parseExpiryDate = (value: string): Date => {
+    const [y, m, d] = value.split('-').map(Number);
+    return y && m && d ? new Date(y, m - 1, d) : new Date();
+  };
+  const formatDateToYMD = (date: Date) =>
+    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  const onChangeExpiryDate = (event: { type: string }, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowExpiryDatePicker(false);
+      if (event.type !== 'set' || !selectedDate) return;
     }
-    const digits = next.replace(/\D/g, '').slice(0, 8);
-    const yyyy = digits.slice(0, 4);
-    let mm = digits.slice(4, 6);
-    let dd = digits.slice(6, 8);
-
-    if (mm.length === 2) {
-      mm = String(Math.min(Math.max(Number(mm), 1), 12)).padStart(2, '0');
+    if (selectedDate) {
+      setFormExpiryDate(formatDateToYMD(selectedDate));
     }
-    if (dd.length === 2 && mm.length === 2) {
-      const year = yyyy.length === 4 ? Number(yyyy) : new Date().getFullYear();
-      const lastDay = new Date(year, Number(mm), 0).getDate();
-      dd = String(Math.min(Math.max(Number(dd), 1), lastDay)).padStart(2, '0');
-    }
-
-    return [yyyy, mm, dd].filter(Boolean).join('-');
   };
 
   // 등록/수정 시각을 "MM/DD HH:mm" 형식으로 표시 (등록·수정자 안내용)
@@ -1075,6 +1086,7 @@ export default function CompartmentDetail({
     setUnitCustomInputOpen(false);
     setUnitCustomInputValue('');
     setExpiryTypeDropdownOpen(false);
+    setCategoryManuallySet(false);
 
     setModalVisible(true);
   };
@@ -1717,7 +1729,12 @@ export default function CompartmentDetail({
                       <TouchableOpacity
                         key={cat.key}
                         style={[styles.comboOption, formCategory === cat.key && styles.comboOptionActive]}
-                        onPress={() => { setFormCategory(cat.key); setCategoryDropdownOpen(false); }}
+                        onPress={() => {
+                          setFormCategory(cat.key);
+                          setCategoryDropdownOpen(false);
+                          setCategoryManuallySet(true);
+                          if (modalMode === 'add') saveCategoryOverride(formName, cat.key);
+                        }}
                         activeOpacity={0.7}
                       >
                         <Text style={[styles.comboOptionText, formCategory === cat.key && styles.comboOptionTextActive]}>
@@ -1817,15 +1834,31 @@ export default function CompartmentDetail({
                     <Text style={styles.comboArrow}>{expiryTypeDropdownOpen ? '▴' : '▾'}</Text>
                   </TouchableOpacity>
                   <View style={styles.dateTypeDivider} />
-                  <TextInput
+                  <TouchableOpacity
                     style={styles.dateTypeInput}
-                    value={formExpiryDate}
-                    onChangeText={(text) => setFormExpiryDate(formatExpiryDateInput(formExpiryDate, text))}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor="#90A4AE"
-                    keyboardType="numeric"
-                  />
+                    activeOpacity={0.7}
+                    onPress={() => setShowExpiryDatePicker(true)}
+                  >
+                    <Text style={{ color: formExpiryDate ? theme.textPrimary : '#90A4AE', fontSize: 14 }}>
+                      {formExpiryDate || 'YYYY-MM-DD'}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
+                {showExpiryDatePicker && (
+                  <>
+                    <DateTimePicker
+                      value={parseExpiryDate(formExpiryDate)}
+                      mode="date"
+                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      onChange={onChangeExpiryDate}
+                    />
+                    {Platform.OS === 'ios' && (
+                      <TouchableOpacity style={styles.presetButton} onPress={() => setShowExpiryDatePicker(false)}>
+                        <Text style={styles.presetButtonText}>완료</Text>
+                      </TouchableOpacity>
+                    )}
+                  </>
+                )}
                 {expiryTypeDropdownOpen && (
                   <View style={styles.dateTypeDropdownOverlay}>
                     {(Object.keys(EXPIRY_TYPE_LABELS) as ExpiryType[]).map(type => (
