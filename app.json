@@ -61,7 +61,7 @@
               "name": "Expiring",
               "label": "유통기한 임박",
               "minWidth": "180dp",
-              "minHeight": "110dp",
+              "minHeight": "48dp",
               "targetCellWidth": 4,
               "targetCellHeight": 2,
               "resizeMode": "horizontal|vertical",
@@ -75,7 +75,7 @@
               "minHeight": "48dp",
               "targetCellWidth": 4,
               "targetCellHeight": 1,
-              "resizeMode": "horizontal",
+              "resizeMode": "horizontal|vertical",
               "previewImage": "./assets/images/widget-preview-summary.png",
               "updatePeriodMillis": 1800000
             }
