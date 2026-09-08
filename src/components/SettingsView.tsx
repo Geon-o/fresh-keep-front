@@ -12,10 +12,14 @@ interface SettingsViewProps {
 
 export default function SettingsView({
   isLoggedIn,
-  user
+  user,
+  onLogin
 }: SettingsViewProps) {
   const router = useRouter();
   const { themeMode, isDark } = useTheme();
+
+  const isSocial = user?.provider === 'google' || user?.provider === 'naver';
+  const providerLabel = user?.provider === 'google' ? '구글' : user?.provider === 'naver' ? '네이버' : '';
 
   // 2026 Toss-style Color Tokens
   const backgroundColor = isDark ? '#101012' : '#F3F4F6';
@@ -55,6 +59,22 @@ export default function SettingsView({
             <Ionicons name="chevron-forward" size={14} color={descColor} />
           </View>
         </TouchableOpacity>
+
+        {/* 닉네임 아래 계정 상태 인라인 안내 */}
+        {isSocial ? (
+          <Text style={[styles.accountStatusText, { color: descColor }]}>
+            {providerLabel}로 로그인됨 · 데이터가 안전하게 보관돼요
+          </Text>
+        ) : (
+          <View style={styles.guestNudgeRow}>
+            <Text style={[styles.accountStatusText, { color: descColor }]}>
+              로그인하면 기기를 바꿔도 데이터가 유지돼요
+            </Text>
+            <TouchableOpacity activeOpacity={0.7} onPress={onLogin} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={[styles.loginLink, { color: isDark ? '#8AB4F8' : '#2563EB' }]}>로그인</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {/* 1. 서비스 이용 섹션 */}
@@ -201,6 +221,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 12,
+  },
+  accountStatusText: {
+    fontSize: 13,
+    fontWeight: '500',
+    letterSpacing: -0.2,
+  },
+  guestNudgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 2,
+    paddingHorizontal: 4,
+  },
+  loginLink: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   sectionWrapper: {
     marginBottom: 22,

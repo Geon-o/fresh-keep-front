@@ -81,7 +81,9 @@
             }
           ]
         }
-      ]
+      ],
+      "@react-native-google-signin/google-signin",
+      "@react-native-seoul/naver-login"
     ],
     "experiments": {
       "typedRoutes": true,

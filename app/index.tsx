@@ -20,9 +20,10 @@ import { registerPushToken } from '../src/utils/pushToken';
 import { updateIngredient } from '../src/api/ingredientService';
 import { useTheme } from '../src/context/ThemeContext';
 import SplashCheckerboard from '../src/components/SplashCheckerboard';
+import WelcomeAuthSheet from '../src/components/WelcomeAuthSheet';
 
 export default function Index() {
-  const { isLoggedIn, user, isLoading: isAuthLoading, authFailed, loginAnonymously } = useAuth();
+  const { isLoggedIn, user, isLoading: isAuthLoading, authFailed, loginAnonymously, sessionExpired, clearSessionExpired } = useAuth();
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
@@ -56,6 +57,10 @@ export default function Index() {
   const [activeTab, setActiveTab] = useState<'home' | 'ingredients' | 'fridge' | 'settings'>('home');
   // 홈 위젯에서 넘어올 때 식재료 목록에 걸어줄 상태 필터/검색어 (nonce로 매번 재적용)
   const [ingredientFocus, setIngredientFocus] = useState<{ status: 'all' | 'expired' | 'imminent' | 'safe'; query: string; nonce: number } | null>(null);
+  // 소셜 로그인 권유 시트
+  const [welcomeVisible, setWelcomeVisible] = useState(false);
+  const [welcomeReason, setWelcomeReason] = useState<'welcome' | 'sessionExpired'>('welcome');
+  const isSocialUser = user?.provider === 'google' || user?.provider === 'naver';
   const [activeIndex, setActiveIndex] = useState(0);
 
   // 2. 냉장고 형태/추가 선택 모달 상태
@@ -277,6 +282,34 @@ export default function Index() {
 
   // 스플래시 오버레이를 띄울지 여부 (인증/로딩 중이거나 최소 시간이 지나지 않았을 때)
   const showSplashOverlay = isAuthLoading || isRefrigeratorsLoading || !isMinTimeElapsed;
+
+  // 첫 진입 시 게스트에게 로그인 권유 시트를 1회 노출한다. (강제 아님)
+  useEffect(() => {
+    if (showSplashOverlay || authFailed) return;
+    if (isSocialUser) return; // 이미 로그인한 사용자는 안 띄움
+    let cancelled = false;
+    AsyncStorage.getItem('@welcome_auth_seen').then(seen => {
+      if (!cancelled && !seen) {
+        setWelcomeReason('welcome');
+        setWelcomeVisible(true);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [showSplashOverlay, authFailed, isSocialUser]);
+
+  // 소셜 사용자 세션이 완전히 만료되면 재로그인 시트를 띄운다.
+  useEffect(() => {
+    if (sessionExpired) {
+      setWelcomeReason('sessionExpired');
+      setWelcomeVisible(true);
+    }
+  }, [sessionExpired]);
+
+  const handleWelcomeClose = () => {
+    setWelcomeVisible(false);
+    clearSessionExpired();
+    AsyncStorage.setItem('@welcome_auth_seen', 'true').catch(() => {});
+  };
 
   // 스플래시가 꺼질 때 뚝 끊기지 않고 서서히 사라지도록 페이드 아웃한다. 뒤에 있는 실제
   // 화면은 showSplashOverlay가 내려가는 시점(=데이터 로딩 완료 후)에 이미 렌더링돼 있으므로,
@@ -794,7 +827,7 @@ export default function Index() {
               <SettingsView
                 isLoggedIn={isLoggedIn}
                 user={user}
-                onLogin={() => router.push('/login')}
+                onLogin={() => { setWelcomeReason('welcome'); setWelcomeVisible(true); }}
               />
             )}
           </View>
@@ -1006,6 +1039,9 @@ export default function Index() {
           </View>
         </View>
       </Modal>
+
+      {/* 소셜 로그인 권유 시트 (첫 진입 1회 / 세션 만료 시) */}
+      <WelcomeAuthSheet visible={welcomeVisible} onClose={handleWelcomeClose} reason={welcomeReason} />
 
       {/* 100% 신뢰성 있는 인앱 비주얼 스플래시 스크린 */}
       {isSplashMounted && (
