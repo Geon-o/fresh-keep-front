@@ -64,7 +64,9 @@ export function ExpiringWidget({ snapshot, width, dark, compact = false }: Props
         <FlexWidget style={{ width: 'match_parent', flexDirection: 'column', flex: 1 }}>
           <FlexWidget style={{ width: 'match_parent', height: 1, backgroundColor: hex(c.border), marginTop: 14, marginBottom: 10 }} />
           {items.length === 0 ? (
-            <TextWidget text="임박·만료된 식재료가 없어요 👍" style={{ fontSize: 13, color: hex(c.textTertiary) }} />
+            <FlexWidget style={{ width: 'match_parent', flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <TextWidget text="임박·만료된 식재료가 없어요 👍" style={{ fontSize: 13, color: hex(c.textTertiary) }} />
+            </FlexWidget>
           ) : (
             // ListWidget = 네이티브 ListView. 항목이 위젯 높이를 넘으면 세로 스크롤된다.
             <ListWidget style={{ width: 'match_parent', height: 'match_parent' }}>
@@ -105,29 +107,32 @@ function Divider({ color }: { color: Hex }) {
 function Row({
   item, textColor, strong, chipBg, cardBg, cardBorder,
 }: { item: WidgetItem; textColor: Hex; strong: Hex; chipBg: Hex; cardBg: Hex; cardBorder: Hex }) {
+  // ListWidget(ListView)은 아이템 root의 marginBottom을 무시하므로, 투명 래퍼의
+  // paddingBottom으로 카드 사이 간격을 만든다.
   return (
-    <FlexWidget
-      clickAction="OPEN_URI"
-      clickActionData={{ uri: 'freshkeep://?tab=ingredients' }}
-      style={{
-        width: 'match_parent',
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: cardBg,
-        borderRadius: 14,
-        borderWidth: 1,
-        borderColor: cardBorder,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        marginBottom: 8,
-      }}
-    >
-      <FlexWidget style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: strong, marginRight: 8 }} />
-      <FlexWidget style={{ flex: 1, marginRight: 8 }}>
-        <TextWidget text={item.name} maxLines={1} style={{ fontSize: 14, color: textColor }} />
-      </FlexWidget>
-      <FlexWidget style={{ backgroundColor: chipBg, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 }}>
-        <TextWidget text={item.dday} style={{ fontSize: 12, fontWeight: 'bold', color: strong }} />
+    <FlexWidget style={{ width: 'match_parent', paddingBottom: 7 }}>
+      <FlexWidget
+        clickAction="OPEN_URI"
+        clickActionData={{ uri: 'freshkeep://?tab=ingredients' }}
+        style={{
+          width: 'match_parent',
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: cardBg,
+          borderRadius: 14,
+          borderWidth: 1,
+          borderColor: cardBorder,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+        }}
+      >
+        <FlexWidget style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: strong, marginRight: 8 }} />
+        <FlexWidget style={{ flex: 1, marginRight: 8 }}>
+          <TextWidget text={item.name} maxLines={1} style={{ fontSize: 14, color: textColor }} />
+        </FlexWidget>
+        <FlexWidget style={{ backgroundColor: chipBg, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 }}>
+          <TextWidget text={item.dday} style={{ fontSize: 12, fontWeight: 'bold', color: strong }} />
+        </FlexWidget>
       </FlexWidget>
     </FlexWidget>
   );
