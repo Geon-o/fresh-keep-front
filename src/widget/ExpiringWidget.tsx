@@ -53,11 +53,11 @@ export function ExpiringWidget({ snapshot, width, dark, compact = false }: Props
     >
       {/* 만료 / 임박 / 안전 세그먼트 (세로 구분선으로 3등분) */}
       <FlexWidget style={{ width: 'match_parent', flexDirection: 'row', alignItems: 'center' }}>
-        <Stat count={counts.expired} label="만료" color={hex(c.ddayExpired)} labelColor={hex(c.textTertiary)} />
+        <Stat count={counts.expired} label="만료" status="expired" color={hex(c.ddayExpired)} labelColor={hex(c.textTertiary)} />
         <Divider color={hex(c.border)} />
-        <Stat count={counts.imminent} label="임박" color={hex(c.ddayImminent)} labelColor={hex(c.textTertiary)} />
+        <Stat count={counts.imminent} label="임박" status="imminent" color={hex(c.ddayImminent)} labelColor={hex(c.textTertiary)} />
         <Divider color={hex(c.border)} />
-        <Stat count={counts.safe} label="안전" color={hex(c.ddaySafe)} labelColor={hex(c.textTertiary)} />
+        <Stat count={counts.safe} label="안전" status="safe" color={hex(c.ddaySafe)} labelColor={hex(c.textTertiary)} />
       </FlexWidget>
 
       {showList && (
@@ -90,10 +90,15 @@ export function ExpiringWidget({ snapshot, width, dark, compact = false }: Props
 }
 
 function Stat({
-  count, label, color, labelColor,
-}: { count: number; label: string; color: Hex; labelColor: Hex }) {
+  count, label, status, color, labelColor,
+}: { count: number; label: string; status: WidgetStatus | 'safe'; color: Hex; labelColor: Hex }) {
+  // 세그먼트 탭 → 식재료 목록을 해당 상태로 필터링해서 연다.
   return (
-    <FlexWidget style={{ flex: 1, flexDirection: 'column', alignItems: 'center' }}>
+    <FlexWidget
+      clickAction="OPEN_URI"
+      clickActionData={{ uri: `freshkeep://?tab=ingredients&status=${status}` }}
+      style={{ flex: 1, flexDirection: 'column', alignItems: 'center' }}
+    >
       <TextWidget text={`${count}`} style={{ fontSize: 22, fontWeight: 'bold', color }} />
       <TextWidget text={label} style={{ fontSize: 12, color: labelColor, marginTop: 2 }} />
     </FlexWidget>
@@ -113,7 +118,7 @@ function Row({
     <FlexWidget style={{ width: 'match_parent', paddingBottom: 7 }}>
       <FlexWidget
         clickAction="OPEN_URI"
-        clickActionData={{ uri: 'freshkeep://?tab=ingredients' }}
+        clickActionData={{ uri: `freshkeep://?tab=ingredients&q=${encodeURIComponent(item.name)}` }}
         style={{
           width: 'match_parent',
           flexDirection: 'row',

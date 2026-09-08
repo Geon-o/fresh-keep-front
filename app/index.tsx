@@ -54,6 +54,8 @@ export default function Index() {
 
   // 1. 네비게이션 및 활성 인덱스 상태
   const [activeTab, setActiveTab] = useState<'home' | 'ingredients' | 'fridge' | 'settings'>('home');
+  // 홈 위젯에서 넘어올 때 식재료 목록에 걸어줄 상태 필터/검색어 (nonce로 매번 재적용)
+  const [ingredientFocus, setIngredientFocus] = useState<{ status: 'all' | 'expired' | 'imminent' | 'safe'; query: string; nonce: number } | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
   // 2. 냉장고 형태/추가 선택 모달 상태
@@ -139,6 +141,13 @@ export default function Index() {
         if (tab === 'home' || tab === 'ingredients' || tab === 'fridge' || tab === 'settings') {
           setActiveCompartment(null); // 구획 상세가 열려 있었다면 닫고 탭 화면을 보여준다
           setActiveTab(tab);
+          // 위젯 세그먼트(status) / 식재료 카드(q) 탭 → 식재료 목록에 필터·검색 적용
+          if (tab === 'ingredients') {
+            const status = parsed.queryParams?.status as string;
+            const q = parsed.queryParams?.q as string;
+            const st = (['expired', 'imminent', 'safe'].includes(status) ? status : 'all') as 'all' | 'expired' | 'imminent' | 'safe';
+            setIngredientFocus({ status: st, query: q || '', nonce: Date.now() });
+          }
         }
       } catch (e) {
         console.error('Failed to parse deep link URL', e);
@@ -752,6 +761,7 @@ export default function Index() {
             {activeTab === 'home' || activeTab === 'ingredients' || activeTab === 'fridge' ? (
               <RefrigeratorVisual
                 mode={activeTab as 'home' | 'ingredients' | 'fridge'}
+                ingredientFocus={ingredientFocus}
                 refrigerators={refrigerators}
                 onPressCompartment={handlePressCompartment}
                 activeIndex={activeIndex}

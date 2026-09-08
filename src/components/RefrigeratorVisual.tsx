@@ -228,6 +228,8 @@ const SEASONAL_INGREDIENTS: SeasonalIngredient[] = [
 
 interface RefrigeratorVisualProps {
   mode?: 'home' | 'ingredients' | 'fridge';
+  // 홈 위젯에서 넘어올 때 식재료 목록에 적용할 상태 필터/검색어 (nonce가 바뀔 때마다 재적용)
+  ingredientFocus?: { status: 'all' | 'expired' | 'imminent' | 'safe'; query: string; nonce: number } | null;
   refrigerators: { id: string; type: FridgeType; name: string; uuid?: string; role?: 'OWNER' | 'MEMBER'; deletionRequested?: boolean; ownerName?: string; memberNames?: string[]; hasUnreadMemo?: boolean }[];
   // subLocation을 넘기면 이동한 화면에서 해당 선반을 바로 펼쳐서 보여준다.
   onPressCompartment: (id: string, label: string, fridgeId: string, subLocation?: string) => void;
@@ -247,6 +249,7 @@ interface RefrigeratorVisualProps {
 
 export default function RefrigeratorVisual({
   mode = 'home',
+  ingredientFocus,
   refrigerators,
   onPressCompartment,
   activeIndex,
@@ -685,6 +688,13 @@ export default function RefrigeratorVisual({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'expired' | 'imminent' | 'safe'>('all');
   const [selectedFridgeFilter, setSelectedFridgeFilter] = useState<string>('all');
+
+  // 홈 위젯에서 상태/식재료를 눌러 넘어오면, 식재료 목록의 필터·검색을 그에 맞게 설정한다.
+  useEffect(() => {
+    if (!ingredientFocus) return;
+    setSelectedFilter(ingredientFocus.status);
+    setSearchQuery(ingredientFocus.query);
+  }, [ingredientFocus?.nonce]);
 
 
 
