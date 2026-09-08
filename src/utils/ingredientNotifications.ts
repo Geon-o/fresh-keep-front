@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ingredient } from '../types';
+import { updateExpiringWidget } from '../widget/update';
 
 const SCHEDULED_IDS_KEY = '@notification_scheduled_ids';
 const ENABLED_KEY = '@notifications_enabled';
@@ -156,6 +157,9 @@ export async function setNotificationMinute(minute: number): Promise<void> {
  */
 export async function rebuildAllNotifications(ingredients: Ingredient[]): Promise<void> {
   try {
+    // 위젯은 알림 on/off와 무관하게 항상 최신 재료를 반영해야 하므로 먼저 갱신한다.
+    await updateExpiringWidget(ingredients);
+
     if (!(await isNotificationsEnabled())) return;
     const notifyHour = await getNotificationHour();
     const notifyMinute = await getNotificationMinute();

@@ -134,6 +134,12 @@ export default function Index() {
         if (uuid && event.url.includes('share-fridge')) {
           setPendingShareUuid(uuid);
         }
+        // 홈 위젯 탭 → 지정한 탭(예: 식재료 목록)으로 이동
+        const tab = parsed.queryParams?.tab as string;
+        if (tab === 'home' || tab === 'ingredients' || tab === 'fridge' || tab === 'settings') {
+          setActiveCompartment(null); // 구획 상세가 열려 있었다면 닫고 탭 화면을 보여준다
+          setActiveTab(tab);
+        }
       } catch (e) {
         console.error('Failed to parse deep link URL', e);
       }

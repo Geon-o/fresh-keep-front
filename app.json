@@ -52,7 +52,36 @@
           "cameraPermission": "식재료 등록 시 제품 바코드를 스캔하려면 카메라 접근 권한이 필요합니다."
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "Expiring",
+              "label": "유통기한 임박",
+              "minWidth": "180dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 2,
+              "resizeMode": "horizontal|vertical",
+              "previewImage": "./assets/images/widget-preview-expiring.png",
+              "updatePeriodMillis": 1800000
+            },
+            {
+              "name": "ExpiringSummary",
+              "label": "유통기한 요약",
+              "minWidth": "180dp",
+              "minHeight": "48dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 1,
+              "resizeMode": "horizontal",
+              "previewImage": "./assets/images/widget-preview-summary.png",
+              "updatePeriodMillis": 1800000
+            }
+          ]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
