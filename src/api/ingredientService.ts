@@ -1,5 +1,5 @@
 import { client } from './client';
-import { ServerIngredient } from './fridgeService';
+import { ServerIngredient, invalidateFridgeLayout } from './fridgeService';
 
 export interface AddIngredientRequest {
   fridgeId: number;
@@ -28,6 +28,7 @@ export interface UpdateIngredientRequest {
  */
 export async function addIngredient(data: AddIngredientRequest): Promise<ServerIngredient> {
   const response = await client.post<ServerIngredient>('/api/ingredients', data);
+  await invalidateFridgeLayout(data.fridgeId);
   return response.data;
 }
 
@@ -36,6 +37,8 @@ export async function addIngredient(data: AddIngredientRequest): Promise<ServerI
  */
 export async function updateIngredient(ingredientId: number, data: UpdateIngredientRequest): Promise<ServerIngredient> {
   const response = await client.patch<ServerIngredient>(`/api/ingredients/${ingredientId}`, data);
+  // 어느 냉장고의 식재료인지 요청에 없으므로 레이아웃 캐시를 전부 버린다.
+  await invalidateFridgeLayout();
   return response.data;
 }
 
@@ -44,4 +47,5 @@ export async function updateIngredient(ingredientId: number, data: UpdateIngredi
  */
 export async function deleteIngredient(ingredientId: number): Promise<void> {
   await client.delete(`/api/ingredients/${ingredientId}`);
+  await invalidateFridgeLayout();
 }

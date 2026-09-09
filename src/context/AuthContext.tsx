@@ -229,7 +229,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await AsyncStorage.setItem('@backup_key', restoredBackupKey);
         }
         await fetchUserProfile();
-        queryClient.invalidateQueries({ queryKey: ['fridges'] });
+        queryClient.invalidateQueries(); // 계정/표시이름이 바뀌면 레이아웃 캐시(식재료·등록자명)까지 전부 새로 받는다
         Alert.alert('불러오기 성공 🎉', '이전 기기의 데이터를 정상적으로 불러왔습니다.');
         return true;
       }
@@ -263,7 +263,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setSessionExpired(false);
       await fetchUserProfile();
-      queryClient.invalidateQueries({ queryKey: ['fridges'] });
+      queryClient.invalidateQueries(); // 계정/표시이름이 바뀌면 레이아웃 캐시(식재료·등록자명)까지 전부 새로 받는다
       return true;
     }
     return false;
@@ -381,7 +381,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const response = await client.patch<UserProfile>('/api/users/me', { name });
     if (response.data && typeof response.data === 'object') {
       setUser(response.data);
-      queryClient.invalidateQueries({ queryKey: ['fridges'] });
+      queryClient.invalidateQueries(); // 계정/표시이름이 바뀌면 레이아웃 캐시(식재료·등록자명)까지 전부 새로 받는다
       return true;
     }
     return false;

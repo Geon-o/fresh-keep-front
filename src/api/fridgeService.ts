@@ -1,4 +1,5 @@
 import { client } from './client';
+import { queryClient } from './queryClient';
 import { FridgeType } from '../types';
 
 export interface ServerFridge {
@@ -127,6 +128,31 @@ export async function getFridgeLayout(fridgeId: number): Promise<ServerFridgeLay
   return response.data;
 }
 
+export const fridgeLayoutKey = (fridgeId: number | string) => ['fridgeLayout', String(fridgeId)];
+
+/**
+ * 4-1. 레이아웃(= 그 냉장고의 식재료 전체) 조회를 react-query 캐시를 거쳐 수행한다.
+ * 화면을 나갔다 돌아오거나 여러 화면이 같은 냉장고를 동시에 볼 때 중복 요청이 사라지고,
+ * 아래 invalidateFridgeLayout으로 무효화되기 전까지는 서버를 다시 부르지 않는다.
+ * (무효화 경로: 내가 식재료를 등록/수정/삭제할 때 + 다른 멤버의 변경 푸시가 도착할 때)
+ */
+export function getFridgeLayoutCached(fridgeId: number | string): Promise<ServerFridgeLayout> {
+  return queryClient.fetchQuery({
+    queryKey: fridgeLayoutKey(fridgeId),
+    queryFn: () => getFridgeLayout(Number(fridgeId)),
+  });
+}
+
+/**
+ * 4-2. 식재료가 바뀐 냉장고의 레이아웃 캐시를 버린다. fridgeId를 모르면(예: 어느 냉장고인지
+ * 알려주지 않는 푸시) 생략해서 전체를 버린다 — 변경은 드물게 일어나므로 과무효화가 더 안전하다.
+ */
+export function invalidateFridgeLayout(fridgeId?: number | string): Promise<void> {
+  return queryClient.invalidateQueries({
+    queryKey: fridgeId === undefined || fridgeId === null ? ['fridgeLayout'] : fridgeLayoutKey(fridgeId),
+  });
+}
+
 export interface IngredientHistoryEntry {
   id: number;
   actionType: 'CREATED' | 'UPDATED' | 'DELETED' | 'NAME_CHANGED' | 'TYPE_CHANGED' | 'NICKNAME_CHANGED';
@@ -180,7 +206,7 @@ export interface CompartmentShelfInfo {
  * 식재료 등록 시 "어느 칸에 넣을지" 선택지를 만드는 데 사용한다.
  */
 export async function getCompartmentShelves(fridgeId: string, compartmentId: string): Promise<CompartmentShelfInfo> {
-  const layout = await getFridgeLayout(Number(fridgeId));
+  const layout = await getFridgeLayoutCached(fridgeId);
   const isLeft = compartmentId.includes('left');
   const isRight = compartmentId.includes('right');
   const serverComp = layout.compartments.find(comp => {
@@ -230,5 +256,7 @@ export async function updateCompartmentShelves(
     doorShelves: JSON.stringify(doorShelves),
     hasDoorStorage,
   });
+  // 선반 구성도 레이아웃 응답에 함께 담겨 오므로 캐시를 갱신해야 한다.
+  await invalidateFridgeLayout(fridgeId);
 }
 

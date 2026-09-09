@@ -15,7 +15,7 @@ import RefrigeratorSelector from '../src/components/RefrigeratorSelector';
 import QrShareModal from '../src/components/QrShareModal';
 import { useAuth } from '../src/context/AuthContext';
 import { serializeMemo } from '../src/utils/memoSerializer';
-import { getFridges, createFridge, deleteFridge, updateFridge, convertTypeToFrontend, getFridgeLayout, approveDeletion, rejectDeletion, cancelDeletionRequest, ServerFridge } from '../src/api/fridgeService';
+import { getFridges, createFridge, deleteFridge, updateFridge, convertTypeToFrontend, getFridgeLayoutCached, approveDeletion, rejectDeletion, cancelDeletionRequest, ServerFridge } from '../src/api/fridgeService';
 import { registerPushToken } from '../src/utils/pushToken';
 import { updateIngredient } from '../src/api/ingredientService';
 import { useTheme } from '../src/context/ThemeContext';
@@ -692,7 +692,7 @@ export default function Index() {
     if (isLoggedIn) {
       try {
         if (!activeCompartment) return;
-        const layout = await getFridgeLayout(Number(activeCompartment.fridgeId));
+        const layout = await getFridgeLayoutCached(activeCompartment.fridgeId);
         
         // targetCompartmentId에 대응하는 서버 구획 찾기
         const serverComp = layout.compartments.find((comp: any) => {

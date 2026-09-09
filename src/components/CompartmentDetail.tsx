@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, ScrollView, Platform, Alert, TextInput, Modal, ActivityIndicator, PanResponder, Dimensions, Animated, Easing, Switch } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, Text, ScrollView, Platform, Alert, TextInput, Modal, ActivityIndicator, PanResponder, Dimensions, Animated, Easing, Switch, DeviceEventEmitter } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { Ingredient, IngredientCategory, ExpiryType } from '../types';
 import { useAuth } from '../context/AuthContext';
-import { getFridgeLayout, updateCompartmentShelves } from '../api/fridgeService';
+import { getFridgeLayoutCached, updateCompartmentShelves } from '../api/fridgeService';
 import { addIngredient, updateIngredient, deleteIngredient } from '../api/ingredientService';
 import { getCustomUnits, addCustomUnit } from '../api/unitService';
 import { serializeMemo, deserializeMemo } from '../utils/memoSerializer';
@@ -781,7 +781,7 @@ export default function CompartmentDetail({
       // 2. 식재료 로드
       if (isLoggedIn) {
         // 서버에서 해당 냉장고 레이아웃 정보 로드 후 매핑
-        const layout = await getFridgeLayout(Number(fridgeId));
+        const layout = await getFridgeLayoutCached(fridgeId);
         
         // targetId 매칭 구획 찾기
         const serverComp = layout.compartments.find(comp => {
@@ -887,6 +887,15 @@ export default function CompartmentDetail({
 
   useEffect(() => {
     loadData(compartmentId);
+  }, [compartmentId, fridgeId, isLoggedIn]);
+
+  // 다른 멤버가 이 냉장고의 식재료를 바꾸면 _layout.tsx가 푸시를 받아 이 이벤트를 쏜다.
+  // 칸 상세를 열어둔 채로도 바로 반영되도록, 캐시가 비워진 뒤 다시 불러온다.
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('ingredientsChanged', () => {
+      loadData(compartmentId);
+    });
+    return () => sub.remove();
   }, [compartmentId, fridgeId, isLoggedIn]);
 
   // 구획 전환 시 슬라이드 및 페이드 인 애니메이션 연동 실행 함수

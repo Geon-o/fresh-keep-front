@@ -4,6 +4,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "../src/api/queryClient";
+import { invalidateFridgeLayout } from "../src/api/fridgeService";
 import { AuthProvider } from "../src/context/AuthContext";
 import { ThemeAlertPortal } from "../src/components/ThemeAlert";
 import * as SplashScreen from 'expo-splash-screen';
@@ -56,17 +57,21 @@ function AppContent() {
 
   // 냉장고 삭제 요청/동의/거절/철회, 새 멤버 합류, 닉네임 변경 푸시가 도착하면, 앱을 재시작하지
   // 않아도 그 자리에서 바로 냉장고 목록(fridges 쿼리)을 다시 불러오도록 연결한다.
-  // 식재료 등록/수정/삭제는 fridges 쿼리가 아니라 각 화면이 자체적으로 불러오는 냉장고
-  // 레이아웃 데이터라서, react-query 무효화 대신 DeviceEventEmitter로 알려 그 화면이 직접 다시 불러오게 한다.
+  // 식재료 등록/수정/삭제는 fridges 쿼리가 아니라 냉장고 레이아웃 데이터라서, 그쪽 캐시를 먼저
+  // 무효화한 뒤(안 그러면 이어지는 재조회가 캐시에 그대로 걸린다) 화면들에 다시 불러오라고 알린다.
   useEffect(() => {
     const FRIDGE_PUSH_TYPES = ['fridge_deletion', 'fridge_share', 'nickname_changed', 'memo_created'];
     const INGREDIENT_PUSH_TYPES = ['ingredient_changed'];
     const handlePushData = (data: Record<string, unknown> | undefined) => {
       const type = data?.type as string;
       if (FRIDGE_PUSH_TYPES.includes(type)) {
-        queryClient.invalidateQueries({ queryKey: ['fridges'] });
+        // 닉네임 변경은 레이아웃 응답의 등록자/수정자 이름에도 반영돼야 하고, 나머지도 드물게
+        // 오는 이벤트라 필터 없이 전부 무효화하는 편이 누락 위험이 없다.
+        queryClient.invalidateQueries();
       }
       if (INGREDIENT_PUSH_TYPES.includes(type)) {
+        // 푸시가 냉장고를 알려주면 그 냉장고만, 아니면 전체 레이아웃 캐시를 버린다.
+        invalidateFridgeLayout(data?.fridgeId as number | string | undefined);
         DeviceEventEmitter.emit('ingredientsChanged');
       }
     };

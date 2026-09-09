@@ -11,7 +11,7 @@ import { FridgeType, Ingredient, Memo, MemoType, ChecklistItem } from '../types'
 import { SAMPLE_INGREDIENTS, CATEGORY_EMOJI, DEFAULT_INSIDE_SHELVES, DEFAULT_DOOR_SHELVES } from './CompartmentDetail';
 import AddIngredientModal from './AddIngredientModal';
 import { useAuth } from '../context/AuthContext';
-import { getFridgeLayout, getCompartmentShelves, CompartmentShelfInfo, getFridgeHistory, IngredientHistoryEntry } from '../api/fridgeService';
+import { getFridgeLayoutCached, getCompartmentShelves, CompartmentShelfInfo, getFridgeHistory, IngredientHistoryEntry } from '../api/fridgeService';
 import { deleteIngredient, updateIngredient } from '../api/ingredientService';
 import { getMemos, createMemo, updateMemo, deleteMemo, toggleMemoItem, markMemosRead } from '../api/memoService';
 import { deserializeMemo, convertServerLocationToLocal, serializeMemo } from '../utils/memoSerializer';
@@ -724,23 +724,24 @@ export default function RefrigeratorVisual({
     isFallback: false,
   });
 
-  // useFocusEffect가 짧은 간격으로 여러 번 발동해도(설정 화면 몇 개를 연달아 오갈 때 등) 매번
-  // 서버를 다시 부르지 않도록, 마지막으로 불러온 시각을 기록해 일정 시간 안이면 건너뛴다.
-  // 단, refrigerators/isLoggedIn이 바뀌어 loadIngredients 자체가 새로 만들어진 경우(예: 앱 시작 시
-  // 빈 배열로 한 번 불렸다가 실제 냉장고 목록이 막 도착한 경우)는 "이전과 다른 로드"이므로
-  // 시간과 무관하게 즉시 다시 불러온다 — 그렇지 않으면 그 첫 빈 로드의 타임스탬프에 발목 잡혀서
-  // 실제 데이터가 도착했는데도 최대 15초간 미리보기가 빈 채로 남는 문제가 생긴다.
-  const lastLoadedAtRef = useRef(0);
-  const lastLoadedFnRef = useRef<(() => Promise<void>) | null>(null);
-  const FOCUS_RELOAD_STALE_MS = 15000;
+  // 화면에 반영된 식재료 목록의 내용 지문. 화면 재진입 때마다 loadIngredients가 다시 돌아도
+  // 내용이 그대로면 setIngredients/알림 재예약(전체 취소 후 재등록)을 건너뛰기 위한 것이다.
+  // 서버 요청 자체는 getFridgeLayoutCached의 react-query 캐시가 막아준다.
+  const lastIngredientsSigRef = useRef<string | null>(null);
 
   // 식재료 실시간 로드 (서버 vs 로컬 분기). 등록 폼 저장 후 재호출할 수 있도록 useCallback으로 분리.
   const loadIngredients = React.useCallback(async () => {
-      lastLoadedAtRef.current = Date.now();
+      const applyIngredients = (list: Ingredient[]) => {
+        const sig = JSON.stringify(list);
+        if (sig === lastIngredientsSigRef.current) return;
+        lastIngredientsSigRef.current = sig;
+        setIngredients(list);
+        rebuildAllNotifications(list);
+      };
       try {
         if (isLoggedIn) {
-          // 각 냉장고의 레이아웃을 서버에서 로드
-          const promises = refrigerators.map(f => getFridgeLayout(Number(f.id)).catch(() => null));
+          // 각 냉장고의 레이아웃을 캐시를 거쳐 로드 (변경 전까지 서버를 다시 부르지 않는다)
+          const promises = refrigerators.map(f => getFridgeLayoutCached(f.id).catch(() => null));
           const layouts = await Promise.all(promises);
           const allIngredients: Ingredient[] = [];
 
@@ -785,15 +786,13 @@ export default function RefrigeratorVisual({
               });
             }
           });
-          setIngredients(allIngredients);
-          rebuildAllNotifications(allIngredients);
+          applyIngredients(allIngredients);
         } else {
           // 로컬 로드
           const ingredientsStr = await AsyncStorage.getItem('@ingredients');
           if (ingredientsStr) {
             const localIngredients: Ingredient[] = JSON.parse(ingredientsStr);
-            setIngredients(localIngredients);
-            rebuildAllNotifications(localIngredients);
+            applyIngredients(localIngredients);
           } else {
             // 로컬 저장소에 데이터 없음 → 빈 상태로 시작
             setIngredients([]);
@@ -854,10 +853,6 @@ export default function RefrigeratorVisual({
   // 다시 불러와야 그 사이 바뀐 설정(알림 시간 등)이 바로 반영된다.
   useFocusEffect(
     React.useCallback(() => {
-      const isSameLoad = lastLoadedFnRef.current === loadIngredients;
-      const isStale = Date.now() - lastLoadedAtRef.current >= FOCUS_RELOAD_STALE_MS;
-      if (isSameLoad && !isStale) return;
-      lastLoadedFnRef.current = loadIngredients;
       loadIngredients();
     }, [loadIngredients])
   );

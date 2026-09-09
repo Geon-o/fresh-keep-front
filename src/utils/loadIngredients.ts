@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ingredient } from '../types';
-import { getFridges, getFridgeLayout } from '../api/fridgeService';
+import { getFridges, getFridgeLayoutCached } from '../api/fridgeService';
 import { deserializeMemo, convertServerLocationToLocal } from './memoSerializer';
 
 /**
@@ -15,7 +15,7 @@ export async function loadAllIngredients(isLoggedIn: boolean): Promise<Ingredien
   }
 
   const fridges = await getFridges().catch(() => []);
-  const layouts = await Promise.all(fridges.map(f => getFridgeLayout(f.id).catch(() => null)));
+  const layouts = await Promise.all(fridges.map(f => getFridgeLayoutCached(f.id).catch(() => null)));
   const all: Ingredient[] = [];
 
   layouts.forEach((layout, index) => {
