@@ -1340,6 +1340,14 @@ export default function RefrigeratorVisual({
     });
 
   // 실시간 검색 및 상태 필터링이 적용된 식재료 목록
+  // 식재료 id에서 등록 순서 값을 뽑는다. 로컬은 `ing_<ms>`(타임스탬프), 서버는 숫자 auto-increment.
+  const registrationOrder = (id: string): number => {
+    const local = /^ing_(\d+)$/.exec(id);
+    if (local) return Number(local[1]);
+    const n = Number(id);
+    return Number.isFinite(n) ? n : 0;
+  };
+
   const filteredIngredients = ingredients
     .filter(item => {
       if (searchQuery.trim()) {
@@ -1356,11 +1364,9 @@ export default function RefrigeratorVisual({
       if (selectedFridgeFilter === 'all') return true;
       return item.fridgeId === selectedFridgeFilter;
     })
-    .sort((a, b) => {
-      const ddayA = getDDayInfo(a.expiryDate);
-      const ddayB = getDDayInfo(b.expiryDate);
-      return ddayA.days - ddayB.days;
-    });
+    // 등록 순서 desc(최근 등록이 최상단). 서버 id는 auto-increment, 로컬 id는 `ing_<타임스탬프>`라
+    // 둘 다 값이 클수록 최신 → 등록순과 일치한다. (한 목록은 서버/로컬 중 하나라 값이 섞이지 않음)
+    .sort((a, b) => registrationOrder(b.id) - registrationOrder(a.id));
 
   // 현재 월 기준 제철 식재료 목록 필터링
   const currentMonth = new Date().getMonth() + 1;
