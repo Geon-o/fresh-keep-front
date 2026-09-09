@@ -20,6 +20,7 @@ export default function SettingsView({
 
   const isSocial = user?.provider === 'google' || user?.provider === 'naver';
   const providerLabel = user?.provider === 'google' ? '구글' : user?.provider === 'naver' ? '네이버' : '';
+  const providerColor = user?.provider === 'google' ? '#4285F4' : user?.provider === 'naver' ? '#03C75A' : undefined;
 
   // 2026 Toss-style Color Tokens
   const backgroundColor = isDark ? '#101012' : '#F3F4F6';
@@ -63,15 +64,15 @@ export default function SettingsView({
         {/* 닉네임 아래 계정 상태 인라인 안내 */}
         {isSocial ? (
           <Text style={[styles.accountStatusText, { color: descColor }]}>
-            {providerLabel}로 로그인됨 · 데이터가 안전하게 보관돼요
+            간편로그인 · <Text style={{ color: providerColor, fontWeight: '700' }}>{providerLabel}</Text>
           </Text>
         ) : (
           <View style={styles.guestNudgeRow}>
             <Text style={[styles.accountStatusText, { color: descColor }]}>
-              로그인하면 기기를 바꿔도 데이터가 유지돼요
+              로그인을 하면 더 안전하게 데이터를 저장할 수 있어요.
             </Text>
             <TouchableOpacity activeOpacity={0.7} onPress={onLogin} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Text style={[styles.loginLink, { color: isDark ? '#8AB4F8' : '#2563EB' }]}>로그인</Text>
+              <Text style={[styles.loginLink, { color: isDark ? '#8AB4F8' : '#2563EB' }]}>간편 로그인하기</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -81,22 +82,26 @@ export default function SettingsView({
       <View style={styles.sectionWrapper}>
         <Text style={[styles.cardSectionTitle, { color: descColor }]}>서비스 이용</Text>
         <View style={[styles.cardSection, { backgroundColor: cardColor, borderColor }]}>
-          {/* 기기 연동 (연동 코드) */}
-          <TouchableOpacity
-            style={styles.listRow}
-            activeOpacity={0.7}
-            onPress={() => router.push('/settings/backup')}
-          >
-            <View style={styles.listRowLeft}>
-              <View style={[styles.iconWrapper, { backgroundColor: isDark ? '#2A2A2D' : '#F3F4F6' }]}>
-                <Ionicons name="key-outline" size={18} color={iconColor} />
-              </View>
-              <Text style={[styles.listRowText, { color: titleColor }]}>기기 연동 · 연동 코드</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={descColor} />
-          </TouchableOpacity>
+          {/* 기기 연동 (연동 코드) — 로그인 안 한 게스트에게만 노출. 로그인 사용자는 계정이 곧 복구 수단이라 불필요. */}
+          {!isSocial && (
+            <>
+              <TouchableOpacity
+                style={styles.listRow}
+                activeOpacity={0.7}
+                onPress={() => router.push('/settings/backup')}
+              >
+                <View style={styles.listRowLeft}>
+                  <View style={[styles.iconWrapper, { backgroundColor: isDark ? '#2A2A2D' : '#F3F4F6' }]}>
+                    <Ionicons name="key-outline" size={18} color={iconColor} />
+                  </View>
+                  <Text style={[styles.listRowText, { color: titleColor }]}>기기 연동 · 연동 코드</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={descColor} />
+              </TouchableOpacity>
 
-          <View style={[styles.divider, { backgroundColor: dividerColor }]} />
+              <View style={[styles.divider, { backgroundColor: dividerColor }]} />
+            </>
+          )}
 
           {/* 화면 테마 설정 */}
           <TouchableOpacity 
@@ -156,10 +161,10 @@ export default function SettingsView({
 
           <View style={[styles.divider, { backgroundColor: dividerColor }]} />
 
-          {/* 초기화 */}
-          <TouchableOpacity 
-            style={styles.listRow} 
-            activeOpacity={0.7} 
+          {/* 초기화 (회원탈퇴/전체삭제) — 게스트·로그인 공통. 계정을 정식으로 나가는 경로. */}
+          <TouchableOpacity
+            style={styles.listRow}
+            activeOpacity={0.7}
             onPress={() => router.push('/settings/reset')}
           >
             <View style={styles.listRowLeft}>
