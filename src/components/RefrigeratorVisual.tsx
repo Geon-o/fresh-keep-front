@@ -2710,15 +2710,17 @@ export default function RefrigeratorVisual({
                     </TouchableOpacity>
                     {/* 이 냉장고를 골랐지만 칸/선반은 아직 정하고 싶지 않을 때 */}
                     {!assignTargetIngredient && (
-                      <TouchableOpacity
-                        style={{ paddingLeft: 56, paddingRight: 16, paddingBottom: 12 }}
-                        activeOpacity={0.7}
-                        onPress={() => handleSkipLocationPicker(fridge.id)}
-                      >
-                        <Text style={{ fontSize: 12, fontWeight: '600', color: theme.primaryText }}>
-                          이 냉장고에 등록하고 위치는 나중에 정할게요
-                        </Text>
-                      </TouchableOpacity>
+                      <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+                        <TouchableOpacity
+                          style={[styles.skipLocationButton, { backgroundColor: theme.primary }]}
+                          activeOpacity={0.85}
+                          onPress={() => handleSkipLocationPicker(fridge.id)}
+                        >
+                          <Text style={styles.skipLocationButtonText}>
+                            이 냉장고에 등록하고 위치는 나중에 정할게요
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
                     )}
                   </View>
                 ))
@@ -4855,6 +4857,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 14,
     paddingHorizontal: 12,
+  },
+  // 평문처럼 보이던 "위치 나중에 정하기"를 확실한 버튼(채움 배경·전체 폭·가운데 정렬)으로 노출
+  skipLocationButton: {
+    alignSelf: 'stretch', // 화면 폭에 맞춰 반응형으로 늘어남
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 7,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+  },
+  skipLocationButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#000000', // primary(밝은 하늘색) 배경 위 검정으로 고대비 확보
+    textAlign: 'center',
   },
   deletionRequestBox: {
     borderRadius: 14,
