@@ -178,7 +178,7 @@ export default function SettingsView({
 
           <View style={[styles.divider, { backgroundColor: dividerColor }]} />
 
-          {/* 초기화 (회원탈퇴/전체삭제) — 게스트·로그인 공통. 계정을 정식으로 나가는 경로. */}
+          {/* 회원탈퇴 — 게스트·로그인 공통. 계정과 소셜 연동·데이터를 완전히 삭제하고 나가는 경로. */}
           <TouchableOpacity
             style={styles.listRow}
             activeOpacity={0.7}
@@ -188,7 +188,7 @@ export default function SettingsView({
               <View style={[styles.iconWrapper, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.05)' }]}>
                 <Ionicons name="trash-outline" size={18} color="#EF4444" />
               </View>
-              <Text style={[styles.listRowText, { color: '#EF4444', fontWeight: '600' }]}>초기화</Text>
+              <Text style={[styles.listRowText, { color: '#EF4444', fontWeight: '600' }]}>회원탈퇴</Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color="#EF4444" />
           </TouchableOpacity>

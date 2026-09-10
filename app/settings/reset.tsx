@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Platform } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,10 +13,21 @@ export default function ResetSettingScreen() {
 
   const [isResetChecked, setIsResetChecked] = useState(false);
 
-  const handleReset = () => {
-    if (!isResetChecked) return;
+  const runWithdraw = () => {
     deleteAccount();
     router.replace('/');
+  };
+
+  const handleReset = () => {
+    if (!isResetChecked) return;
+    Alert.alert(
+      '정말 회원탈퇴하시겠어요?',
+      '확인을 누르면 계정과 소셜 로그인 연결, 모든 데이터가 즉시 삭제되며 되돌릴 수 없습니다.',
+      [
+        { text: '취소', style: 'cancel' },
+        { text: '회원탈퇴', style: 'destructive', onPress: runWithdraw },
+      ],
+    );
   };
 
   // 2026 Toss-style Color Tokens
@@ -33,7 +44,7 @@ export default function ResetSettingScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.7}>
           <Ionicons name="chevron-back" size={24} color={titleColor} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: titleColor }]}>초기화</Text>
+        <Text style={[styles.headerTitle, { color: titleColor }]}>회원탈퇴</Text>
         <View style={styles.headerRightSpacer} />
       </View>
 
@@ -42,13 +53,13 @@ export default function ResetSettingScreen() {
         <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
           <View style={styles.alertHeader}>
             <Ionicons name="warning" size={26} color="#EF4444" />
-            <Text style={[styles.alertTitle, { color: titleColor }]}>정말 초기화하시겠습니까?</Text>
+            <Text style={[styles.alertTitle, { color: titleColor }]}>정말 회원탈퇴하시겠습니까?</Text>
           </View>
 
           <Text style={[styles.alertBody, { color: descColor }]}>
-            초기화를 진행하면 현재 기기에 등록된 모든 냉장고 구획 정보와 보관 중인 식재료 기록 데이터가 데이터베이스 및 로컬 저장소에서 영구히 삭제됩니다.{"\n\n"}
-            이 작업은 다른 기기로 데이터를 옮기는 기능이 아니라 계정을 완전히 삭제하는 회원탈퇴에 해당합니다. 기기 변경·재설치로 데이터를 이어가려는 경우에는 초기화 대신 '연동 코드'를 사용해 주세요.{"\n\n"}
-            본 작업은 연동 코드를 가지고 있더라도 되돌릴 수 없는 완전한 삭제 작업입니다. 신중하게 선택해 주시기 바랍니다.
+            회원탈퇴를 진행하면 계정과 소셜 로그인(구글·네이버) 연결, 등록한 모든 냉장고·식재료 데이터가 서버와 기기에서 영구히 삭제됩니다.{"\n\n"}
+            다른 사람과 공유 중인 냉장고 중 내가 만든 냉장고는 함께 삭제되어, 공유받던 사용자에게도 더 이상 보이지 않게 됩니다.{"\n\n"}
+            기기 변경·재설치로 데이터를 이어가려면 탈퇴 대신 간편 로그인 또는 '연동 코드'를 사용해 주세요. 본 작업은 되돌릴 수 없습니다.
           </Text>
 
           <TouchableOpacity 
@@ -88,7 +99,7 @@ export default function ResetSettingScreen() {
             onPress={handleReset}
             activeOpacity={0.7}
           >
-            <Text style={[styles.confirmText, { color: isResetChecked ? '#FFFFFF' : descColor }]}>초기화</Text>
+            <Text style={[styles.confirmText, { color: isResetChecked ? '#FFFFFF' : descColor }]}>회원탈퇴</Text>
           </TouchableOpacity>
         </View>
       </View>

@@ -352,6 +352,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error('Backend user delete API request failed:', apiErr);
       }
 
+      // 소셜 SDK 세션도 정리한다. 이걸 안 하면 SDK가 캐시된 세션으로 다음 로그인을 자격증명 확인 없이
+      // 즉시 통과시켜, 탈퇴 후 재로그인 시 "바로 로그인"되는 것처럼 보인다.
+      if (Platform.OS !== 'web') {
+        try { await GoogleSignin.signOut(); } catch {}
+        try { await NaverLogin.logout(); } catch {}
+      }
+
       await clearAuthTokens();
       await AsyncStorage.removeItem('@backup_key');
       await AsyncStorage.removeItem('@device_uuid');
@@ -363,11 +370,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await loginAnonymously();
 
       if (serverDeleteSucceeded) {
-        Alert.alert('초기화 완료', '계정이 완전히 삭제되고 안전하게 초기화되었습니다.');
+        Alert.alert('회원탈퇴 완료', '계정과 소셜 로그인 연결, 모든 데이터가 삭제되었습니다.');
       } else {
         Alert.alert(
           '일부만 완료됨 ⚠️',
-          '이 기기의 데이터는 초기화됐지만, 서버에서 계정 삭제 요청이 실패했습니다. 네트워크 상태를 확인한 뒤 설정에서 다시 시도해 주세요.'
+          '이 기기의 데이터는 삭제됐지만, 서버에서 계정 삭제 요청이 실패했습니다. 네트워크 상태를 확인한 뒤 설정에서 다시 시도해 주세요.'
         );
       }
     } catch (e) {
