@@ -808,11 +808,15 @@ export default function RefrigeratorVisual({
   // AddIngredientModal 저장 완료 콜백: 수정된 식재료가 오면 전체 재조회 없이 로컬 상태만 갱신,
   // 등록(신규)이면 인자가 없으므로 목록을 다시 불러온다.
   const handleIngredientSaved = (updated?: Ingredient) => {
-    if (updated) {
-      setIngredients(prev => prev.map(item => item.id === updated.id ? updated : item));
-    } else {
+    if (!updated) {
       loadIngredients();
+      return;
     }
+    // 수정: 전체 재조회 없이 로컬 상태만 갱신하되, 위젯/알림도 새 목록으로 다시 계산해야 한다
+    // (날짜 수정으로 만료↔임박이 바뀌어도 위젯이 즉시 반영되도록).
+    const next = ingredients.map(item => (item.id === updated.id ? updated : item));
+    setIngredients(next);
+    rebuildAllNotifications(next);
   };
 
   // 식재료 목록 카드의 X 아이콘: 확인 후 즉시 삭제 (수정 모달 없이 바로 처리)

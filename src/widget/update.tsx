@@ -3,7 +3,7 @@ import { Platform, Appearance } from 'react-native';
 import { requestWidgetUpdate } from 'react-native-android-widget';
 import { Ingredient } from '../types';
 import { ExpiringWidget } from './ExpiringWidget';
-import { buildSnapshot, saveSnapshot } from './snapshot';
+import { computeSnapshot, saveSnapshot } from './snapshot';
 import { WIDGET_NAME, WIDGET_NAME_SUMMARY, isCompactHeight } from './taskHandler';
 
 // 재료 목록으로 스냅샷을 만들어 저장하고, 이미 배치된 위젯(목록형/요약형 둘 다)이 있으면 즉시 다시 그린다.
@@ -11,8 +11,8 @@ import { WIDGET_NAME, WIDGET_NAME_SUMMARY, isCompactHeight } from './taskHandler
 export async function updateExpiringWidget(ingredients: Ingredient[]): Promise<void> {
   if (Platform.OS !== 'android') return;
   try {
-    const snapshot = buildSnapshot(ingredients);
-    await saveSnapshot(snapshot);
+    await saveSnapshot(ingredients);
+    const snapshot = computeSnapshot(ingredients.map(i => ({ name: i.name, expiryDate: i.expiryDate })));
     const dark = Appearance.getColorScheme() === 'dark';
     await Promise.all([
       requestWidgetUpdate({
