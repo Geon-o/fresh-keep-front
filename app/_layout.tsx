@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { DeviceEventEmitter } from "react-native";
+import { DeviceEventEmitter, LogBox } from "react-native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -34,6 +34,10 @@ const originalActivate = KeepAwake.activateKeepAwakeAsync;
     console.warn('Keep awake activation failed silently:', e);
   }
 };
+
+// expo 개발 클라이언트가 앱 재개 시점에 keep-awake를 켜려다(액티비티가 아직 resume 전) 실패하며
+// 던지는 개발 전용 rejection 레드박스를 억제한다. 릴리즈에선 우리가 keep-awake를 쓰지 않아 발생하지 않음.
+LogBox.ignoreLogs(['Unable to activate keep awake']);
 
 // 앱 시작 시 자동 스플래시 스크린 숨김을 방지하고 수동으로 제어
 SplashScreen.preventAutoHideAsync().catch(() => {});
