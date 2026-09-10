@@ -245,6 +245,8 @@ interface RefrigeratorVisualProps {
   onShareFridge?: (fridgeName: string, fridgeUuid: string) => void;
   onScanQr?: () => void;
   onChangeTab?: (tab: 'home' | 'ingredients' | 'fridge' | 'settings') => void;
+  // 게스트에게 홈 상단에 노출할 로그인 유도 문구를 눌렀을 때 (로그인 시트 열기)
+  onRequestLogin?: () => void;
 }
 
 export default function RefrigeratorVisual({
@@ -263,10 +265,13 @@ export default function RefrigeratorVisual({
   onCancelDeletionRequest,
   onShareFridge,
   onScanQr,
-  onChangeTab
+  onChangeTab,
+  onRequestLogin
 }: RefrigeratorVisualProps) {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const { isLoggedIn, user } = useAuth();
+  // 소셜(구글·네이버) 로그인 사용자가 아니면 게스트로 보고 홈 상단에 로그인 유도 문구를 노출한다.
+  const isSocialUser = user?.provider === 'google' || user?.provider === 'naver';
   const queryClient = useQueryClient();
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [ingredientsLoaded, setIngredientsLoaded] = useState(false);
@@ -1729,6 +1734,21 @@ export default function RefrigeratorVisual({
           contentContainerStyle={styles.dashboardContent}
           showsVerticalScrollIndicator={false}
         >
+          {/* 게스트 로그인 유도 문구 — 대시보드 바로 위, 왼쪽 정렬. 소셜 로그인 사용자에겐 숨김. */}
+          {!isSocialUser && (
+            <TouchableOpacity
+              style={styles.loginNudge}
+              activeOpacity={0.7}
+              onPress={() => onRequestLogin?.()}
+            >
+              <Ionicons name="lock-closed-outline" size={13} color={theme.textSecondary} />
+              <Text style={[styles.loginNudgeText, { color: theme.textSecondary }]}>
+                더 안전한 데이터 보관을 위해 로그인해주세요
+              </Text>
+              <Ionicons name="chevron-forward" size={13} color={theme.textSecondary} />
+            </TouchableOpacity>
+          )}
+
           {/* 식재료 신선도 요약 대시보드 */}
           {(() => {
             // 아래 만료/임박/안전 통계와 겹치지 않도록, 상단에는 "앞으로 7일간 며칠에 몇 개가
@@ -3391,6 +3411,19 @@ const styles = StyleSheet.create({
   dashboardContent: {
     paddingTop: 20,
     paddingBottom: 60, // 하단 탭바 높이에 맞춰 최소한의 여백만 부여
+  },
+  loginNudge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start', // 왼쪽 정렬 + 터치 영역을 문구 폭으로 제한
+    gap: 5,
+    marginHorizontal: 20, // 대시보드 카드와 좌측 정렬 맞춤
+    marginBottom: 10, // 대시보드에 가깝게 붙임
+  },
+  loginNudgeText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    letterSpacing: -0.2,
   },
   fridgeModeContent: {
     paddingTop: 20,

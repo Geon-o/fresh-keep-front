@@ -5,8 +5,10 @@ import SocialLoginButtons from './SocialLoginButtons';
 
 interface Props {
   visible: boolean;
-  // 시트를 닫을 때 (로그인 성공 or "게스트로 둘러보기")
+  // 시트를 닫을 때 ("게스트로 둘러보기"·백드롭 등, 로그인 없이 닫힘)
   onClose: () => void;
+  // 실제 로그인 성공 시 (어떤 제공자인지 전달). 닫기/화면전환/안내는 부모가 처리.
+  onLoginSuccess?: (provider: 'google' | 'naver') => void;
   // 세션 만료로 다시 뜬 경우 문구를 살짝 바꾼다
   reason?: 'welcome' | 'sessionExpired';
 }
@@ -15,7 +17,7 @@ interface Props {
  * 첫 진입 권유형 시트. 강제 아님 — "게스트로 둘러보기" 한 탭으로 통과 가능.
  * 로그인의 "혜택"을 앞세운다(위협형 문구 지양).
  */
-export default function WelcomeAuthSheet({ visible, onClose, reason = 'welcome' }: Props) {
+export default function WelcomeAuthSheet({ visible, onClose, onLoginSuccess, reason = 'welcome' }: Props) {
   const { isDark } = useTheme();
 
   const sheetBg = isDark ? '#1C1C1E' : '#FFFFFF';
@@ -40,7 +42,7 @@ export default function WelcomeAuthSheet({ visible, onClose, reason = 'welcome' 
           <Text style={[styles.desc, { color: descColor }]}>{desc}</Text>
 
           <View style={styles.buttons}>
-            <SocialLoginButtons onSuccess={onClose} />
+            <SocialLoginButtons onSuccess={(provider) => onLoginSuccess?.(provider)} />
           </View>
 
           <TouchableOpacity style={styles.guestButton} activeOpacity={0.7} onPress={onClose}>

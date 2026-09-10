@@ -3,8 +3,8 @@ import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, Alert } fr
 import { useAuth } from '../context/AuthContext';
 
 interface Props {
-  // 로그인(및 충돌 해결)이 성공적으로 끝나면 호출 (예: 시트 닫기)
-  onSuccess?: () => void;
+  // 로그인(및 충돌 해결)이 성공적으로 끝나면 호출 (예: 시트 닫기). 어떤 제공자로 로그인했는지 전달.
+  onSuccess?: (provider: 'google' | 'naver') => void;
 }
 
 /**
@@ -16,7 +16,7 @@ export default function SocialLoginButtons({ onSuccess }: Props) {
   const [busy, setBusy] = useState<null | 'google' | 'naver'>(null);
 
   // 충돌 시: 게스트 데이터를 합칠지, 기존 계정 데이터만 쓸지 사용자에게 물어본다.
-  const handleConflict = (conflictToken: string) => {
+  const handleConflict = (conflictToken: string, provider: 'google' | 'naver') => {
     Alert.alert(
       '기존 데이터를 어떻게 할까요?',
       '이 기기에서 로그인 없이 추가한 데이터가 있어요.\n\n• 합치기: 지금 데이터를 기존 계정에 더합니다\n• 기존 계정만: 로그인 계정의 데이터만 사용합니다(이 기기 데이터는 버려짐)',
@@ -27,7 +27,7 @@ export default function SocialLoginButtons({ onSuccess }: Props) {
           style: 'destructive',
           onPress: async () => {
             const ok = await resolveSocialConflict(conflictToken, 'account');
-            if (ok) onSuccess?.();
+            if (ok) onSuccess?.(provider);
             else Alert.alert('로그인 실패', '잠시 후 다시 시도해 주세요.');
           },
         },
@@ -35,7 +35,7 @@ export default function SocialLoginButtons({ onSuccess }: Props) {
           text: '합치기',
           onPress: async () => {
             const ok = await resolveSocialConflict(conflictToken, 'merge');
-            if (ok) onSuccess?.();
+            if (ok) onSuccess?.(provider);
             else Alert.alert('로그인 실패', '잠시 후 다시 시도해 주세요.');
           },
         },
@@ -50,10 +50,10 @@ export default function SocialLoginButtons({ onSuccess }: Props) {
       const result = provider === 'google' ? await loginWithGoogle() : await loginWithNaver();
       switch (result.status) {
         case 'success':
-          onSuccess?.();
+          onSuccess?.(provider);
           break;
         case 'conflict':
-          handleConflict(result.conflictToken);
+          handleConflict(result.conflictToken, provider);
           break;
         case 'cancelled':
           break; // 사용자가 취소 — 조용히

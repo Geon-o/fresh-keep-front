@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, Modal, TouchableOpacity, Text, TextInput, Alert, Platform, ActivityIndicator, Animated, Easing, BackHandler, Image, DeviceEventEmitter } from 'react-native';
+import { StyleSheet, View, Modal, TouchableOpacity, Text, TextInput, Alert, Platform, ActivityIndicator, Animated, Easing, BackHandler, Image, DeviceEventEmitter, ToastAndroid } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Linking from 'expo-linking';
@@ -309,6 +309,16 @@ export default function Index() {
     setWelcomeVisible(false);
     clearSessionExpired();
     AsyncStorage.setItem('@welcome_auth_seen', 'true').catch(() => {});
+  };
+
+  // 소셜 로그인 성공: 시트를 닫고 홈으로 이동한 뒤 토스트로 안내한다(설정에 머무르지 않도록).
+  const handleLoginSuccess = (provider: 'google' | 'naver') => {
+    handleWelcomeClose();
+    setActiveTab('home');
+    const label = provider === 'google' ? '구글' : '네이버';
+    if (Platform.OS === 'android') {
+      ToastAndroid.show(`${label} 로그인 했습니다.`, ToastAndroid.SHORT);
+    }
   };
 
   // 스플래시가 꺼질 때 뚝 끊기지 않고 서서히 사라지도록 페이드 아웃한다. 뒤에 있는 실제
@@ -822,6 +832,7 @@ export default function Index() {
                 }}
                 onScanQr={() => router.push('/qr-scan')}
                 onChangeTab={setActiveTab}
+                onRequestLogin={() => { setWelcomeReason('welcome'); setWelcomeVisible(true); }}
               />
             ) : (
               <SettingsView
@@ -1041,7 +1052,7 @@ export default function Index() {
       </Modal>
 
       {/* 소셜 로그인 권유 시트 (첫 진입 1회 / 세션 만료 시) */}
-      <WelcomeAuthSheet visible={welcomeVisible} onClose={handleWelcomeClose} reason={welcomeReason} />
+      <WelcomeAuthSheet visible={welcomeVisible} onClose={handleWelcomeClose} onLoginSuccess={handleLoginSuccess} reason={welcomeReason} />
 
       {/* 100% 신뢰성 있는 인앱 비주얼 스플래시 스크린 */}
       {isSplashMounted && (
