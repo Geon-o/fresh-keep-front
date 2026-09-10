@@ -161,6 +161,23 @@ export default function SettingsView({
 
           <View style={[styles.divider, { backgroundColor: dividerColor }]} />
 
+          {/* 개인정보 처리방침 — 법상 별도 공개 의무. 이용약관과 분리해 노출. */}
+          <TouchableOpacity
+            style={styles.listRow}
+            activeOpacity={0.7}
+            onPress={() => router.push('/settings/privacy')}
+          >
+            <View style={styles.listRowLeft}>
+              <View style={[styles.iconWrapper, { backgroundColor: isDark ? '#2A2A2D' : '#F3F4F6' }]}>
+                <Ionicons name="shield-checkmark-outline" size={18} color={iconColor} />
+              </View>
+              <Text style={[styles.listRowText, { color: titleColor }]}>개인정보 처리방침</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={descColor} />
+          </TouchableOpacity>
+
+          <View style={[styles.divider, { backgroundColor: dividerColor }]} />
+
           {/* 초기화 (회원탈퇴/전체삭제) — 게스트·로그인 공통. 계정을 정식으로 나가는 경로. */}
           <TouchableOpacity
             style={styles.listRow}
