@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, ActivityIndicator, Platform, Alert } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Ionicons } from '@expo/vector-icons';
 import { Ingredient, IngredientCategory, ExpiryType } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -12,7 +11,6 @@ import { serializeMemo } from '../utils/memoSerializer';
 import { rebuildAllNotifications } from '../utils/ingredientNotifications';
 import { guessCategory, saveCategoryOverride } from '../utils/categoryGuess';
 import { createStyles, CATEGORIES, DEFAULT_UNITS, EXPIRY_TYPE_LABELS } from './CompartmentDetail';
-import BarcodeScannerModal from './BarcodeScannerModal';
 
 interface AddIngredientModalProps {
   visible: boolean;
@@ -48,9 +46,6 @@ export default function AddIngredientModal({ visible, fridgeId, compartmentId, s
   const [formMemo, setFormMemo] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const isSavingRef = useRef(false);
-
-  const [scannerVisible, setScannerVisible] = useState(false);
-  const [isLookingUpBarcode, setIsLookingUpBarcode] = useState(false);
 
   const [customUnits, setCustomUnits] = useState<string[]>([]);
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
@@ -200,37 +195,6 @@ export default function AddIngredientModal({ visible, fridgeId, compartmentId, s
     setUnitCustomInputValue('');
     setUnitCustomInputOpen(false);
     setUnitDropdownOpen(false);
-  };
-
-  // 바코드 스캔 결과로 제품명을 자동 채운다. 카테고리/유통기한은 바코드에 담기지 않는 정보라
-  // (제품 식별자일 뿐 배치별 날짜를 담을 수 없음) 사용자가 직접 입력해야 한다.
-  const handleBarcodeScanned = async (barcode: string) => {
-    setScannerVisible(false);
-    setIsLookingUpBarcode(true);
-    try {
-      const response = await fetch(
-        `https://world.openfoodfacts.org/api/v2/product/${barcode}.json?fields=product_name,product_name_ko,brands`
-      );
-      const json = await response.json();
-      const name = json?.status === 1
-        ? (json.product?.product_name_ko || json.product?.product_name || json.product?.brands)
-        : null;
-
-      if (name) {
-        setFormName(name);
-      } else {
-        const message = '등록된 제품 정보를 찾지 못했어요. 이름을 직접 입력해 주세요.';
-        if (Platform.OS === 'web') window.alert(message);
-        else Alert.alert('알림', message);
-      }
-    } catch (e) {
-      console.error('Barcode lookup failed', e);
-      const message = '제품 정보를 불러오지 못했어요. 이름을 직접 입력해 주세요.';
-      if (Platform.OS === 'web') window.alert(message);
-      else Alert.alert('알림', message);
-    } finally {
-      setIsLookingUpBarcode(false);
-    }
   };
 
   const handleSave = async (keepOpenForNext: boolean = false) => {
@@ -389,26 +353,7 @@ export default function AddIngredientModal({ visible, fridgeId, compartmentId, s
                 showsVerticalScrollIndicator={false}
               >
                 <View style={styles.formGroup}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={styles.formLabel}>식재료명</Text>
-                    {!isEdit && (
-                      <TouchableOpacity
-                        style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
-                        activeOpacity={0.7}
-                        onPress={() => setScannerVisible(true)}
-                        disabled={isLookingUpBarcode}
-                      >
-                        {isLookingUpBarcode ? (
-                          <ActivityIndicator size="small" color={theme.primary} />
-                        ) : (
-                          <Ionicons name="barcode-outline" size={16} color={theme.primary} />
-                        )}
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: theme.primary }}>
-                          {isLookingUpBarcode ? '조회 중...' : '바코드 스캔'}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
+                  <Text style={styles.formLabel}>식재료명</Text>
                   <TextInput
                     style={styles.input}
                     value={formName}
@@ -624,12 +569,6 @@ export default function AddIngredientModal({ visible, fridgeId, compartmentId, s
           )}
         </View>
       </View>
-
-      <BarcodeScannerModal
-        visible={scannerVisible}
-        onClose={() => setScannerVisible(false)}
-        onScanned={handleBarcodeScanned}
-      />
     </Modal>
   );
 }
