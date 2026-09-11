@@ -752,13 +752,18 @@ export default function RefrigeratorVisual({
 
   // 식재료 목록 탭용 상태
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFilter, setSelectedFilter] = useState<'all' | 'expired' | 'imminent' | 'safe'>('all');
-  const [selectedFridgeFilter, setSelectedFridgeFilter] = useState<string>('all');
+  // 필터는 복수 선택. 빈 배열 = "전체"(제한 없음). statusFilters는 'expired'|'imminent'|'safe' 값을 담는다.
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
+  const [fridgeFilters, setFridgeFilters] = useState<string[]>([]);
+  // 필터 다이얼로그: 열려 있을 때 임시 선택(temp)을 만지다가 "적용"을 눌러야 실제 필터에 반영된다.
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [tempStatusFilters, setTempStatusFilters] = useState<string[]>([]);
+  const [tempFridgeFilters, setTempFridgeFilters] = useState<string[]>([]);
 
   // 홈 위젯에서 상태/식재료를 눌러 넘어오면, 식재료 목록의 필터·검색을 그에 맞게 설정한다.
   useEffect(() => {
     if (!ingredientFocus) return;
-    setSelectedFilter(ingredientFocus.status);
+    setStatusFilters(ingredientFocus.status === 'all' ? [] : [ingredientFocus.status]);
     setSearchQuery(ingredientFocus.query);
   }, [ingredientFocus?.nonce]);
 
@@ -900,6 +905,42 @@ export default function RefrigeratorVisual({
       setPantryToggling(false);
     }
   };
+
+  // 필터 다이얼로그 열기: 현재 적용된 필터를 임시 선택으로 복사해 시작한다.
+  const openFilterModal = () => {
+    setTempStatusFilters(statusFilters);
+    setTempFridgeFilters(fridgeFilters);
+    setFilterModalVisible(true);
+  };
+
+  // 임시 선택 토글 (다이얼로그 안에서만 반영, 적용 전)
+  const toggleTempStatus = (status: string) => {
+    setTempStatusFilters(prev => prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]);
+  };
+  const toggleTempFridge = (fridgeId: string) => {
+    setTempFridgeFilters(prev => prev.includes(fridgeId) ? prev.filter(f => f !== fridgeId) : [...prev, fridgeId]);
+  };
+
+  // 적용: 모두 선택한 경우는 "전체"(빈 배열)로 정규화해 저장한다.
+  const applyFilters = () => {
+    const STATUS_KEYS = ['expired', 'imminent', 'safe'];
+    setStatusFilters(tempStatusFilters.length >= STATUS_KEYS.length ? [] : tempStatusFilters);
+    setFridgeFilters(tempFridgeFilters.length >= refrigerators.length ? [] : tempFridgeFilters);
+    setFilterModalVisible(false);
+  };
+
+  const resetFilters = () => {
+    setStatusFilters([]);
+    setFridgeFilters([]);
+  };
+
+  // 필터 다이얼로그의 옵션 한 줄 (체크박스 + 라벨)
+  const renderFilterOption = (key: string, label: string, selected: boolean, onPress: () => void) => (
+    <TouchableOpacity key={key} style={styles.filterOptionRow} activeOpacity={0.7} onPress={onPress}>
+      <Text style={[styles.filterOptionText, { color: selected ? theme.primaryText : theme.textSecondary }]}>{label}</Text>
+      <Ionicons name={selected ? 'checkbox' : 'square-outline'} size={22} color={selected ? theme.primary : theme.textMuted} />
+    </TouchableOpacity>
+  );
 
   // AddIngredientModal 저장 완료 콜백: 수정된 식재료가 오면 전체 재조회 없이 로컬 상태만 갱신,
   // 등록(신규)이면 인자가 없으므로 목록을 다시 불러온다.
@@ -1485,13 +1526,13 @@ export default function RefrigeratorVisual({
       return true;
     })
     .filter(item => {
-      if (selectedFilter === 'all') return true;
+      if (statusFilters.length === 0) return true;
       const dday = getDDayInfo(item.expiryDate);
-      return dday.status === selectedFilter;
+      return statusFilters.includes(dday.status);
     })
     .filter(item => {
-      if (selectedFridgeFilter === 'all') return true;
-      return item.fridgeId === selectedFridgeFilter;
+      if (fridgeFilters.length === 0) return true;
+      return fridgeFilters.includes(item.fridgeId ?? '');
     })
     // 등록 순서 desc(최근 등록이 최상단). 서버 id는 auto-increment, 로컬 id는 `ing_<타임스탬프>`라
     // 둘 다 값이 클수록 최신 → 등록순과 일치한다. (한 목록은 서버/로컬 중 하나라 값이 섞이지 않음)
@@ -1927,10 +1968,10 @@ export default function RefrigeratorVisual({
                 {/* 만료/임박/안전 각각 개수를 큼직하게 부각 (도넛 대신 숫자 자체가 주인공) */}
                 <View style={styles.statBlockRow}>
                   <TouchableOpacity
-                    style={[styles.statBlock, selectedFilter === 'expired' && { backgroundColor: theme.ddayExpired + '12' }]}
+                    style={[styles.statBlock, statusFilters.includes('expired') && { backgroundColor: theme.ddayExpired + '12' }]}
                     activeOpacity={0.7}
                     onPress={() => {
-                      setSelectedFilter('expired');
+                      setStatusFilters(['expired']);
                       onChangeTab?.('ingredients');
                     }}
                   >
@@ -1941,10 +1982,10 @@ export default function RefrigeratorVisual({
                   <View style={[styles.statBlockDivider, { backgroundColor: theme.borderLight }]} />
 
                   <TouchableOpacity
-                    style={[styles.statBlock, selectedFilter === 'imminent' && { backgroundColor: theme.ddayImminent + '12' }]}
+                    style={[styles.statBlock, statusFilters.includes('imminent') && { backgroundColor: theme.ddayImminent + '12' }]}
                     activeOpacity={0.7}
                     onPress={() => {
-                      setSelectedFilter('imminent');
+                      setStatusFilters(['imminent']);
                       onChangeTab?.('ingredients');
                     }}
                   >
@@ -1955,10 +1996,10 @@ export default function RefrigeratorVisual({
                   <View style={[styles.statBlockDivider, { backgroundColor: theme.borderLight }]} />
 
                   <TouchableOpacity
-                    style={[styles.statBlock, selectedFilter === 'safe' && { backgroundColor: theme.ddaySafe + '12' }]}
+                    style={[styles.statBlock, statusFilters.includes('safe') && { backgroundColor: theme.ddaySafe + '12' }]}
                     activeOpacity={0.7}
                     onPress={() => {
-                      setSelectedFilter('safe');
+                      setStatusFilters(['safe']);
                       onChangeTab?.('ingredients');
                     }}
                   >
@@ -2471,124 +2512,54 @@ export default function RefrigeratorVisual({
                 )}
               </View>
 
-              {/* 냉장고 필터 칩 바 (냉장고가 2개 이상일 때만 표시) */}
-              {refrigerators.length > 1 && (
-                <View style={[styles.filterContainer, { marginBottom: 8 }]}>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
-                    <TouchableOpacity
-                      style={[
-                        styles.filterChip,
-                        { backgroundColor: theme.surfaceTertiary, borderWidth: 1, borderColor: theme.borderLight },
-                        selectedFridgeFilter === 'all' && [styles.filterChipActive, { backgroundColor: theme.primary, borderColor: theme.primary }]
-                      ]}
-                      onPress={() => setSelectedFridgeFilter('all')}
-                    >
-                      <Text style={[styles.filterChipText, { color: theme.textSecondary }, selectedFridgeFilter === 'all' && { color: theme.primaryOnPrimary }]}>
-                        전체 냉장고
-                      </Text>
-                    </TouchableOpacity>
-                    {refrigerators.map(fridge => (
-                      <TouchableOpacity
-                        key={fridge.id}
-                        style={[
-                          styles.filterChip,
-                          { backgroundColor: theme.surfaceTertiary, borderWidth: 1, borderColor: theme.borderLight },
-                          selectedFridgeFilter === fridge.id && [styles.filterChipActive, { backgroundColor: theme.primary, borderColor: theme.primary }]
-                        ]}
-                        onPress={() => setSelectedFridgeFilter(fridge.id)}
-                      >
-                        <Text
-                          style={[styles.filterChipText, { color: theme.textSecondary }, selectedFridgeFilter === fridge.id && { color: theme.primaryOnPrimary }]}
-                          numberOfLines={1}
-                        >
-                          {fridge.name}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
+              {/* 필터 바: [필터 버튼] — [적용된 필터 칩 가로 스크롤] — [초기화] */}
+              <View style={styles.filterBarRow}>
+                <TouchableOpacity
+                  style={[styles.filterOpenButton, { backgroundColor: theme.surfaceTertiary, borderColor: theme.borderLight }]}
+                  activeOpacity={0.7}
+                  onPress={openFilterModal}
+                >
+                  <Ionicons name="filter" size={15} color={theme.textSecondary} />
+                  <Text style={[styles.filterOpenButtonText, { color: theme.textSecondary }]}>필터</Text>
+                </TouchableOpacity>
 
-              {/* 상태 필터 칩 바 */}
-              <View style={styles.filterContainer}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
-                  <TouchableOpacity
-                    style={[
-                      styles.filterChip, 
-                      { 
-                        backgroundColor: theme.surfaceTertiary,
-                        borderWidth: 1,
-                        borderColor: theme.borderLight
-                      },
-                      selectedFilter === 'all' && [
-                        styles.filterChipActive, 
-                        { backgroundColor: theme.primary, borderColor: theme.primary }
-                      ]
-                    ]}
-                    onPress={() => setSelectedFilter('all')}
-                  >
-                    <Text style={[styles.filterChipText, { color: theme.textSecondary }, selectedFilter === 'all' && { color: theme.primaryOnPrimary }]}>
-                      전체 {ingredients.length}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.filterChip, 
-                      { 
-                        backgroundColor: theme.surfaceTertiary,
-                        borderWidth: 1,
-                        borderColor: theme.borderLight
-                      },
-                      selectedFilter === 'expired' && [
-                        styles.filterChipActive, 
-                        { backgroundColor: theme.ddayExpired, borderColor: theme.ddayExpired }
-                      ]
-                    ]}
-                    onPress={() => setSelectedFilter('expired')}
-                  >
-                    <Text style={[styles.filterChipText, { color: theme.textSecondary }, selectedFilter === 'expired' && { color: '#FFFFFF' }]}>
-                      만료 {totalExpired}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.filterChip, 
-                      { 
-                        backgroundColor: theme.surfaceTertiary,
-                        borderWidth: 1,
-                        borderColor: theme.borderLight
-                      },
-                      selectedFilter === 'imminent' && [
-                        styles.filterChipActive, 
-                        { backgroundColor: theme.ddayImminent, borderColor: theme.ddayImminent }
-                      ]
-                    ]}
-                    onPress={() => setSelectedFilter('imminent')}
-                  >
-                    <Text style={[styles.filterChipText, { color: theme.textSecondary }, selectedFilter === 'imminent' && { color: '#FFFFFF' }]}>
-                      임박 {totalImminent}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.filterChip, 
-                      { 
-                        backgroundColor: theme.surfaceTertiary,
-                        borderWidth: 1,
-                        borderColor: theme.borderLight
-                      },
-                      selectedFilter === 'safe' && [
-                        styles.filterChipActive, 
-                        { backgroundColor: theme.ddaySafe, borderColor: theme.ddaySafe }
-                      ]
-                    ]}
-                    onPress={() => setSelectedFilter('safe')}
-                  >
-                    <Text style={[styles.filterChipText, { color: theme.textSecondary }, selectedFilter === 'safe' && { color: '#FFFFFF' }]}>
-                      안전 {totalSafe}
-                    </Text>
-                  </TouchableOpacity>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.filterAppliedScroll}
+                  contentContainerStyle={{ gap: 6, alignItems: 'center' }}
+                >
+                  {/* 냉장고: 비었거나(=전체) 모두면 '전체 냉장고' 하나, 아니면 선택 순서대로 */}
+                  {(fridgeFilters.length === 0
+                    ? ['전체 냉장고']
+                    : fridgeFilters.map(id => refrigerators.find(r => r.id === id)?.name || '냉장고')
+                  ).map((label, i) => (
+                    <View key={`f-${i}`} style={[styles.filterAppliedChip, { backgroundColor: theme.surfaceTertiary, borderColor: theme.borderLight }]}>
+                      <Text style={[styles.filterAppliedChipText, { color: theme.textSecondary }]} numberOfLines={1}>{label}</Text>
+                    </View>
+                  ))}
+                  {/* 상태: 비었거나 모두면 '전체 상태' 하나, 아니면 상태별 색으로 */}
+                  {(statusFilters.length === 0
+                    ? [{ label: '전체 상태', color: theme.textSecondary }]
+                    : statusFilters.map(s => ({
+                        label: s === 'expired' ? '만료' : s === 'imminent' ? '임박' : '안전',
+                        color: s === 'expired' ? theme.ddayExpired : s === 'imminent' ? theme.ddayImminent : theme.ddaySafe,
+                      }))
+                  ).map((chip, i) => (
+                    <View key={`s-${i}`} style={[styles.filterAppliedChip, { backgroundColor: chip.color + '14', borderColor: chip.color }]}>
+                      <Text style={[styles.filterAppliedChipText, { color: chip.color }]} numberOfLines={1}>{chip.label}</Text>
+                    </View>
+                  ))}
                 </ScrollView>
+
+                <TouchableOpacity
+                  style={styles.filterResetButton}
+                  activeOpacity={0.7}
+                  onPress={resetFilters}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="refresh" size={18} color={theme.textMuted} />
+                </TouchableOpacity>
               </View>
 
               {/* 식재료 리스트 */}
@@ -2744,6 +2715,54 @@ export default function RefrigeratorVisual({
           </TouchableOpacity>
         </View>
       )}
+
+      {/* 식재료 목록 필터 다이얼로그: 냉장고/상태를 복수 선택하고 '적용'을 눌러야 반영된다 */}
+      <Modal
+        visible={filterModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFilterModalVisible(false)}
+      >
+        <View style={[styles.filterModalOverlay, { backgroundColor: theme.modalOverlay }]}>
+          <View style={[styles.filterModalCard, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
+            <View style={[styles.filterModalHeader, { borderBottomColor: theme.borderLight }]}>
+              <Text style={[styles.filterModalTitle, { color: theme.textPrimary }]}>필터</Text>
+              <TouchableOpacity onPress={() => setFilterModalVisible(false)}>
+                <Ionicons name="close" size={24} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 420 }} contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false}>
+              <Text style={[styles.filterModalSectionTitle, { color: theme.textTertiary }]}>냉장고</Text>
+              {renderFilterOption('fridge-all', '전체 냉장고', tempFridgeFilters.length === 0, () => setTempFridgeFilters([]))}
+              {refrigerators.map(f => renderFilterOption(`fridge-${f.id}`, f.name, tempFridgeFilters.includes(f.id), () => toggleTempFridge(f.id)))}
+
+              <Text style={[styles.filterModalSectionTitle, { color: theme.textTertiary, marginTop: 20 }]}>식재료 상태</Text>
+              {renderFilterOption('status-all', '전체', tempStatusFilters.length === 0, () => setTempStatusFilters([]))}
+              {[{ k: 'expired', l: '만료' }, { k: 'imminent', l: '임박' }, { k: 'safe', l: '안전' }].map(s =>
+                renderFilterOption(`status-${s.k}`, s.l, tempStatusFilters.includes(s.k), () => toggleTempStatus(s.k))
+              )}
+            </ScrollView>
+
+            <View style={[styles.filterModalFooter, { borderTopColor: theme.borderLight }]}>
+              <TouchableOpacity
+                style={[styles.filterFooterButton, { backgroundColor: theme.surfaceTertiary }]}
+                activeOpacity={0.8}
+                onPress={() => setFilterModalVisible(false)}
+              >
+                <Text style={[styles.filterFooterButtonText, { color: theme.textSecondary }]}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.filterFooterButton, { backgroundColor: theme.primary }]}
+                activeOpacity={0.8}
+                onPress={applyFilters}
+              >
+                <Text style={[styles.filterFooterButtonText, { color: theme.primaryOnPrimary }]}>적용</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* 식재료 등록 위치(냉장고 → 칸 → 선반/문쪽) 선택 모달 */}
       <Modal
@@ -4498,6 +4517,101 @@ const styles = StyleSheet.create({
   filterContainer: {
     marginBottom: 16,
     height: 38,
+  },
+  filterBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    gap: 8,
+    marginBottom: 12,
+  },
+  filterOpenButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  filterOpenButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  filterAppliedScroll: {
+    flex: 1,
+  },
+  filterAppliedChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  filterAppliedChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    maxWidth: 110,
+  },
+  filterResetButton: {
+    padding: 4,
+  },
+  filterModalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  filterModalCard: {
+    width: '100%',
+    maxWidth: 420,
+    borderRadius: 18,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  filterModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+  },
+  filterModalTitle: {
+    fontSize: 17,
+    fontWeight: 'bold',
+  },
+  filterModalSectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  filterOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+  },
+  filterOptionText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  filterModalFooter: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+  },
+  filterFooterButton: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterFooterButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
   },
   filterChip: {
     paddingHorizontal: 14,
