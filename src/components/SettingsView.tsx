@@ -67,14 +67,18 @@ export default function SettingsView({
             간편로그인 · <Text style={{ color: providerColor, fontWeight: '700' }}>{providerLabel}</Text>
           </Text>
         ) : (
-          <View style={styles.guestNudgeRow}>
+          <TouchableOpacity
+            style={styles.guestNudgeRow}
+            activeOpacity={0.7}
+            onPress={onLogin}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="lock-closed-outline" size={13} color={descColor} />
             <Text style={[styles.accountStatusText, { color: descColor }]}>
-              로그인을 하면 더 안전하게 데이터를 저장할 수 있어요.
+              더 안전한 데이터 보관을 위해 로그인해주세요
             </Text>
-            <TouchableOpacity activeOpacity={0.7} onPress={onLogin} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Text style={[styles.loginLink, { color: isDark ? '#8AB4F8' : '#2563EB' }]}>간편 로그인하기</Text>
-            </TouchableOpacity>
-          </View>
+            <Ionicons name="chevron-forward" size={13} color={descColor} />
+          </TouchableOpacity>
         )}
       </View>
 
