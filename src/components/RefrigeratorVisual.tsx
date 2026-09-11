@@ -249,6 +249,61 @@ interface RefrigeratorVisualProps {
   onRequestLogin?: () => void;
 }
 
+// 컨테이너보다 텍스트가 길 때만 오른쪽→왼쪽으로 천천히 슬라이드(마퀴)해서 전체 내용을 보여준다.
+// 짧으면 애니메이션 없이 그대로 한 줄로 표시한다.
+function MarqueeText({ text, style, containerStyle }: { text: string; style?: any; containerStyle?: any }) {
+  const [containerW, setContainerW] = React.useState(0);
+  const [contentW, setContentW] = React.useState(0);
+  const tx = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    tx.stopAnimation();
+    tx.setValue(0);
+    if (contentW > containerW && containerW > 0) {
+      const distance = contentW - containerW;
+      const duration = Math.max(distance * 25, 800);
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.delay(1200),
+          Animated.timing(tx, { toValue: -distance, duration, useNativeDriver: true }),
+          Animated.delay(1200),
+          Animated.timing(tx, { toValue: 0, duration, useNativeDriver: true }),
+        ])
+      );
+      loop.start();
+      return () => loop.stop();
+    }
+  }, [contentW, containerW, text]);
+
+  const overflowing = contentW > containerW && containerW > 0;
+
+  return (
+    <View
+      style={[{ overflow: 'hidden' }, containerStyle]}
+      onLayout={e => setContainerW(e.nativeEvent.layout.width)}
+    >
+      {/* 숨은 측정용: 큰 고정 폭 + 한 줄로 두어 wrap을 막고, onTextLayout으로 실제 텍스트 픽셀 너비를 잰다 */}
+      <Text
+        numberOfLines={1}
+        style={[style, { position: 'absolute', opacity: 0, width: 9999 }]}
+        onTextLayout={e => {
+          const w = e.nativeEvent.lines?.[0]?.width ?? 0;
+          if (w > 0) setContentW(Math.ceil(w));
+        }}
+      >
+        {text}
+      </Text>
+      {/* 표시용: 넘칠 때는 잰 자연 너비를 명시해 잘리지 않게 하고 translateX로 슬라이드한다 */}
+      <Animated.Text
+        numberOfLines={1}
+        style={[style, overflowing ? { width: contentW, transform: [{ translateX: tx }] } : null]}
+      >
+        {text}
+      </Animated.Text>
+    </View>
+  );
+}
+
 export default function RefrigeratorVisual({
   mode = 'home',
   ingredientFocus,
@@ -275,6 +330,8 @@ export default function RefrigeratorVisual({
   const queryClient = useQueryClient();
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [ingredientsLoaded, setIngredientsLoaded] = useState(false);
+  // 식재료 목록 카드에서 점 3개(더보기) 메뉴가 열린 항목 ID. 한 번에 하나만 펼친다.
+  const [openMenuItemId, setOpenMenuItemId] = useState<string | null>(null);
   // 실온 보관함(팬트리)이 켜진 냉장고 ID 집합 = ROOM_TEMP 구획이 존재하는 냉장고. 서랍 노출/설정 토글 상태의 근거.
   const [pantryFridgeIds, setPantryFridgeIds] = useState<Set<string>>(new Set());
   // 팬트리 토글 전환 중 중복 요청 방지
@@ -2558,41 +2615,61 @@ export default function RefrigeratorVisual({
                             borderColor: isUnassigned ? theme.primaryBorder : theme.borderLight,
                             borderWidth: isUnassigned ? 1.5 : 1,
                           },
+                          // 메뉴가 열린 카드는 팝업이 다른 카드에 가리지 않도록 위로 올린다
+                          openMenuItemId === item.id && { zIndex: 20, elevation: 20 },
                         ]}
                         activeOpacity={0.8}
                         onPress={() => isUnassigned
                           ? handleOpenAssignLocationPicker(item)
                           : onPressCompartment(item.location!, locationLabel, item.fridgeId || '', item.subLocation)}
                       >
-                        {/* 상단 줄: 만료 배지(좌, 최우선 정보) — 수정/삭제(우) */}
+                        {/* 상단 줄: 냉장고 위치(좌) — 더보기(점 3개) 메뉴(우) */}
                         <View style={styles.ingCardTopRow}>
-                          <View style={[styles.urgentDDayBadge, { backgroundColor: dday.color + '12', borderColor: dday.color }]}>
-                            <Text style={[styles.urgentDDayText, { color: dday.color }]}>{dday.text}</Text>
-                          </View>
+                          <Text
+                            style={[styles.ingCardTopLocText, { color: isUnassigned ? theme.primaryText : theme.textTertiary }]}
+                            numberOfLines={1}
+                          >
+                            {isUnassigned
+                              ? `${fridge ? fridge.name : '냉장고'} · 탭해서 위치 지정하기`
+                              : `${fridge ? fridge.name : '냉장고'} > ${getLocationDisplayLabel(locationLabel, item.subLocation)}`}
+                          </Text>
                           <View style={styles.ingCardTopRowIcons}>
                             <TouchableOpacity
                               style={styles.ingCardTopRowIconButton}
                               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                              onPress={() => handleOpenAssignLocationPicker(item)}
+                              onPress={() => setOpenMenuItemId(openMenuItemId === item.id ? null : item.id)}
                             >
-                              <Ionicons name="location-outline" size={20} color={isDark ? '#FFFFFF' : theme.textMuted} />
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={styles.ingCardTopRowIconButton}
-                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                              onPress={() => setEditIngredientTarget(item)}
-                            >
-                              <Ionicons name="pencil-outline" size={20} color={isDark ? '#FFFFFF' : theme.textMuted} />
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={styles.ingCardTopRowIconButton}
-                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                              onPress={() => handleDeleteIngredient(item)}
-                            >
-                              <Ionicons name="trash-outline" size={20} color={theme.danger} />
+                              <Ionicons name="ellipsis-horizontal" size={20} color={isDark ? '#FFFFFF' : theme.textMuted} />
                             </TouchableOpacity>
                           </View>
                         </View>
+
+                        {/* 점 3개 메뉴: 위치수정/수정/삭제를 아이콘+텍스트로, 카드 위에 떠서 세로로 펼친다 */}
+                        {openMenuItemId === item.id && (
+                          <View style={[styles.ingCardMenu, { backgroundColor: theme.surface, borderColor: theme.borderLight, shadowColor: theme.shadow }]}>
+                            <TouchableOpacity
+                              style={styles.ingCardMenuItem}
+                              onPress={() => { setOpenMenuItemId(null); handleOpenAssignLocationPicker(item); }}
+                            >
+                              <Ionicons name="location-outline" size={18} color={isDark ? '#FFFFFF' : theme.textSecondary} />
+                              <Text style={[styles.ingCardMenuText, { color: theme.textSecondary }]}>위치수정</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.ingCardMenuItem}
+                              onPress={() => { setOpenMenuItemId(null); setEditIngredientTarget(item); }}
+                            >
+                              <Ionicons name="pencil-outline" size={18} color={isDark ? '#FFFFFF' : theme.textSecondary} />
+                              <Text style={[styles.ingCardMenuText, { color: theme.textSecondary }]}>수정</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.ingCardMenuItem}
+                              onPress={() => { setOpenMenuItemId(null); handleDeleteIngredient(item); }}
+                            >
+                              <Ionicons name="trash-outline" size={18} color={theme.danger} />
+                              <Text style={[styles.ingCardMenuText, { color: theme.danger }]}>삭제</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
 
                         <View style={styles.ingCardMainRow}>
                           <View style={[styles.ingCardEmojiBg, { backgroundColor: theme.surfaceTertiary }]}>
@@ -2600,10 +2677,7 @@ export default function RefrigeratorVisual({
                           </View>
 
                           <View style={styles.ingCardInfo}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                              <Text style={[styles.ingCardName, { color: theme.textPrimary, flexShrink: 1 }]} numberOfLines={1}>
-                                {item.name}
-                              </Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                               {isUnassigned && (
                                 <View
                                   style={{
@@ -2622,19 +2696,21 @@ export default function RefrigeratorVisual({
                                   <Text style={{ fontSize: 10, fontWeight: '700', color: theme.primaryText }}>위치 미정</Text>
                                 </View>
                               )}
+                              {/* 이름: 길어서 개수 자리까지 밀려 잘릴 상황이면 그 자리에서 마퀴로 전체를 보여준다 */}
+                              <MarqueeText
+                                text={item.name}
+                                style={[styles.ingCardName, { color: theme.textPrimary }]}
+                                containerStyle={{ flex: 1 }}
+                              />
+                              <Text style={[styles.ingCardQtyInline, { color: theme.textSecondary }]} numberOfLines={1}>
+                                {item.quantity}{item.unit}
+                              </Text>
                             </View>
-                            <Text
-                              style={[
-                                styles.ingCardLocBottom,
-                                { color: isUnassigned ? theme.primaryText : theme.textTertiary },
-                              ]}
-                              numberOfLines={1}
-                            >
-                              {isUnassigned
-                                ? `${fridge ? fridge.name : '냉장고'} · 탭해서 위치 지정하기`
-                                : `${fridge ? fridge.name : '냉장고'} > ${getLocationDisplayLabel(locationLabel, item.subLocation)}`}
-                              <Text style={[styles.ingCardQtyValue, { color: theme.textSecondary }]}> · {item.quantity}{item.unit}</Text>
-                            </Text>
+                          </View>
+
+                          {/* D-Day 배지: 카드 오른쪽 세로 중앙 */}
+                          <View style={[styles.urgentDDayBadge, { backgroundColor: dday.color + '12', borderColor: dday.color }]}>
+                            <Text style={[styles.urgentDDayText, { color: dday.color }]}>{dday.text}</Text>
                           </View>
                         </View>
                       </TouchableOpacity>
@@ -3671,15 +3747,15 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   urgentDDayBadge: {
-    height: 22,
-    paddingHorizontal: 8,
-    borderRadius: 8,
+    height: 28,
+    paddingHorizontal: 12,
+    borderRadius: 9,
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   urgentDDayText: {
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: 'bold',
     includeFontPadding: false,
     textAlignVertical: 'center',
@@ -4467,17 +4543,11 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   ingCardName: {
-    flex: 1,
     fontSize: 18,
     fontWeight: 'bold',
   },
-  ingCardLocBottom: {
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  ingCardQtyValue: {
-    fontSize: 11,
+  ingCardQtyInline: {
+    fontSize: 15,
     fontWeight: '700',
   },
   ingCardTopRow: {
@@ -4486,6 +4556,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     marginBottom: 14,
+  },
+  ingCardTopLocText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
   },
   ingCardTopRowIcons: {
     flexDirection: 'row',
@@ -4497,6 +4572,32 @@ const styles = StyleSheet.create({
     height: 30,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  ingCardMenu: {
+    position: 'absolute',
+    top: 38,
+    right: 10,
+    minWidth: 140,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 4,
+    flexDirection: 'column',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 30,
+  },
+  ingCardMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+  },
+  ingCardMenuText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   emptyStateContainer: {
     flex: 1,
