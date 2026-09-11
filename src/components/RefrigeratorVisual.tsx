@@ -1025,6 +1025,22 @@ export default function RefrigeratorVisual({
     try {
       if (isLoggedIn) {
         const info = await getCompartmentShelves(fridgeId, compartmentId);
+        // 실온 보관함(팬트리)은 칸이 1개뿐이라 선반 선택 단계를 건너뛰고 바로 그 칸으로 등록/지정한다.
+        if (compartmentId === 'pantry') {
+          const pantryShelfId = info.insideShelves?.[0]?.id ?? 'shelf_1';
+          if (assignTargetIngredient) {
+            await finalizeAssignLocation(assignTargetIngredient, compartmentId, pantryShelfId, info.serverCompartmentId ?? null);
+          } else {
+            setAddLocationPickerVisible(false);
+            setAddIngredientTarget({
+              fridgeId,
+              compartmentId,
+              shelfId: pantryShelfId,
+              serverCompartmentId: info.serverCompartmentId ?? null,
+            });
+          }
+          return;
+        }
         setAddPickerShelves(info);
       } else {
         const configStr = await AsyncStorage.getItem(`@shelf_config_${fridgeId}_${compartmentId}`);
@@ -1078,8 +1094,8 @@ export default function RefrigeratorVisual({
 
   // 식재료에 구획/선반을 (재)지정한다. 등록(POST)이 아니라 수정(PATCH)이므로
   // AddIngredientModal이 아니라 여기서 직접 처리하고 로컬 상태만 갱신한다.
-  const finalizeAssignLocation = async (item: Ingredient, compartmentId: string, shelfId: string) => {
-    const serverCompartmentId = addPickerShelves?.serverCompartmentId ?? null;
+  const finalizeAssignLocation = async (item: Ingredient, compartmentId: string, shelfId: string, serverCompartmentIdOverride?: number | null) => {
+    const serverCompartmentId = serverCompartmentIdOverride !== undefined ? serverCompartmentIdOverride : (addPickerShelves?.serverCompartmentId ?? null);
     setAddLocationPickerVisible(false);
     try {
       if (isLoggedIn) {
