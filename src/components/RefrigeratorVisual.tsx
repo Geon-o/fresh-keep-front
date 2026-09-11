@@ -4047,7 +4047,7 @@ const styles = StyleSheet.create({
   },
   fridgeCard: {
     width: '90%',
-    height: '92%',
+    height: '96%',
     borderRadius: 28,
     borderWidth: 1.5,
     padding: 20,
