@@ -2998,17 +2998,25 @@ export default function RefrigeratorVisual({
                     </View>
                   ))}
 
-                  <View style={styles.memoTileWrapper}>
-                    <TouchableOpacity
-                      style={[styles.memoTile, styles.memoAddTile, { borderColor: theme.primary, backgroundColor: theme.primaryLight }]}
-                      activeOpacity={0.7}
-                      onPress={() => openMemoComposer()}
-                    >
-                      <Ionicons name="add" size={26} color={theme.primary} />
-                    </TouchableOpacity>
-                  </View>
+                  {memoEntries.length === 0 && (
+                    <View style={{ width: '100%', paddingVertical: 48, alignItems: 'center' }}>
+                      <Ionicons name="document-text-outline" size={44} color={theme.textMuted} style={{ marginBottom: 10 }} />
+                      <Text style={{ color: theme.textSecondary, fontSize: 15, fontWeight: '600' }}>등록된 메모가 없어요.</Text>
+                    </View>
+                  )}
                 </View>
               </ScrollView>
+            )}
+
+            {/* 메모 작성 플로팅 버튼 (식재료 목록 FAB와 동일한 아웃라인 고스트 스타일) */}
+            {!memoLoading && (
+              <TouchableOpacity
+                style={[styles.addIngredientFab, { backgroundColor: theme.surface, borderWidth: 2, borderColor: theme.primary, shadowColor: theme.shadow }]}
+                activeOpacity={0.85}
+                onPress={() => openMemoComposer()}
+              >
+                <Ionicons name="add" size={28} color={theme.primaryText} />
+              </TouchableOpacity>
             )}
           </View>
         </View>
@@ -3893,7 +3901,7 @@ const styles = StyleSheet.create({
   },
   fridgeCardMemoDot: {
     position: 'absolute',
-    top: -4,
+    bottom: -4,
     right: -4,
     width: 12,
     height: 12,
