@@ -2391,27 +2391,18 @@ export default function RefrigeratorVisual({
                         </TouchableOpacity>
 
                         {isLoggedIn && (
-                          <View style={styles.fridgeMemoStickerWrapper}>
+                          <View style={styles.fridgeMemoTagWrapper} pointerEvents="box-none">
+                            {/* 카드 상단에 클립처럼 걸린 노란 메모 태그 */}
                             <TouchableOpacity
-                              style={styles.fridgeMemoSticker}
-                              activeOpacity={0.75}
+                              style={styles.fridgeMemoTag}
+                              activeOpacity={0.8}
                               onPress={() => openMemoList(fridge.id)}
                             >
-                              {/* 메모 패드 특유의 노란 뜯는 커버 + 절취선(점선) + 줄노트 */}
-                              <View style={styles.fridgeMemoStickerCap} />
-                              <View style={styles.fridgeMemoStickerPerforation}>
-                                {Array.from({ length: 6 }).map((_, i) => (
-                                  <View key={i} style={styles.fridgeMemoStickerDot} />
-                                ))}
-                              </View>
-                              {[20, 27].map((top) => (
-                                <View key={top} style={[styles.fridgeMemoStickerLine, { top }]} />
-                              ))}
+                              <Text style={styles.fridgeMemoTagText}>메모</Text>
+                              {fridge.hasUnreadMemo && (
+                                <View style={[styles.fridgeCardMemoDot, { backgroundColor: theme.danger, borderColor: '#FFFDF0' }]} pointerEvents="none" />
+                              )}
                             </TouchableOpacity>
-                            {/* 빨간 점은 sticker의 overflow:hidden 때문에 잘려서 형제로 뺀다 */}
-                            {fridge.hasUnreadMemo && (
-                              <View style={[styles.fridgeCardMemoDot, { backgroundColor: theme.danger, borderColor: '#FFFDF0' }]} pointerEvents="none" />
-                            )}
                           </View>
                         )}
 
@@ -3873,64 +3864,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 10,
   },
-  fridgeMemoStickerWrapper: {
+  fridgeMemoTagWrapper: {
     position: 'absolute',
-    top: 14,
-    right: 54,
-    width: 32,
-    height: 32,
+    top: -6,
+    right: 68,
     zIndex: 10,
   },
-  fridgeMemoSticker: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#FFFDF0',
-    borderRadius: 4,
-    overflow: 'hidden',
-    transform: [{ rotate: '6deg' }],
+  fridgeMemoTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 56,
+    paddingHorizontal: 16,
+    paddingVertical: 5,
+    borderRadius: 9,
+    backgroundColor: '#FFC107',
     shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 2 },
     elevation: 4,
   },
-  // 메모 패드 위쪽의 노란 뜯는 커버. 아래쪽 모서리를 크게 둥글려서 아치형으로 보이게 한다.
-  fridgeMemoStickerCap: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 9,
-    backgroundColor: '#FFC107',
-  },
-  fridgeMemoStickerPerforation: {
-    position: 'absolute',
-    top: 13,
-    left: 2,
-    right: 2,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  fridgeMemoStickerDot: {
-    width: 2,
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: 'rgba(0,0,0,0.25)',
-  },
-  fridgeMemoStickerLine: {
-    position: 'absolute',
-    left: 4,
-    right: 4,
-    height: 1,
-    backgroundColor: 'rgba(0,0,0,0.18)',
+  fridgeMemoTagText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#5C4500',
   },
   fridgeCardMemoDot: {
     position: 'absolute',
-    top: -6,
-    right: -6,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    top: -4,
+    right: -4,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     borderWidth: 2,
   },
   memoTypeSegmentRow: {
@@ -4087,6 +4053,7 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.08,
