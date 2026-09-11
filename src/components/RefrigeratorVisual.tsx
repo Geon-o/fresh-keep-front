@@ -3766,15 +3766,15 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   urgentDDayBadge: {
-    height: 28,
-    paddingHorizontal: 12,
-    borderRadius: 9,
+    height: 24,
+    paddingHorizontal: 10,
+    borderRadius: 8,
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   urgentDDayText: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: 'bold',
     includeFontPadding: false,
     textAlignVertical: 'center',
@@ -4657,11 +4657,11 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   ingCardName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
   },
   ingCardQtyInline: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '700',
   },
   ingCardTopRow: {
@@ -4669,11 +4669,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 14,
+    marginBottom: 6,
   },
   ingCardTopLocText: {
     flex: 1,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
   },
   ingCardTopRowIcons: {
