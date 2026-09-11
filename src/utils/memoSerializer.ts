@@ -52,6 +52,9 @@ export function convertServerLocationToLocal(
   const isLeft = name.includes('좌');
   const isRight = name.includes('우');
   
+  if (storageType === 'ROOM_TEMP') {
+    return 'pantry';
+  }
   if (storageType === 'FROZEN') {
     return isLeft || isRight ? `freezer_${isLeft ? 'left' : 'right'}` : 'freezer';
   }

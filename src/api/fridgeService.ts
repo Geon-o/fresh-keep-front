@@ -184,6 +184,23 @@ export async function updateFridge(fridgeId: number, name: string, type: FridgeT
   return response.data;
 }
 
+/**
+ * 5-2. 실온 보관함(팬트리) 사용 켜기 — 해당 냉장고에 ROOM_TEMP 구획을 만든다.
+ */
+export async function enablePantry(fridgeId: number): Promise<void> {
+  await client.post(`/api/fridges/${fridgeId}/pantry`);
+  await invalidateFridgeLayout(fridgeId);
+}
+
+/**
+ * 5-3. 실온 보관함(팬트리) 사용 끄기 — ROOM_TEMP 구획을 삭제한다.
+ * 안에 식재료가 남아있으면 서버가 400을 반환하므로 호출부에서 메시지를 노출한다.
+ */
+export async function disablePantry(fridgeId: number): Promise<void> {
+  await client.delete(`/api/fridges/${fridgeId}/pantry`);
+  await invalidateFridgeLayout(fridgeId);
+}
+
 const DEFAULT_INSIDE_SHELVES = [
   { id: 'shelf_1', label: '선반 1단' },
   { id: 'shelf_2', label: '선반 2단' },
@@ -210,6 +227,9 @@ export async function getCompartmentShelves(fridgeId: string, compartmentId: str
   const isLeft = compartmentId.includes('left');
   const isRight = compartmentId.includes('right');
   const serverComp = layout.compartments.find(comp => {
+    if (compartmentId === 'pantry') {
+      return comp.storageType === 'ROOM_TEMP';
+    }
     if (compartmentId.startsWith('freezer')) {
       if (comp.storageType !== 'FROZEN') return false;
     } else {

@@ -187,10 +187,10 @@ export default function Index() {
           
           // 캐시 갱신
           queryClient.invalidateQueries({ queryKey: ['fridges'] });
-          Alert.alert('공동 관리 냉장고 추가 성공 🎉', '공유된 냉장고가 정상적으로 목록에 추가되었습니다.');
+          Alert.alert('공동 관리 냉장고 추가 성공 🎉', '공유된 냉장고가 정상적으로 목록에 추가되었어요.');
         } catch (e: any) {
           console.error('Failed to join shared fridge via deep link', e);
-          const errMsg = e.response?.data?.message || '이미 공유 등록된 냉장고이거나 유효하지 않은 공유 링크입니다.';
+          const errMsg = e.response?.data?.message || '이미 공유 등록된 냉장고이거나 유효하지 않은 공유 링크예요.';
           Alert.alert('공유 냉장고 연동 실패 ❌', errMsg);
         } finally {
           setIsGlobalLoading(false);
@@ -236,7 +236,7 @@ export default function Index() {
         return true;
       } else {
         backPressedTimeRef.current = now;
-        showToast('✅ 한 번 더 뒤로가면 앱이 꺼집니다.');
+        showToast('✅ 한 번 더 뒤로가면 앱이 꺼져요.');
         return true;
       }
     };
@@ -317,7 +317,7 @@ export default function Index() {
     setActiveTab('home');
     const label = provider === 'google' ? '구글' : '네이버';
     if (Platform.OS === 'android') {
-      ToastAndroid.show(`${label} 로그인 했습니다.`, ToastAndroid.SHORT);
+      ToastAndroid.show(`${label} 로그인 했어요.`, ToastAndroid.SHORT);
     }
   };
 
@@ -520,7 +520,7 @@ export default function Index() {
       return;
     }
     if (trimmedName.length > 20) {
-      Alert.alert('경고 ⚠️', '냉장고 이름은 최대 20자까지 설정 가능합니다.');
+      Alert.alert('경고 ⚠️', '냉장고 이름은 최대 20자까지 설정 가능해요.');
       return;
     }
 
@@ -600,17 +600,17 @@ export default function Index() {
         showToast('냉장고가 삭제되었습니다 🗑️');
         await resetActiveFridgeIndex();
       } else if (isOwner) {
-        showToast('삭제 요청을 보냈습니다. 함께 쓰는 멤버가 동의하면 삭제됩니다.');
+        showToast('삭제 요청을 보냈어요. 함께 쓰는 멤버가 동의하면 삭제돼요.');
       } else {
-        showToast('냉장고에서 나갔습니다.');
+        showToast('냉장고에서 나갔어요.');
         await resetActiveFridgeIndex();
       }
     };
 
     Alert.alert(
       isOwner
-        ? `[${activeFridge.name}]와 보관 중인 모든 식재료 데이터가 함께 영구 삭제됩니다. 함께 쓰는 멤버가 있다면 먼저 동의를 요청합니다. 삭제하시겠습니까?`
-        : `[${activeFridge.name}]에서 나가시겠습니까? 나가도 그동안 등록한 식재료는 그대로 남습니다.`,
+        ? `[${activeFridge.name}]와 보관 중인 모든 식재료 데이터가 함께 영구 삭제돼요. 함께 쓰는 멤버가 있다면 먼저 동의를 요청해요. 삭제하시겠어요?`
+        : `[${activeFridge.name}]에서 나가시겠어요? 나가도 그동안 등록한 식재료는 그대로 남아요.`,
       undefined,
       [
         { text: '취소', style: 'cancel' },
@@ -626,10 +626,10 @@ export default function Index() {
       const result = await approveDeletion(Number(activeFridge.id));
       queryClient.invalidateQueries({ queryKey: ['fridges'] });
       if (result.deleted) {
-        showToast('삭제에 동의했습니다. 냉장고가 삭제되었습니다 🗑️');
+        showToast('삭제에 동의했어요. 냉장고가 삭제되었어요 🗑️');
         await resetActiveFridgeIndex();
       } else {
-        showToast('삭제에 동의했습니다. 다른 멤버의 동의를 기다리는 중입니다.');
+        showToast('삭제에 동의했어요. 다른 멤버의 동의를 기다리는 중이에요.');
       }
     } catch (e) {
       console.error('Failed to approve fridge deletion', e);
@@ -642,7 +642,7 @@ export default function Index() {
     try {
       await rejectDeletion(Number(activeFridge.id));
       queryClient.invalidateQueries({ queryKey: ['fridges'] });
-      showToast('삭제 요청을 거절했습니다.');
+      showToast('삭제 요청을 거절했어요.');
     } catch (e) {
       console.error('Failed to reject fridge deletion', e);
     }
@@ -654,7 +654,7 @@ export default function Index() {
     try {
       await cancelDeletionRequest(Number(activeFridge.id));
       queryClient.invalidateQueries({ queryKey: ['fridges'] });
-      showToast('삭제 요청을 철회했습니다.');
+      showToast('삭제 요청을 철회했어요.');
     } catch (e) {
       console.error('Failed to cancel fridge deletion request', e);
     }
@@ -708,6 +708,9 @@ export default function Index() {
         const serverComp = layout.compartments.find((comp: any) => {
           const isLeft = targetCompartmentId.includes('left');
           const isRight = targetCompartmentId.includes('right');
+          if (targetCompartmentId === 'pantry') {
+            return comp.storageType === 'ROOM_TEMP';
+          }
           if (targetCompartmentId.startsWith('freezer')) {
             if (comp.storageType !== 'FROZEN') return false;
           } else {
@@ -719,7 +722,7 @@ export default function Index() {
         });
 
         if (!serverComp) {
-          throw new Error('이동 대상 서버 구획을 찾을 수 없습니다.');
+          throw new Error('이동 대상 서버 구획을 찾을 수 없어요.');
         }
 
         const memoContent = serializeMemo(category as any, targetShelfId, currentMemo);

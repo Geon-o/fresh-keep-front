@@ -120,7 +120,7 @@ export default function LoginScreen() {
             ) : (
               <View style={styles.buttonContainer}>
                 <Text style={[styles.infoText, { color: theme.textSecondary }]}>
-                  냉장고집사는 기기별 안전한 로컬 저장과 백엔드 익명 세션을 기반으로 별도의 가입 없이 즉시 작동합니다.{"\n\n"}
+                  냉장고집사는 기기별 안전한 로컬 저장과 백엔드 익명 세션을 기반으로 별도의 가입 없이 즉시 작동해요.{"\n\n"}
                   이전 기기의 연동 코드를 가지고 계신가요?
                 </Text>
                 

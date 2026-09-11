@@ -22,7 +22,7 @@ export default function ResetSettingScreen() {
     if (!isResetChecked) return;
     Alert.alert(
       '정말 회원탈퇴하시겠어요?',
-      '확인을 누르면 계정과 소셜 로그인 연결, 모든 데이터가 즉시 삭제되며 되돌릴 수 없습니다.',
+      '확인을 누르면 계정과 소셜 로그인 연결, 모든 데이터가 즉시 삭제되며 되돌릴 수 없어요.',
       [
         { text: '취소', style: 'cancel' },
         { text: '회원탈퇴', style: 'destructive', onPress: runWithdraw },
@@ -57,9 +57,9 @@ export default function ResetSettingScreen() {
           </View>
 
           <Text style={[styles.alertBody, { color: descColor }]}>
-            회원탈퇴를 진행하면 계정과 소셜 로그인(구글·네이버) 연결, 등록한 모든 냉장고·식재료 데이터가 서버와 기기에서 영구히 삭제됩니다.{"\n\n"}
-            다른 사람과 공유 중인 냉장고 중 내가 만든 냉장고는 함께 삭제되어, 공유받던 사용자에게도 더 이상 보이지 않게 됩니다.{"\n\n"}
-            기기 변경·재설치로 데이터를 이어가려면 탈퇴 대신 간편 로그인 또는 '연동 코드'를 사용해 주세요. 본 작업은 되돌릴 수 없습니다.
+            회원탈퇴를 진행하면 계정과 소셜 로그인(구글·네이버) 연결, 등록한 모든 냉장고·식재료 데이터가 서버와 기기에서 영구히 삭제돼요.{"\n\n"}
+            다른 사람과 공유 중인 냉장고 중 내가 만든 냉장고는 함께 삭제되어, 공유받던 사용자에게도 더 이상 보이지 않게 돼요.{"\n\n"}
+            기기 변경·재설치로 데이터를 이어가려면 탈퇴 대신 간편 로그인 또는 '연동 코드'를 사용해 주세요. 본 작업은 되돌릴 수 없어요.
           </Text>
 
           <TouchableOpacity 
@@ -72,7 +72,7 @@ export default function ResetSettingScreen() {
               size={22} 
               color={isResetChecked ? theme.primary : descColor} 
             />
-            <Text style={[styles.checkboxText, { color: titleColor }]}>이해했습니다.</Text>
+            <Text style={[styles.checkboxText, { color: titleColor }]}>이해했어요.</Text>
           </TouchableOpacity>
         </View>
 

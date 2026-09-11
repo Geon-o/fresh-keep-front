@@ -263,11 +263,11 @@ export default function AddIngredientModal({ visible, fridgeId, compartmentId, s
         }
       } else if (isLoggedIn) {
         if (!fridgeId) {
-          throw new Error('냉장고 ID를 로드하지 못했습니다.');
+          throw new Error('냉장고 ID를 로드하지 못했어요.');
         }
         // compartmentId가 지정된 경우에만 서버 구획 ID가 필수 (없으면 "위치 미정" 등록)
         if (compartmentId && !serverCompartmentId) {
-          throw new Error('서버 구획 ID를 로드하지 못했습니다.');
+          throw new Error('서버 구획 ID를 로드하지 못했어요.');
         }
         await addIngredient({
           fridgeId: Number(fridgeId),
@@ -308,7 +308,7 @@ export default function AddIngredientModal({ visible, fridgeId, compartmentId, s
       }
     } catch (e) {
       console.error('Failed to save ingredient', e);
-      Alert.alert('오류 ⚠️', '식재료를 저장하지 못했습니다.');
+      Alert.alert('오류 ⚠️', '식재료를 저장하지 못했어요.');
     } finally {
       isSavingRef.current = false;
       setIsSaving(false);

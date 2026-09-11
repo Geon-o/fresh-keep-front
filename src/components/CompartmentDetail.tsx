@@ -504,7 +504,7 @@ export default function CompartmentDetail({
         await loadData(targetCompartmentId);
       } catch (error) {
         console.error('Failed to move ingredient:', error);
-        Alert.alert('이동 실패 ⚠️', '식재료 위치를 변경하는 중 오류가 발생했습니다.');
+        Alert.alert('이동 실패 ⚠️', '식재료 위치를 변경하는 중 오류가 발생했어요.');
       }
     }
     
@@ -651,6 +651,8 @@ export default function CompartmentDetail({
   const [doorPanelHeight, setDoorPanelHeight] = useState(0);
   const DOOR_TOGGLE_BAR_HEIGHT = 38;
   const DOOR_DRAWER_HEIGHT = Math.min(screenHeight * 0.6, 480);
+  // 실온 보관함(팬트리) 식재료 목록의 고정 높이 — 식재료가 적어도 영역을 크게 유지하고, 넘치면 목록 내부에서 세로 스크롤한다.
+  const PANTRY_LIST_HEIGHT = screenHeight * 0.72;
   const doorSlideDistance = Math.min(doorPanelHeight || DOOR_DRAWER_HEIGHT, DOOR_DRAWER_HEIGHT);
 
   // 식재료 폼 상태
@@ -787,6 +789,9 @@ export default function CompartmentDetail({
         const serverComp = layout.compartments.find(comp => {
           const isLeft = targetId.includes('left');
           const isRight = targetId.includes('right');
+          if (targetId === 'pantry') {
+            return comp.storageType === 'ROOM_TEMP';
+          }
           if (targetId.startsWith('freezer')) {
             if (comp.storageType !== 'FROZEN') return false;
           } else {
@@ -1156,7 +1161,7 @@ export default function CompartmentDetail({
       try {
         if (modalMode === 'add') {
           if (!serverCompartmentId) {
-            throw new Error('서버 구획 ID를 로드하지 못했습니다.');
+            throw new Error('서버 구획 ID를 로드하지 못했어요.');
           }
           const savedIng = await addIngredient({
             fridgeId: Number(fridgeId),
@@ -1215,7 +1220,7 @@ export default function CompartmentDetail({
         }
       } catch (e) {
         console.error('Failed to save ingredient to server', e);
-        Alert.alert('오류 ⚠️', '서버에 식재료를 저장하지 못했습니다.');
+        Alert.alert('오류 ⚠️', '서버에 식재료를 저장하지 못했어요.');
         return;
       }
     } else {
@@ -1275,7 +1280,7 @@ export default function CompartmentDetail({
           setIngredients(updated);
         } catch (e) {
           console.error('Failed to delete ingredient from server', e);
-          Alert.alert('오류 ⚠️', '식재료 삭제에 실패했습니다.');
+          Alert.alert('오류 ⚠️', '식재료 삭제에 실패했어요.');
           return;
         }
       } else {
@@ -1360,11 +1365,11 @@ export default function CompartmentDetail({
 
     if (hasItems) {
       if (Platform.OS === 'web') {
-        const check = window.confirm(`[${label}]에 보관 중인 식재료가 있습니다.\n선반을 삭제하시면 보관 중인 식재료도 함께 영구 삭제됩니다. 계속하시겠습니까?`);
+        const check = window.confirm(`[${label}]에 보관 중인 식재료가 있어요.\n선반을 삭제하시면 보관 중인 식재료도 함께 영구 삭제돼요. 계속하시겠어요?`);
         if (check) performDelete();
       } else {
         Alert.alert(
-          `[${label}]에 보관 중인 식재료가 존재합니다. 선반을 삭제하시면 보관 중인 식재료도 함께 삭제됩니다. 계속하시겠습니까?`,
+          `[${label}]에 보관 중인 식재료가 있어요. 선반을 삭제하시면 보관 중인 식재료도 함께 삭제돼요. 계속하시겠어요?`,
           undefined,
           [
             { text: '취소', style: 'cancel' },
@@ -1410,12 +1415,12 @@ export default function CompartmentDetail({
       if (hasItemsInDoor || doorShelves.length > 0) {
         if (Platform.OS === 'web') {
           const check = window.confirm(
-            '문쪽 보관실을 비활성화하면 보관 중인 문쪽 식재료와 선반 구성이 모두 삭제됩니다. 계속하시겠습니까?'
+            '문쪽 보관실을 비활성화하면 보관 중인 문쪽 식재료와 선반 구성이 모두 삭제돼요. 계속하시겠어요?'
           );
           if (check) performDisable();
         } else {
           Alert.alert(
-            '문쪽 보관실을 비활성화하면 보관 중인 문쪽 식재료와 선반 구성이 모두 삭제됩니다. 계속하시겠습니까?',
+            '문쪽 보관실을 비활성화하면 보관 중인 문쪽 식재료와 선반 구성이 모두 삭제돼요. 계속하시겠어요?',
             undefined,
             [
               { text: '취소', style: 'cancel' },
@@ -1456,7 +1461,9 @@ export default function CompartmentDetail({
   // 선반 아코디언 카드 렌더러 (안쪽/문쪽 공용)
   const renderShelfCard = (shelf: { id: string; label: string }, section: 'inside' | 'door') => {
     const items = getItemsBySubLocation(shelf.id);
-    const isExpanded = expandedShelfIds.has(shelf.id);
+    // 실온 보관함(팬트리)은 위치(칸)가 목적이 아니라 "안에 뭐가 있는지"가 중점이라 선반 헤더 없이 항상 펼친 목록만 보여준다.
+    const isPantry = compartmentId === 'pantry';
+    const isExpanded = isPantry || expandedShelfIds.has(shelf.id);
 
     return (
       <View
@@ -1464,64 +1471,79 @@ export default function CompartmentDetail({
         ref={el => { shelfRefs.current[shelf.id] = el; }}
         style={[styles.shelfCard, activeHoverShelfId === shelf.id && styles.shelfHovered]}
       >
-        <TouchableOpacity
-          style={styles.shelfCardHeader}
-          activeOpacity={0.7}
-          onPress={() => toggleShelfExpanded(shelf.id)}
-        >
-          <Text style={styles.shelfLabel} numberOfLines={1}>{shelf.label}</Text>
-          <View style={styles.shelfCountBadge}>
-            <Text style={styles.shelfCountBadgeText}>{items.length}개</Text>
-          </View>
-          <Text style={styles.shelfExpandIcon}>{isExpanded ? '▾' : '▸'}</Text>
+        {!isPantry && (
           <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={() => handleDeleteShelf(shelf.id, shelf.label, section)}
+            style={styles.shelfCardHeader}
+            activeOpacity={0.7}
+            onPress={() => toggleShelfExpanded(shelf.id)}
           >
-            <Text style={styles.deleteButtonText}>✕</Text>
+            <Text style={styles.shelfLabel} numberOfLines={1}>{shelf.label}</Text>
+            <View style={styles.shelfCountBadge}>
+              <Text style={styles.shelfCountBadgeText}>{items.length}개</Text>
+            </View>
+            <Text style={styles.shelfExpandIcon}>{isExpanded ? '▾' : '▸'}</Text>
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={() => handleDeleteShelf(shelf.id, shelf.label, section)}
+            >
+              <Text style={styles.deleteButtonText}>✕</Text>
+            </TouchableOpacity>
           </TouchableOpacity>
-        </TouchableOpacity>
+        )}
 
         {isExpanded && (
-          <View style={styles.shelfExpandedContent}>
+          <View style={[styles.shelfExpandedContent, isPantry && { maxHeight: PANTRY_LIST_HEIGHT, marginTop: 0, paddingTop: 0, borderTopWidth: 0 }]}>
             <ScrollView
               showsVerticalScrollIndicator={true}
+              style={isPantry ? { height: PANTRY_LIST_HEIGHT } : undefined}
               contentContainerStyle={styles.shelfItemsScroll}
               scrollEnabled={scrollEnabled}
               nestedScrollEnabled
             >
-              {items.map(item => (
-                <DraggableBadge
-                  key={item.id}
-                  item={item}
-                  shelfId={shelf.id}
-                  draggingItem={draggingItem}
-                  setDraggingItem={setDraggingItem}
-                  dragPosition={dragPosition}
-                  setDragCurrentCoords={setDragCurrentCoords}
-                  setScrollEnabled={setScrollEnabled}
-                  setActiveHoverShelfId={setActiveHoverShelfId}
-                  compartmentId={compartmentId}
-                  onNavigateCompartment={onNavigateCompartment}
-                  onPressItem={handleOpenEditModal}
-                  measureShelves={measureShelves}
-                  shelfLayouts={shelfLayouts}
-                  lastSwappedTime={lastSwappedTime}
-                  screenWidth={screenWidth}
-                  theme={theme}
-                  styles={styles}
-                  handleDropIngredient={handleDropIngredient}
-                  getFourDoorSwitchTarget={getFourDoorSwitchTarget}
-                  getDDayInfo={getDDayInfo}
-                />
-              ))}
-              <TouchableOpacity
-                style={styles.addIngredientBadge}
-                activeOpacity={0.7}
-                onPress={() => handleOpenAddModal(shelf.id)}
-              >
-                <Text style={styles.addIngredientBadgeText}>+ 식재료 추가하기</Text>
-              </TouchableOpacity>
+              {isPantry && items.length === 0 ? (
+                <View style={{ height: PANTRY_LIST_HEIGHT - 24, alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="restaurant-outline" size={48} color={theme.textMuted} style={{ marginBottom: 12 }} />
+                  <Text style={{ color: theme.textSecondary, fontSize: 15, fontWeight: '600' }}>등록된 식재료가 없어요.</Text>
+                </View>
+              ) : (
+                <>
+                  {items.map(item => (
+                    <DraggableBadge
+                      key={item.id}
+                      item={item}
+                      shelfId={shelf.id}
+                      draggingItem={draggingItem}
+                      setDraggingItem={setDraggingItem}
+                      dragPosition={dragPosition}
+                      setDragCurrentCoords={setDragCurrentCoords}
+                      setScrollEnabled={setScrollEnabled}
+                      setActiveHoverShelfId={setActiveHoverShelfId}
+                      compartmentId={compartmentId}
+                      onNavigateCompartment={onNavigateCompartment}
+                      onPressItem={handleOpenEditModal}
+                      measureShelves={measureShelves}
+                      shelfLayouts={shelfLayouts}
+                      lastSwappedTime={lastSwappedTime}
+                      screenWidth={screenWidth}
+                      theme={theme}
+                      styles={styles}
+                      handleDropIngredient={handleDropIngredient}
+                      getFourDoorSwitchTarget={getFourDoorSwitchTarget}
+                      getDDayInfo={getDDayInfo}
+                    />
+                  ))}
+                  {/* 실온 보관함(팬트리)은 인라인 버튼 대신 우측 하단 플로팅 버튼으로 등록한다 */}
+                  {!isPantry && (
+                    <TouchableOpacity
+                      style={styles.addIngredientBadge}
+                      activeOpacity={0.7}
+                      onPress={() => handleOpenAddModal(shelf.id)}
+                    >
+                      <Text style={styles.addIngredientBadgeText}>+ 식재료 추가하기</Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              )}
             </ScrollView>
           </View>
         )}
@@ -1553,16 +1575,18 @@ export default function CompartmentDetail({
         </View>
       ) : (
         <>
-          {/* 설정 바: 문쪽 보관실 사용 설정 */}
-          <View style={styles.settingsBar}>
-            <Text style={styles.settingsLabel}>문쪽 보관실 사용</Text>
-            <Switch
-              value={hasDoorStorage}
-              onValueChange={handleToggleDoorStorage}
-              trackColor={{ false: theme.toggleBg, true: theme.primary }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
+          {/* 설정 바: 문쪽 보관실 사용 설정 — 실온 보관함(팬트리)엔 문쪽 개념이 없어 숨긴다 */}
+          {compartmentId !== 'pantry' && (
+            <View style={styles.settingsBar}>
+              <Text style={styles.settingsLabel}>문쪽 보관실 사용</Text>
+              <Switch
+                value={hasDoorStorage}
+                onValueChange={handleToggleDoorStorage}
+                trackColor={{ false: theme.toggleBg, true: theme.primary }}
+                thumbColor="#FFFFFF"
+              />
+            </View>
+          )}
 
           {/* 문쪽 보관실 여닫기 바 + 아래로 펼쳐지는 드로어 (설정 바 바로 아래, 안쪽 보관실 위에 겹쳐서 열림) */}
           {hasDoorStorage && (
@@ -1633,13 +1657,16 @@ export default function CompartmentDetail({
             >
               {insideShelves.map((shelf) => renderShelfCard(shelf, 'inside'))}
 
-              <TouchableOpacity
-                style={styles.addShelfButton}
-                activeOpacity={0.7}
-                onPress={() => handleAddShelf('inside')}
-              >
-                <Text style={styles.addShelfButtonText}>+ 선반 추가</Text>
-              </TouchableOpacity>
+              {/* 실온 보관함(팬트리)은 칸을 나누지 않으므로 선반 추가 버튼을 두지 않는다 */}
+              {compartmentId !== 'pantry' && (
+                <TouchableOpacity
+                  style={styles.addShelfButton}
+                  activeOpacity={0.7}
+                  onPress={() => handleAddShelf('inside')}
+                >
+                  <Text style={styles.addShelfButtonText}>+ 선반 추가</Text>
+                </TouchableOpacity>
+              )}
             </ScrollView>
 
             {/* 문쪽 보관실이 열려있는 동안 안쪽 보관실 영역만 어둡게 (뒷배경 전체가 아니라 이 영역만) */}
@@ -1652,6 +1679,17 @@ export default function CompartmentDetail({
             )}
           </Animated.View>
         </>
+      )}
+
+      {/* 실온 보관함(팬트리) 식재료 등록 플로팅 버튼 (식재료 메뉴의 FAB와 동일한 아웃라인 고스트 스타일) */}
+      {compartmentId === 'pantry' && !isLoading && (
+        <TouchableOpacity
+          style={[styles.pantryAddFab, { backgroundColor: theme.surface, borderColor: theme.primary, shadowColor: theme.shadow }]}
+          activeOpacity={0.85}
+          onPress={() => handleOpenAddModal('shelf_1')}
+        >
+          <Ionicons name="add" size={28} color={theme.primaryText} />
+        </TouchableOpacity>
       )}
 
       {/* 식재료 등록/수정 모달 */}
@@ -2250,6 +2288,21 @@ export function createStyles(theme: ThemeColors, isDark: boolean) {
       fontSize: 13,
       fontWeight: 'bold',
       color: theme.textTertiary,
+    },
+    pantryAddFab: {
+      position: 'absolute',
+      right: 20,
+      bottom: 24,
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      borderWidth: 2,
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 6,
     },
     shelfExpandedContent: {
       maxHeight: 260,

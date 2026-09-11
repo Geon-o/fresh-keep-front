@@ -119,7 +119,7 @@ export default function BackupViewScreen() {
           ) : (
             <View style={styles.noKeyWrapper}>
               <Ionicons name="alert-circle-outline" size={20} color="#EF4444" />
-              <Text style={[styles.noKeyText, { color: '#EF4444' }]}>연동 코드를 불러오지 못했습니다.</Text>
+              <Text style={[styles.noKeyText, { color: '#EF4444' }]}>연동 코드를 불러오지 못했어요.</Text>
             </View>
           )}
         </View>
@@ -134,9 +134,9 @@ export default function BackupViewScreen() {
           </View>
           <Text style={[styles.warningBodyText, { color: descColor }]}>
             {backupKey ? (
-              `1. 기기 변경, 앱 삭제 시 이 연동 코드가 없으면 기존의 냉장고 데이터를 이어받을 수 없으니 분실하지 않도록 주의해 주세요.\n\n2. 연동 코드가 타인에게 노출되지 않도록 안전한 개인 메모장 등에 별도로 기록하여 보관하시는 것을 권장합니다.`
+              `1. 기기 변경, 앱 삭제 시 이 연동 코드가 없으면 기존의 냉장고 데이터를 이어받을 수 없으니 분실하지 않도록 주의해 주세요.\n\n2. 연동 코드가 타인에게 노출되지 않도록 안전한 개인 메모장 등에 별도로 기록하여 보관하시는 것을 권장해요.`
             ) : (
-              `연동 코드를 불러오지 못했습니다.\n\n네트워크 연결을 확인한 뒤 화면을 다시 열면 새 연동 코드가 자동으로 발급됩니다. 재발급되어도 기존 냉장고 데이터는 그대로 유지되며, 데이터를 지우려면 이 화면이 아니라 설정의 '초기화' 메뉴를 이용해야 합니다.`
+              `연동 코드를 불러오지 못했어요.\n\n네트워크 연결을 확인한 뒤 화면을 다시 열면 새 연동 코드가 자동으로 발급돼요. 재발급되어도 기존 냉장고 데이터는 그대로 유지되며, 데이터를 지우려면 이 화면이 아니라 설정의 '초기화' 메뉴를 이용해야 해요.`
             )}
           </Text>
         </View>

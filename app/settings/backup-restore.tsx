@@ -30,7 +30,7 @@ export default function BackupRestoreScreen() {
       }
     } catch (e) {
       console.error('Restore action error:', e);
-      Alert.alert('오류 ❌', '복구 처리 중 예상치 못한 에러가 발생했습니다.');
+      Alert.alert('오류 ❌', '복구 처리 중 예상치 못한 에러가 발생했어요.');
     } finally {
       setIsRestoring(false);
     }
@@ -64,7 +64,7 @@ export default function BackupRestoreScreen() {
 
       <ScrollView contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
         <Text style={[styles.sectionDesc, { color: descColor }]}>
-          보관 중인 연동 코드를 입력해 이전 기기의 냉장고 데이터를 안전하게 이어받습니다.
+          보관 중인 연동 코드를 입력해 이전 기기의 냉장고 데이터를 안전하게 이어받아요.
         </Text>
 
         {/* 연동 코드 입력 카드 */}
@@ -128,7 +128,7 @@ export default function BackupRestoreScreen() {
             <Text style={[styles.warningTitle, { color: isDark ? '#60A5FA' : '#2563EB' }]}>데이터 복구 시 주의사항</Text>
           </View>
           <Text style={[styles.warningBodyText, { color: descColor }]}>
-            {`1. 불러오기를 완료하면 현재 기기에 로컬 세션으로 저장되어 있던 기존 냉장고 구성 및 재료 목록은 지워집니다.\n\n2. 입력하신 연동 코드에 연결된 이전 클라우드 데이터베이스의 정보로 완벽하게 대체 및 갱신됩니다.\n\n3. 불러오기가 성공적으로 끝나면 안전한 데이터 동기화를 위해 메인 화면이 다시 로드됩니다.`}
+            {`1. 불러오기를 완료하면 현재 기기에 로컬 세션으로 저장되어 있던 기존 냉장고 구성 및 재료 목록은 지워져요.\n\n2. 입력하신 연동 코드에 연결된 이전 클라우드 데이터베이스의 정보로 완벽하게 대체 및 갱신돼요.\n\n3. 불러오기가 성공적으로 끝나면 안전한 데이터 동기화를 위해 메인 화면이 다시 로드돼요.`}
           </Text>
         </View>
       </ScrollView>

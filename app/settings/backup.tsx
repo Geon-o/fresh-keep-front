@@ -30,7 +30,7 @@ export default function BackupHubScreen() {
 
       <ScrollView contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
         <Text style={[styles.sectionDesc, { color: descColor }]}>
-          내 연동 코드를 확인하거나, 연동 코드를 입력해 다른 기기의 냉장고 데이터를 이어받을 수 있습니다.
+          내 연동 코드를 확인하거나, 연동 코드를 입력해 다른 기기의 냉장고 데이터를 이어받을 수 있어요.
         </Text>
 
         {/* 메뉴 선택 카드 */}

@@ -117,7 +117,7 @@ export default function RefrigeratorSelector({ onSelect, currentType }: Refriger
           <View style={[styles.warningModalContent, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
             <View style={styles.warningBody}>
               <Text style={[styles.warningText, { color: theme.textSecondary }]}>
-                냉장고의 타입을 변경하시면, <Text style={{ fontWeight: 'bold', color: theme.danger }}>현재 보관 중인 모든 식재료 데이터가 삭제</Text>되고 선택하신 구조의 새로운 냉장고로 배치됩니다.
+                냉장고의 타입을 변경하시면, <Text style={{ fontWeight: 'bold', color: theme.danger }}>현재 보관 중인 모든 식재료 데이터가 삭제</Text>되고 선택하신 구조의 새로운 냉장고로 배치돼요.
               </Text>
               <Text style={[styles.warningTextSub, { color: theme.textTertiary }]}>
                 이 작업은 되돌릴 수 없으니 신중히 결정해 주세요.
@@ -135,7 +135,7 @@ export default function RefrigeratorSelector({ onSelect, currentType }: Refriger
                   color={isAgreed ? theme.primary : theme.textMuted}
                 />
                 <Text style={[styles.checkboxLabel, { color: theme.textPrimary }]}>
-                  위 주의사항을 확인하였으며, 이에 동의합니다.
+                  위 주의사항을 확인하였으며, 이에 동의해요.
                 </Text>
               </TouchableOpacity>
             </View>

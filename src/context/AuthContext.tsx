@@ -230,13 +230,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         await fetchUserProfile();
         queryClient.invalidateQueries(); // 계정/표시이름이 바뀌면 레이아웃 캐시(식재료·등록자명)까지 전부 새로 받는다
-        Alert.alert('불러오기 성공 🎉', '이전 기기의 데이터를 정상적으로 불러왔습니다.');
+        Alert.alert('불러오기 성공 🎉', '이전 기기의 데이터를 정상적으로 불러왔어요.');
         return true;
       }
       return false;
     } catch (e: any) {
       console.error('Restore failed', e);
-      const errMsg = e.response?.data?.message || '유효하지 않은 연동 코드이거나 네트워크 오류입니다.';
+      const errMsg = e.response?.data?.message || '유효하지 않은 연동 코드이거나 네트워크 오류예요.';
       Alert.alert('불러오기 실패 ❌', errMsg);
       return false;
     } finally {
@@ -291,13 +291,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const loginWithGoogle = async (): Promise<SocialLoginResult> => {
-    if (Platform.OS === 'web') return { status: 'error', message: '웹에서는 지원하지 않습니다.' };
+    if (Platform.OS === 'web') return { status: 'error', message: '웹에서는 지원하지 않아요.' };
     try {
       await GoogleSignin.hasPlayServices();
       const res = await GoogleSignin.signIn();
       if (!isSuccessResponse(res)) return { status: 'cancelled' };
       const idToken = res.data.idToken;
-      if (!idToken) return { status: 'error', message: 'idToken을 받지 못했습니다.' };
+      if (!idToken) return { status: 'error', message: 'idToken을 받지 못했어요.' };
       return await postSocial('/api/auth/social/google', { idToken });
     } catch (e: any) {
       if (isErrorWithCode(e) && e.code === statusCodes.SIGN_IN_CANCELLED) {
@@ -309,7 +309,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const loginWithNaver = async (): Promise<SocialLoginResult> => {
-    if (Platform.OS === 'web') return { status: 'error', message: '웹에서는 지원하지 않습니다.' };
+    if (Platform.OS === 'web') return { status: 'error', message: '웹에서는 지원하지 않아요.' };
     try {
       const res = await NaverLogin.login();
       if (!res.isSuccess || !res.successResponse) {
@@ -370,11 +370,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await loginAnonymously();
 
       if (serverDeleteSucceeded) {
-        Alert.alert('회원탈퇴 완료', '계정과 소셜 로그인 연결, 모든 데이터가 삭제되었습니다.');
+        Alert.alert('회원탈퇴 완료', '계정과 소셜 로그인 연결, 모든 데이터가 삭제되었어요.');
       } else {
         Alert.alert(
           '일부만 완료됨 ⚠️',
-          '이 기기의 데이터는 삭제됐지만, 서버에서 계정 삭제 요청이 실패했습니다. 네트워크 상태를 확인한 뒤 설정에서 다시 시도해 주세요.'
+          '이 기기의 데이터는 삭제됐지만, 서버에서 계정 삭제 요청이 실패했어요. 네트워크 상태를 확인한 뒤 설정에서 다시 시도해 주세요.'
         );
       }
     } catch (e) {

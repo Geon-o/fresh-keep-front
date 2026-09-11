@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions, TextInput, Platform, ActivityIndicator, Linking, Alert, Modal, Animated, PanResponder, DeviceEventEmitter, KeyboardAvoidingView } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions, TextInput, Platform, ActivityIndicator, Linking, Alert, Modal, Animated, PanResponder, DeviceEventEmitter, KeyboardAvoidingView, Switch } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -11,7 +11,7 @@ import { FridgeType, Ingredient, Memo, MemoType, ChecklistItem } from '../types'
 import { SAMPLE_INGREDIENTS, CATEGORY_EMOJI, DEFAULT_INSIDE_SHELVES, DEFAULT_DOOR_SHELVES } from './CompartmentDetail';
 import AddIngredientModal from './AddIngredientModal';
 import { useAuth } from '../context/AuthContext';
-import { getFridgeLayoutCached, getCompartmentShelves, CompartmentShelfInfo, getFridgeHistory, IngredientHistoryEntry } from '../api/fridgeService';
+import { getFridgeLayoutCached, getCompartmentShelves, CompartmentShelfInfo, getFridgeHistory, IngredientHistoryEntry, enablePantry, disablePantry } from '../api/fridgeService';
 import { deleteIngredient, updateIngredient } from '../api/ingredientService';
 import { getMemos, createMemo, updateMemo, deleteMemo, toggleMemoItem, markMemosRead } from '../api/memoService';
 import { deserializeMemo, convertServerLocationToLocal, serializeMemo } from '../utils/memoSerializer';
@@ -275,6 +275,10 @@ export default function RefrigeratorVisual({
   const queryClient = useQueryClient();
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [ingredientsLoaded, setIngredientsLoaded] = useState(false);
+  // 실온 보관함(팬트리)이 켜진 냉장고 ID 집합 = ROOM_TEMP 구획이 존재하는 냉장고. 서랍 노출/설정 토글 상태의 근거.
+  const [pantryFridgeIds, setPantryFridgeIds] = useState<Set<string>>(new Set());
+  // 팬트리 토글 전환 중 중복 요청 방지
+  const [pantryToggling, setPantryToggling] = useState(false);
   const { theme, isDark } = useTheme();
 
   // 냉장고 설정 바텀시트: 슬라이드가 다 올라온 뒤에 배경이 어두워지고,
@@ -545,7 +549,7 @@ export default function RefrigeratorVisual({
       return;
     }
     if (content.length > MEMO_CONTENT_MAX) {
-      Alert.alert('알림 ⚠️', `메모는 ${MEMO_CONTENT_MAX}자를 넘을 수 없습니다.`);
+      Alert.alert('알림 ⚠️', `메모는 ${MEMO_CONTENT_MAX}자를 넘을 수 없어요.`);
       return;
     }
     setMemoSaving(true);
@@ -560,7 +564,7 @@ export default function RefrigeratorVisual({
       setMemoEntries(entries);
     } catch (e) {
       console.error('Failed to save memo', e);
-      Alert.alert('오류 ⚠️', '메모 저장에 실패했습니다.');
+      Alert.alert('오류 ⚠️', '메모 저장에 실패했어요.');
     } finally {
       setMemoSaving(false);
     }
@@ -575,7 +579,7 @@ export default function RefrigeratorVisual({
         setMemoEntries(prev => prev.filter(m => m.id !== memo.id));
       } catch (e) {
         console.error('Failed to delete memo', e);
-        Alert.alert('오류 ⚠️', '메모 삭제에 실패했습니다.');
+        Alert.alert('오류 ⚠️', '메모 삭제에 실패했어요.');
       }
     };
     if (Platform.OS === 'web') {
@@ -750,6 +754,17 @@ export default function RefrigeratorVisual({
           const layouts = await Promise.all(promises);
           const allIngredients: Ingredient[] = [];
 
+          // 각 냉장고에 ROOM_TEMP 구획이 있는지 = 팬트리 사용 여부. 식재료 유무와 무관하게 항상 갱신한다
+          // (빈 팬트리도 서랍/토글에 반영돼야 하므로 아래 식재료 sig 비교의 영향을 받지 않는다).
+          const pantrySet = new Set<string>();
+          layouts.forEach((layout, index) => {
+            if (layout && Array.isArray(layout.compartments)
+              && layout.compartments.some(comp => comp.storageType === 'ROOM_TEMP')) {
+              pantrySet.add(refrigerators[index].id);
+            }
+          });
+          setPantryFridgeIds(pantrySet);
+
           layouts.forEach((layout, index) => {
             if (!layout) return;
             const fridge = refrigerators[index];
@@ -810,6 +825,25 @@ export default function RefrigeratorVisual({
       }
   }, [refrigerators, isLoggedIn]);
 
+  // 실온 보관함(팬트리) 사용 켜기/끄기. 끄려는데 안에 식재료가 있으면 서버가 400 + 안내 메시지를 주므로 그대로 노출한다.
+  const handleTogglePantry = async (fridgeId: string, enable: boolean) => {
+    if (pantryToggling) return;
+    setPantryToggling(true);
+    try {
+      if (enable) {
+        await enablePantry(Number(fridgeId));
+      } else {
+        await disablePantry(Number(fridgeId));
+      }
+      await loadIngredients();
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || '실온 보관함 설정을 변경하지 못했어요.';
+      Alert.alert('알림', msg);
+    } finally {
+      setPantryToggling(false);
+    }
+  };
+
   // AddIngredientModal 저장 완료 콜백: 수정된 식재료가 오면 전체 재조회 없이 로컬 상태만 갱신,
   // 등록(신규)이면 인자가 없으므로 목록을 다시 불러온다.
   const handleIngredientSaved = (updated?: Ingredient) => {
@@ -840,7 +874,7 @@ export default function RefrigeratorVisual({
         loadIngredients();
       } catch (e) {
         console.error('Failed to delete ingredient', e);
-        Alert.alert('오류 ⚠️', '식재료 삭제에 실패했습니다.');
+        Alert.alert('오류 ⚠️', '식재료 삭제에 실패했어요.');
       }
     };
 
@@ -924,6 +958,7 @@ export default function RefrigeratorVisual({
       case 'freezer_right': return '냉동실 (우)';
       case 'fridge': return '냉장실';
       case 'freezer': return '냉동실';
+      case 'pantry': return '실온 보관함';
       default: return '보관실';
     }
   };
@@ -1049,7 +1084,7 @@ export default function RefrigeratorVisual({
     try {
       if (isLoggedIn) {
         if (!serverCompartmentId) {
-          throw new Error('서버 구획 ID를 로드하지 못했습니다.');
+          throw new Error('서버 구획 ID를 로드하지 못했어요.');
         }
         const memoContent = serializeMemo(item.category, shelfId, item.memo || '');
         await updateIngredient(Number(item.id), { compartmentId: serverCompartmentId, memo: memoContent });
@@ -1067,7 +1102,7 @@ export default function RefrigeratorVisual({
       ));
     } catch (e) {
       console.error('Failed to assign location', e);
-      Alert.alert('오류 ⚠️', '위치를 지정하지 못했습니다.');
+      Alert.alert('오류 ⚠️', '위치를 지정하지 못했어요.');
     }
   };
 
@@ -1313,6 +1348,23 @@ export default function RefrigeratorVisual({
     );
   };
 
+  // 실온 보관함(팬트리) — 냉장고 그림 아래에 붙는 단순 버튼. ROOM_TEMP 구획이 있는 냉장고에서만 노출된다.
+  // 냉장/냉동 도어와 달리 손잡이·내용물 미리보기는 두지 않고, 유통기한 경고 배지만 남긴다.
+  const renderPantryDrawer = (fridgeId: string) => {
+    if (!pantryFridgeIds.has(fridgeId)) return null;
+    return (
+      <TouchableOpacity
+        style={[styles.pantryButton, { backgroundColor: theme.surfaceTertiary, borderColor: theme.borderLight }]}
+        activeOpacity={0.75}
+        onPress={() => onPressCompartment('pantry', '실온 보관함', fridgeId)}
+      >
+        {renderDoorAlertBadge(fridgeId, 'pantry')}
+        <Ionicons name="cube-outline" size={18} color={theme.textSecondary} />
+        <Text style={[styles.pantryButtonText, { color: theme.textSecondary }]}>실온 보관함</Text>
+      </TouchableOpacity>
+    );
+  };
+
   // 유통기한 기준 화면의 통계 계산
   const getStats = () => {
     let expired = 0;
@@ -1402,7 +1454,7 @@ export default function RefrigeratorVisual({
         });
       } catch (browserErr) {
         console.error("Failed to open YouTube link via WebBrowser:", browserErr);
-        Alert.alert("알림 ⚠️", "유튜브 링크를 열 수 없습니다.");
+        Alert.alert("알림 ⚠️", "유튜브 링크를 열 수 없어요.");
       }
     }
   };
@@ -1577,7 +1629,7 @@ export default function RefrigeratorVisual({
       if (index <= 34) {
         level = '관심';
         color = theme.ddaySafe;
-        description = '식중독 발생 가능성이 낮습니다. 일반적인 위생 수칙을 준수하세요. 🍃';
+        description = '식중독 발생 가능성이 낮아요. 일반적인 위생 수칙을 준수하세요. 🍃';
       } else if (index <= 70) {
         level = '주의';
         color = theme.ddayImminent;
@@ -1634,7 +1686,7 @@ export default function RefrigeratorVisual({
       if (index <= 34) {
         level = '관심';
         color = theme.ddaySafe;
-        description = '식중독 발생 가능성이 낮습니다. 일반적인 위생 수칙을 준수하세요. 🍃';
+        description = '식중독 발생 가능성이 낮아요. 일반적인 위생 수칙을 준수하세요. 🍃';
       } else if (index <= 70) {
         level = '주의';
         color = theme.ddayImminent;
@@ -1936,12 +1988,8 @@ export default function RefrigeratorVisual({
               </View>
             ) : (
               <View style={[styles.emptyUrgentCard, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
-                <Ionicons name="sparkles" size={24} color={theme.success} style={{ marginBottom: 4 }} />
                 <Text style={[styles.emptyUrgentText, { color: theme.textSecondary }]}>
-                  소비가 임박한 식재료가 없습니다.
-                </Text>
-                <Text style={[styles.emptyUrgentSub, { color: theme.textMuted }]}>
-                  모든 식재료가 신선하게 보관되고 있어요! 🍃
+                  소비가 임박한 식재료가 없어요.
                 </Text>
               </View>
             )}
@@ -2259,6 +2307,7 @@ export default function RefrigeratorVisual({
                         {fridge.type === 'four-door' && renderFourDoor(fridge.id)}
                         {fridge.type === 'side-by-side' && renderSideBySide(fridge.id)}
                         {fridge.type === 'two-door' && renderTwoDoor(fridge.id)}
+                        {renderPantryDrawer(fridge.id)}
 
                         {fridge.deletionRequested && (
                           <View style={styles.deletionOverlay}>
@@ -2266,7 +2315,7 @@ export default function RefrigeratorVisual({
                               <>
                                 <Ionicons name="warning-outline" size={32} color="#FFFFFF" style={{ marginBottom: 10 }} />
                                 <Text style={styles.deletionOverlayText}>
-                                  {fridge.ownerName ? `${fridge.ownerName}님이` : '냉장고 주인이'} 냉장고를 삭제하려고 합니다.{'\n'}동의하시겠습니까?
+                                  {fridge.ownerName ? `${fridge.ownerName}님이` : '냉장고 주인이'} 냉장고를 삭제하려고 해요.{'\n'}동의하시겠어요?
                                 </Text>
                                 <View style={styles.deletionOverlayButtonRow}>
                                   <TouchableOpacity
@@ -2289,7 +2338,7 @@ export default function RefrigeratorVisual({
                               <>
                                 <Ionicons name="time-outline" size={32} color="#FFFFFF" style={{ marginBottom: 10 }} />
                                 <Text style={styles.deletionOverlayText}>
-                                  삭제 요청을 보냈습니다.{'\n'}함께 쓰는 멤버의 동의를 기다리는 중입니다.
+                                  삭제 요청을 보냈어요.{'\n'}함께 쓰는 멤버의 동의를 기다리는 중이에요.
                                 </Text>
                                 <TouchableOpacity
                                   style={[styles.deletionOverlayButton, { backgroundColor: 'rgba(255,255,255,0.15)' }]}
@@ -2580,11 +2629,13 @@ export default function RefrigeratorVisual({
                 <View style={styles.emptyStateContainer}>
                   <Ionicons name="restaurant-outline" size={48} color={theme.textMuted} style={{ marginBottom: 12 }} />
                   <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>
-                    {searchQuery.trim() ? '검색 결과와 일치하는 식재료가 없습니다.' : '등록된 식재료가 없습니다.'}
+                    {searchQuery.trim() ? '검색 결과와 일치하는 식재료가 없어요.' : '등록된 식재료가 없어요.'}
                   </Text>
-                  <Text style={{ color: theme.textMuted, fontSize: 12, marginTop: 4 }}>
-                    {searchQuery.trim() ? '다른 키워드로 검색해 보세요!' : '보관소에서 식재료를 추가해 보세요! 📦'}
-                  </Text>
+                  {searchQuery.trim() && (
+                    <Text style={{ color: theme.textMuted, fontSize: 12, marginTop: 4 }}>
+                      다른 키워드로 검색해 보세요!
+                    </Text>
+                  )}
                 </View>
               )}
 
@@ -2725,7 +2776,10 @@ export default function RefrigeratorVisual({
                   </View>
                 ))
               ) : (
-                getCompartmentsForType(refrigerators.find(f => f.id === addPickerFridgeId)!.type).map(comp => (
+                [
+                  ...getCompartmentsForType(refrigerators.find(f => f.id === addPickerFridgeId)!.type),
+                  ...(pantryFridgeIds.has(addPickerFridgeId!) ? [{ id: 'pantry', label: '실온 보관함' }] : []),
+                ].map(comp => (
                   <TouchableOpacity
                     key={comp.id}
                     style={[styles.settingsActionRow, { borderBottomWidth: 1, borderBottomColor: theme.borderLight }]}
@@ -2771,7 +2825,7 @@ export default function RefrigeratorVisual({
               </View>
             ) : historyEntries.length === 0 ? (
               <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-                <Text style={{ color: theme.textMuted, fontSize: 13 }}>아직 기록이 없습니다.</Text>
+                <Text style={{ color: theme.textMuted, fontSize: 13 }}>아직 기록이 없어요.</Text>
               </View>
             ) : (
               <ScrollView style={styles.pickerModalBody} showsVerticalScrollIndicator={false}>
@@ -3156,6 +3210,23 @@ export default function RefrigeratorVisual({
                         </TouchableOpacity>
                       )}
 
+                      {/* 실온 보관함(팬트리) 사용 — 구획을 만들고 없애는 구조 변경이라 주인만, 서버 기능이라 로그인 시에만 노출 */}
+                      {activeFridge.role !== 'MEMBER' && isLoggedIn && (
+                        <View style={[styles.settingsActionRow, { borderBottomWidth: 1, borderBottomColor: theme.borderLight }]}>
+                          <View style={styles.settingsActionLeft}>
+                            <View style={[styles.settingsIconBadge, { backgroundColor: theme.primaryLight }]}>
+                              <Ionicons name="cube-outline" size={18} color={theme.primary} />
+                            </View>
+                            <Text style={[styles.settingsActionText, { color: theme.textSecondary }]}>실온 보관함 사용</Text>
+                          </View>
+                          <Switch
+                            value={pantryFridgeIds.has(activeFridge.id)}
+                            onValueChange={(v) => handleTogglePantry(activeFridge.id, v)}
+                            disabled={pantryToggling}
+                          />
+                        </View>
+                      )}
+
                       {/* 냉장고 공유 (QR) — 공유받은 멤버는 재공유 불가, 내 냉장고(주인)일 때만 가능 */}
                       {onShareFridge && activeFridge && activeFridge.uuid && activeFridge.role !== 'MEMBER' && (
                         <TouchableOpacity
@@ -3204,7 +3275,7 @@ export default function RefrigeratorVisual({
                       activeFridge.role === 'MEMBER' ? (
                         <View style={[styles.deletionRequestBox, { backgroundColor: theme.dangerLight, borderColor: theme.danger }]}>
                           <Text style={[styles.deletionRequestText, { color: theme.danger }]}>
-                            냉장고 주인이 삭제를 요청했습니다. 동의하시나요?
+                            냉장고 주인이 삭제를 요청했어요. 동의하시나요?
                           </Text>
                           <View style={styles.deletionRequestButtonRow}>
                             <TouchableOpacity
@@ -3232,7 +3303,7 @@ export default function RefrigeratorVisual({
                       ) : (
                         <View style={[styles.deletionRequestBox, { backgroundColor: theme.dangerLight, borderColor: theme.danger }]}>
                           <Text style={[styles.deletionRequestText, { color: theme.danger }]}>
-                            삭제 요청을 보냈습니다. 함께 쓰는 멤버의 동의를 기다리는 중입니다.
+                            삭제 요청을 보냈어요. 함께 쓰는 멤버의 동의를 기다리는 중이에요.
                           </Text>
                           <TouchableOpacity
                             style={[styles.deletionRequestButton, { backgroundColor: theme.surface, borderColor: theme.borderLight, alignSelf: 'stretch' }]}
@@ -3270,7 +3341,7 @@ export default function RefrigeratorVisual({
                 </>
               ) : (
                 <Text style={{ color: theme.textMuted, textAlign: 'center', marginVertical: 20 }}>
-                  선택된 냉장고가 없습니다.
+                  선택된 냉장고가 없어요.
                 </Text>
               )}
             </View>
@@ -3918,6 +3989,24 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 4,
     gap: 3,
+  },
+  pantryButton: {
+    width: '100%',
+    marginTop: 8,
+    minHeight: 52,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    position: 'relative',
+  },
+  pantryButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
   horizontalRow: {
     flex: 1,

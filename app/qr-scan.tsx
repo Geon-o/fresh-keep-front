@@ -102,7 +102,7 @@ export default function QrScanScreen() {
       router.back();
     } catch (e: any) {
       console.error('Failed to share fridge', e);
-      const errMsg = e.response?.data?.message || '이미 등록된 냉장고이거나 유효하지 않은 공유 코드입니다.';
+      const errMsg = e.response?.data?.message || '이미 등록된 냉장고이거나 유효하지 않은 공유 코드예요.';
       DeviceEventEmitter.emit('fridgeShareResult', `등록 실패: ${errMsg}`);
       router.back();
     }

@@ -35,7 +35,7 @@ export default function NicknameSettingScreen() {
     const trimmed = text.trim();
     if (trimmed && trimmed === user?.name) {
       setIsInvalid(true);
-      setErrorMessage('현재 사용 중인 닉네임입니다.');
+      setErrorMessage('현재 사용 중인 닉네임이에요.');
     }
   };
 
@@ -59,7 +59,7 @@ export default function NicknameSettingScreen() {
     // 2. 현재 사용 중인 닉네임과 동일한지 최종 확인
     if (trimmed === user?.name) {
       setIsInvalid(true);
-      setErrorMessage('현재 사용 중인 닉네임입니다.');
+      setErrorMessage('현재 사용 중인 닉네임이에요.');
       return;
     }
     
@@ -79,22 +79,22 @@ export default function NicknameSettingScreen() {
     try {
       const success = await updateNickname(trimmed);
       if (success) {
-        Alert.alert('알림 🎉', '닉네임이 성공적으로 변경되었습니다.', [
+        Alert.alert('알림 🎉', '닉네임이 성공적으로 변경되었어요.', [
           { text: '확인', onPress: () => router.back() }
         ]);
       } else {
-        Alert.alert('알림 ⚠️', '닉네임 변경에 실패했습니다. 다시 시도해 주세요.');
+        Alert.alert('알림 ⚠️', '닉네임 변경에 실패했어요. 다시 시도해 주세요.');
       }
     } catch (e: any) {
       if (e.response?.status === 409 || e.response?.data?.message === 'DUPLICATE_NICKNAME') {
         setIsDuplicate(true);
-        setErrorMessage('이미 사용 중인 닉네임입니다.');
+        setErrorMessage('이미 사용 중인 닉네임이에요.');
       } else if (e.response?.status === 400 || e.response?.data?.message === 'INVALID_NICKNAME') {
         setIsInvalid(true);
         setErrorMessage('한글, 영문, 숫자 조합의 2~8자 닉네임을 입력해 주세요.');
       } else {
         console.error(e);
-        Alert.alert('알림 ⚠️', '닉네임 변경에 실패했습니다. 다시 시도해 주세요.');
+        Alert.alert('알림 ⚠️', '닉네임 변경에 실패했어요. 다시 시도해 주세요.');
       }
     } finally {
       setIsUpdating(false);
@@ -157,7 +157,7 @@ export default function NicknameSettingScreen() {
             <Text style={styles.errorText}>{errorMessage}</Text>
           ) : (
             <Text style={[styles.helperText, { color: descColor }]}>
-              특수문자, 공백, 이모지는 입력 불가하며 2~8자까지 가능합니다.
+              특수문자, 공백, 이모지는 입력 불가하며 2~8자까지 가능해요.
             </Text>
           )}
         </View>
