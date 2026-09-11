@@ -2483,10 +2483,8 @@ export default function RefrigeratorVisual({
 
       {mode === 'ingredients' && (
         <View style={{ flex: 1 }}>
-          <Text style={[styles.pageTitle, { color: theme.textPrimary, paddingTop: 16 }]}>식재료 목록</Text>
-
           {/* 검색 바 */}
-              <View style={[styles.searchContainer, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderLight }]}>
+              <View style={[styles.searchContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                 <Ionicons name="search" size={18} color={theme.textTertiary} />
                 <TextInput
                   style={[styles.searchInput, { color: theme.textPrimary }]}
@@ -2505,12 +2503,12 @@ export default function RefrigeratorVisual({
               {/* 필터 바: [필터 버튼] — [적용된 필터 칩 가로 스크롤] — [초기화] */}
               <View style={styles.filterBarRow}>
                 <TouchableOpacity
-                  style={[styles.filterOpenButton, { backgroundColor: theme.surfaceTertiary, borderColor: theme.borderLight }]}
+                  style={[styles.filterOpenButton, { backgroundColor: theme.surfaceTertiary, borderColor: theme.border }]}
                   activeOpacity={0.7}
                   onPress={openFilterModal}
                 >
-                  <Ionicons name="filter" size={15} color={theme.textSecondary} />
-                  <Text style={[styles.filterOpenButtonText, { color: theme.textSecondary }]}>필터</Text>
+                  <Ionicons name="filter" size={15} color={theme.textPrimary} />
+                  <Text style={[styles.filterOpenButtonText, { color: theme.textPrimary }]}>필터</Text>
                 </TouchableOpacity>
 
                 <ScrollView
@@ -2524,22 +2522,26 @@ export default function RefrigeratorVisual({
                     ? ['전체 냉장고']
                     : fridgeFilters.map(id => refrigerators.find(r => r.id === id)?.name || '냉장고')
                   ).map((label, i) => (
-                    <View key={`f-${i}`} style={[styles.filterAppliedChip, { backgroundColor: theme.surfaceTertiary, borderColor: theme.borderLight }]}>
+                    <View key={`f-${i}`} style={[styles.filterAppliedChip, { backgroundColor: theme.surfaceTertiary, borderColor: theme.border }]}>
                       <Text style={[styles.filterAppliedChipText, { color: theme.textSecondary }]} numberOfLines={1}>{label}</Text>
                     </View>
                   ))}
-                  {/* 상태: 비었거나 모두면 '전체 상태' 하나, 아니면 상태별 색으로 */}
-                  {(statusFilters.length === 0
-                    ? [{ label: '전체 상태', color: theme.textSecondary }]
-                    : statusFilters.map(s => ({
-                        label: s === 'expired' ? '만료' : s === 'imminent' ? '임박' : '안전',
-                        color: s === 'expired' ? theme.ddayExpired : s === 'imminent' ? theme.ddayImminent : theme.ddaySafe,
-                      }))
-                  ).map((chip, i) => (
-                    <View key={`s-${i}`} style={[styles.filterAppliedChip, { backgroundColor: chip.color + '14', borderColor: chip.color }]}>
-                      <Text style={[styles.filterAppliedChipText, { color: chip.color }]} numberOfLines={1}>{chip.label}</Text>
+                  {/* 상태: 비었거나 모두면 '전체 상태'(연한 칩), 아니면 선택 상태별 색 칩 */}
+                  {statusFilters.length === 0 ? (
+                    <View key="s-all" style={[styles.filterAppliedChip, { backgroundColor: theme.surfaceTertiary, borderColor: theme.border }]}>
+                      <Text style={[styles.filterAppliedChipText, { color: theme.textSecondary }]} numberOfLines={1}>전체 상태</Text>
                     </View>
-                  ))}
+                  ) : (
+                    statusFilters.map((s, i) => {
+                      const label = s === 'expired' ? '만료' : s === 'imminent' ? '임박' : '안전';
+                      const color = s === 'expired' ? theme.ddayExpired : s === 'imminent' ? theme.ddayImminent : theme.ddaySafe;
+                      return (
+                        <View key={`s-${i}`} style={[styles.filterAppliedChip, { backgroundColor: color + '14', borderColor: color }]}>
+                          <Text style={[styles.filterAppliedChipText, { color }]} numberOfLines={1}>{label}</Text>
+                        </View>
+                      );
+                    })
+                  )}
                 </ScrollView>
 
                 <TouchableOpacity
@@ -2548,7 +2550,7 @@ export default function RefrigeratorVisual({
                   onPress={resetFilters}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <Ionicons name="refresh" size={18} color={theme.textMuted} />
+                  <Ionicons name="refresh" size={18} color={theme.textSecondary} />
                 </TouchableOpacity>
               </View>
 
@@ -4466,7 +4468,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 20,
-    marginTop: 10,
+    marginTop: 24,
     marginBottom: 14,
     paddingHorizontal: 16,
     height: 48,

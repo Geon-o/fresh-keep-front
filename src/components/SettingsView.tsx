@@ -46,9 +46,7 @@ export default function SettingsView({
     >
       {/* 상단 프로필 헤더 영역 */}
       <View style={styles.headerContainer}>
-        <Text style={[styles.headerTitle, { color: titleColor }]}>설정</Text>
-        
-        <TouchableOpacity 
+        <TouchableOpacity
           activeOpacity={0.7} 
           onPress={() => router.push('/settings/nickname')}
           style={styles.profileSection}
