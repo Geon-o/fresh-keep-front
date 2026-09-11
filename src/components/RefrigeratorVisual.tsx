@@ -2333,11 +2333,10 @@ export default function RefrigeratorVisual({
                       <View key="add_page" style={[styles.slideContainer, { width: screenWidth }]}>
                         <View style={[styles.addFridgeBox, { width: screenWidth - 40, backgroundColor: theme.surface, borderColor: theme.primary, shadowColor: theme.shadow }]}>
                           <TouchableOpacity activeOpacity={0.8} onPress={onOpenAddSelector} style={styles.addFridgeMainArea}>
-                            <View style={[styles.addIconCircle, { backgroundColor: theme.primaryLight }]}>
-                              <Text style={[styles.addIconText, { color: theme.primary }]}>+</Text>
+                            <View style={[styles.addIconCircle, { backgroundColor: theme.primary }]}>
+                              <Text style={[styles.addIconText, { color: '#FFFFFF' }]}>+</Text>
                             </View>
-                            <Text style={[styles.addFridgeTitle, { color: theme.textPrimary }]}>냉장고 추가</Text>
-                            <Text style={[styles.addFridgeDesc, { color: theme.textMuted }]}>새로운 냉장고 타입을 설정하고 관리를 시작하세요 (최대 3대)</Text>
+                            <Text style={[styles.addFridgeTitle, { color: theme.textPrimary }]}>냉장고 추가 (최대 3대)</Text>
                           </TouchableOpacity>
 
                           {onScanQr && (
@@ -2348,8 +2347,8 @@ export default function RefrigeratorVisual({
                                 activeOpacity={0.7}
                                 onPress={onScanQr}
                               >
-                                <Ionicons name="scan-outline" size={18} color={theme.primary} />
-                                <Text style={[styles.qrJoinText, { color: theme.primary }]}>QR로 공유 냉장고 참여하기</Text>
+                                <Ionicons name="scan-outline" size={18} color={theme.textPrimary} />
+                                <Text style={[styles.qrJoinText, { color: theme.textPrimary }]}>QR로 공유 냉장고 참여하기</Text>
                               </TouchableOpacity>
                             </>
                           )}
