@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions, TextInput, Platform, ActivityIndicator, Linking, Alert, Modal, Animated, PanResponder, DeviceEventEmitter, KeyboardAvoidingView, Switch } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, Text, ScrollView, useWindowDimensions, TextInput, Platform, ActivityIndicator, Linking, Alert, Modal, Animated, PanResponder, DeviceEventEmitter, KeyboardAvoidingView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -10,6 +10,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { FridgeType, Ingredient, Memo, MemoType, ChecklistItem } from '../types';
 import { SAMPLE_INGREDIENTS, CATEGORY_EMOJI, DEFAULT_INSIDE_SHELVES, DEFAULT_DOOR_SHELVES } from './CompartmentDetail';
 import AddIngredientModal from './AddIngredientModal';
+import ToggleSwitch from './ToggleSwitch';
 import { useAuth } from '../context/AuthContext';
 import { getFridgeLayoutCached, getCompartmentShelves, CompartmentShelfInfo, getFridgeHistory, IngredientHistoryEntry, enablePantry, disablePantry } from '../api/fridgeService';
 import { deleteIngredient, updateIngredient } from '../api/ingredientService';
@@ -891,6 +892,15 @@ export default function RefrigeratorVisual({
   const handleTogglePantry = async (fridgeId: string, enable: boolean) => {
     if (pantryToggling) return;
     setPantryToggling(true);
+
+    // 낙관적 업데이트: 서버 응답을 기다리는 동안 이전 상태로 렌더링되면서 스위치가
+    // 켜짐→꺼짐→켜짐으로 깜빡이므로, 탭한 즉시 반영하고 실패 시에만 되돌린다.
+    setPantryFridgeIds(prev => {
+      const next = new Set(prev);
+      if (enable) next.add(fridgeId); else next.delete(fridgeId);
+      return next;
+    });
+
     try {
       if (enable) {
         await enablePantry(Number(fridgeId));
@@ -899,6 +909,11 @@ export default function RefrigeratorVisual({
       }
       await loadIngredients();
     } catch (e: any) {
+      setPantryFridgeIds(prev => {
+        const next = new Set(prev);
+        if (enable) next.delete(fridgeId); else next.add(fridgeId);
+        return next;
+      });
       const msg = e?.response?.data?.message || '실온 보관함 설정을 변경하지 못했어요.';
       Alert.alert('알림', msg);
     } finally {
@@ -3330,10 +3345,11 @@ export default function RefrigeratorVisual({
                             </View>
                             <Text style={[styles.settingsActionText, { color: theme.textSecondary }]}>실온 보관함 사용</Text>
                           </View>
-                          <Switch
+                          <ToggleSwitch
                             value={pantryFridgeIds.has(activeFridge.id)}
                             onValueChange={(v) => handleTogglePantry(activeFridge.id, v)}
                             disabled={pantryToggling}
+                            theme={theme}
                           />
                         </View>
                       )}
