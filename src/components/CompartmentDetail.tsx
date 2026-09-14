@@ -144,6 +144,7 @@ interface DraggableBadgeProps {
   handleDropIngredient: (item: Ingredient, dropX: number, dropY: number, targetCompartmentId: string) => Promise<void>;
   getFourDoorSwitchTarget: (compId: string) => { id: string; label: string } | null;
   getDDayInfo: (expiryDate: string) => { text: string; color: string };
+  onScrollDelta: (shelfId: string, deltaY: number) => void;
 }
 
 const DraggableBadge = ({
@@ -167,6 +168,7 @@ const DraggableBadge = ({
   handleDropIngredient,
   getFourDoorSwitchTarget,
   getDDayInfo,
+  onScrollDelta,
 }: DraggableBadgeProps) => {
   const dDay = getDDayInfo(item.expiryDate);
   const emoji = CATEGORY_EMOJI[item.category] || '';
@@ -175,6 +177,7 @@ const DraggableBadge = ({
   const longPressTimer = useRef<any>(null);
   const isDraggingActive = useRef(false);
   const touchStartPos = useRef({ x: 0, y: 0 });
+  const lastMoveY = useRef(0);
 
   // Stale Closure 방지를 위해 최신 Props를 Ref에 항시 동기화
   const latestProps = useRef({
@@ -195,6 +198,7 @@ const DraggableBadge = ({
     screenWidth,
     handleDropIngredient,
     getFourDoorSwitchTarget,
+    onScrollDelta,
   });
 
   useEffect(() => {
@@ -216,6 +220,7 @@ const DraggableBadge = ({
       screenWidth,
       handleDropIngredient,
       getFourDoorSwitchTarget,
+      onScrollDelta,
     };
   }); // 매 렌더링마다 최신 값 동기화
 
@@ -227,6 +232,7 @@ const DraggableBadge = ({
         const startX = evt.nativeEvent.pageX;
         const startY = evt.nativeEvent.pageY;
         touchStartPos.current = { x: startX, y: startY };
+        lastMoveY.current = startY;
         isDraggingActive.current = false;
 
         // 0.7초 롱프레스 타이머 가동
@@ -258,6 +264,12 @@ const DraggableBadge = ({
               clearTimeout(longPressTimer.current);
             }
           }
+
+          // 아이템 위에서 시작된 터치라 이 뱃지가 제스처를 점유해버려 부모
+          // ScrollView가 스크롤하지 못하므로, 직접 스크롤 위치를 옮겨 대신 처리한다.
+          const deltaY = lastMoveY.current - currentY;
+          lastMoveY.current = currentY;
+          props.onScrollDelta(props.shelfId, deltaY);
         } else {
           // 드래그 중인 경우
           props.dragPosition.setValue({ x: currentX - 70, y: currentY - 50 });
@@ -308,11 +320,16 @@ const DraggableBadge = ({
           clearTimeout(longPressTimer.current);
         }
         const props = latestProps.current;
-        
+
         if (!isDraggingActive.current) {
-          // 타이머 만료 전 손 뗌 -> 단순 탭 (수정 모달 바로 오픈)
           props.setScrollEnabled(true);
-          props.onPressItem(props.item);
+          // 손을 뗀 지점이 시작 지점에서 많이 벗어났다면 스크롤 스와이프였던 것이므로
+          // 탭으로 취급하지 않는다 (수정 모달 오픈 방지)
+          const dx = Math.abs(evt.nativeEvent.pageX - touchStartPos.current.x);
+          const dy = Math.abs(evt.nativeEvent.pageY - touchStartPos.current.y);
+          if (dx <= 8 && dy <= 8) {
+            props.onPressItem(props.item);
+          }
         }
         isDraggingActive.current = false;
       },
@@ -377,6 +394,18 @@ export default function CompartmentDetail({
   const [draggingItem, setDraggingItem] = useState<Ingredient | null>(null);
   const dragPosition = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const [dragCurrentCoords, setDragCurrentCoords] = useState<{ x: number, y: number }>({ x: 0, y: 0 });
+
+  // 선반별 식재료 목록 ScrollView 레퍼런스/현재 스크롤 위치. 식재료 뱃지가 터치를
+  // 선점해 네이티브 스크롤이 먹히지 않는 문제를 우회하기 위해 직접 스크롤시킨다.
+  const shelfScrollRefs = useRef<Record<string, ScrollView | null>>({});
+  const shelfScrollOffsets = useRef<Record<string, number>>({});
+  const handleShelfScrollDelta = (shelfId: string, deltaY: number) => {
+    const ref = shelfScrollRefs.current[shelfId];
+    if (!ref) return;
+    const nextY = Math.max(0, (shelfScrollOffsets.current[shelfId] || 0) + deltaY);
+    shelfScrollOffsets.current[shelfId] = nextY;
+    ref.scrollTo({ y: nextY, animated: false });
+  };
 
   // 구획 전환 시 페이드 및 슬라이드 인 애니메이션 제어용 상태
   const contentOpacity = useRef(new Animated.Value(1)).current;
@@ -1494,6 +1523,9 @@ export default function CompartmentDetail({
         {isExpanded && (
           <View style={[styles.shelfExpandedContent, isPantry && { maxHeight: PANTRY_LIST_HEIGHT, marginTop: 0, paddingTop: 0, borderTopWidth: 0 }]}>
             <ScrollView
+              ref={(ref) => { shelfScrollRefs.current[shelf.id] = ref; }}
+              onScroll={(e) => { shelfScrollOffsets.current[shelf.id] = e.nativeEvent.contentOffset.y; }}
+              scrollEventThrottle={16}
               showsVerticalScrollIndicator={true}
               style={isPantry ? { height: PANTRY_LIST_HEIGHT } : undefined}
               contentContainerStyle={styles.shelfItemsScroll}
@@ -1530,6 +1562,7 @@ export default function CompartmentDetail({
                       handleDropIngredient={handleDropIngredient}
                       getFourDoorSwitchTarget={getFourDoorSwitchTarget}
                       getDDayInfo={getDDayInfo}
+                      onScrollDelta={handleShelfScrollDelta}
                     />
                   ))}
                   {/* 실온 보관함(팬트리)은 인라인 버튼 대신 우측 하단 플로팅 버튼으로 등록한다 */}
