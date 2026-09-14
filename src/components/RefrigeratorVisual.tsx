@@ -760,6 +760,9 @@ export default function RefrigeratorVisual({
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [tempStatusFilters, setTempStatusFilters] = useState<string[]>([]);
   const [tempFridgeFilters, setTempFridgeFilters] = useState<string[]>([]);
+  // 식재료 목록 보기 순서: 등록순(기본) / 유통·소비기한순(임박한 것부터) / 이름순(가나다)
+  const [sortOrder, setSortOrder] = useState<'registration' | 'expiry' | 'name'>('registration');
+  const [tempSortOrder, setTempSortOrder] = useState<typeof sortOrder>('registration');
 
   // 홈 위젯에서 상태/식재료를 눌러 넘어오면, 식재료 목록의 필터·검색을 그에 맞게 설정한다.
   useEffect(() => {
@@ -925,6 +928,7 @@ export default function RefrigeratorVisual({
   const openFilterModal = () => {
     setTempStatusFilters(statusFilters);
     setTempFridgeFilters(fridgeFilters);
+    setTempSortOrder(sortOrder);
     setFilterModalVisible(true);
   };
 
@@ -941,12 +945,14 @@ export default function RefrigeratorVisual({
     const STATUS_KEYS = ['expired', 'imminent', 'safe'];
     setStatusFilters(tempStatusFilters.length >= STATUS_KEYS.length ? [] : tempStatusFilters);
     setFridgeFilters(tempFridgeFilters.length >= refrigerators.length ? [] : tempFridgeFilters);
+    setSortOrder(tempSortOrder);
     setFilterModalVisible(false);
   };
 
   const resetFilters = () => {
     setStatusFilters([]);
     setFridgeFilters([]);
+    setSortOrder('registration');
   };
 
   // 필터 다이얼로그의 옵션 한 줄 (체크박스 + 라벨)
@@ -954,6 +960,14 @@ export default function RefrigeratorVisual({
     <TouchableOpacity key={key} style={styles.filterOptionRow} activeOpacity={0.7} onPress={onPress}>
       <Text style={[styles.filterOptionText, { color: selected ? theme.primaryText : theme.textSecondary }]}>{label}</Text>
       <Ionicons name={selected ? 'checkbox' : 'square-outline'} size={22} color={selected ? theme.primary : theme.textMuted} />
+    </TouchableOpacity>
+  );
+
+  // 보기 순서 옵션 한 줄 (단일 선택 라디오 버튼 + 라벨)
+  const renderSortOption = (key: typeof sortOrder, label: string) => (
+    <TouchableOpacity key={key} style={styles.filterOptionRow} activeOpacity={0.7} onPress={() => setTempSortOrder(key)}>
+      <Text style={[styles.filterOptionText, { color: tempSortOrder === key ? theme.primaryText : theme.textSecondary }]}>{label}</Text>
+      <Ionicons name={tempSortOrder === key ? 'radio-button-on' : 'radio-button-off'} size={22} color={tempSortOrder === key ? theme.primary : theme.textMuted} />
     </TouchableOpacity>
   );
 
@@ -1549,9 +1563,18 @@ export default function RefrigeratorVisual({
       if (fridgeFilters.length === 0) return true;
       return fridgeFilters.includes(item.fridgeId ?? '');
     })
-    // 등록 순서 desc(최근 등록이 최상단). 서버 id는 auto-increment, 로컬 id는 `ing_<타임스탬프>`라
-    // 둘 다 값이 클수록 최신 → 등록순과 일치한다. (한 목록은 서버/로컬 중 하나라 값이 섞이지 않음)
-    .sort((a, b) => registrationOrder(b.id) - registrationOrder(a.id));
+    .sort((a, b) => {
+      if (sortOrder === 'expiry') {
+        // 유통·소비기한이 임박한 것부터
+        return new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime();
+      }
+      if (sortOrder === 'name') {
+        return a.name.localeCompare(b.name, 'ko');
+      }
+      // 등록 순서 desc(최근 등록이 최상단). 서버 id는 auto-increment, 로컬 id는 `ing_<타임스탬프>`라
+      // 둘 다 값이 클수록 최신 → 등록순과 일치한다. (한 목록은 서버/로컬 중 하나라 값이 섞이지 않음)
+      return registrationOrder(b.id) - registrationOrder(a.id);
+    });
 
   // 현재 월 기준 제철 식재료 목록 필터링
   const currentMonth = new Date().getMonth() + 1;
@@ -2749,6 +2772,11 @@ export default function RefrigeratorVisual({
               {[{ k: 'expired', l: '만료' }, { k: 'imminent', l: '임박' }, { k: 'safe', l: '안전' }].map(s =>
                 renderFilterOption(`status-${s.k}`, s.l, tempStatusFilters.includes(s.k), () => toggleTempStatus(s.k))
               )}
+
+              <Text style={[styles.filterModalSectionTitle, { color: theme.textTertiary, marginTop: 20 }]}>보기 순서</Text>
+              {renderSortOption('registration', '등록순')}
+              {renderSortOption('expiry', '유통·소비기한순')}
+              {renderSortOption('name', '이름순')}
             </ScrollView>
 
             <View style={[styles.filterModalFooter, { borderTopColor: theme.borderLight }]}>
